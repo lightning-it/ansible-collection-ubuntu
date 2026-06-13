@@ -1,0 +1,18 @@
+---
+- name: Verify github_runner
+  hosts: github_runner
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: Check runner directory
+      ansible.builtin.stat:
+        path: /opt/actions-runner
+      register: github_runner_directory
+      changed_when: false
+
+    - name: Assert disabled role did not create runner directory
+      ansible.builtin.assert:
+        that:
+          - not github_runner_directory.stat.exists
+        fail_msg: "Disabled github_runner role created /opt/actions-runner"

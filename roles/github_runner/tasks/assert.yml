@@ -1,0 +1,27 @@
+---
+- name: Validate GitHub runner role inputs
+  ansible.builtin.assert:
+    that:
+      - github_runner_user | trim | length > 0
+      - github_runner_group | trim | length > 0
+      - github_runner_home | trim | length > 0
+      - github_runner_dir | trim | length > 0
+      - github_runner_work_dir | trim | length > 0
+      - github_runner_version | trim | length > 0
+      - github_runner_arch in ['x64', 'arm64', 'arm']
+      - github_runner_archive_url | trim | length > 0
+      - github_runner_archive_path | trim | length > 0
+      - github_runner_packages is sequence
+      - github_runner_packages is not string
+      - github_runner_incus_packages is sequence
+      - github_runner_incus_packages is not string
+      - github_runner_user_groups_extra is sequence
+      - github_runner_user_groups_extra is not string
+      - github_runner_labels is sequence
+      - github_runner_labels is not string
+      - not github_runner_register | bool or github_runner_url | trim | length > 0
+      - github_runner_service_user | trim | length > 0
+      - github_runner_service_state in ['started', 'stopped', 'restarted', 'reloaded']
+    fail_msg: "GitHub runner role variables are invalid."
+  changed_when: false
+  when: github_runner_enabled | bool

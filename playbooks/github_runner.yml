@@ -1,0 +1,8 @@
+---
+- name: Configure GitHub Actions self-hosted runner
+  hosts: github_runners
+  become: true
+  vars:
+    github_runner_registration_token: "{{ lookup('ansible.builtin.env', 'GITHUB_RUNNER_TOKEN') }}"
+  roles:
+    - role: lit.ubuntu.github_runner
