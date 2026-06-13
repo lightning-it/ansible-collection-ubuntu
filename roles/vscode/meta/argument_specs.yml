@@ -1,0 +1,59 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      Shared VS Code defaults, discovery, and helper tasks for Ubuntu.
+    options:
+      vscode_users:
+        type: list
+        elements: str
+      vscode_user_home:
+        type: str
+        default: ""
+      vscode_package_name:
+        type: str
+        default: code
+      vscode_repo_enabled:
+        type: bool
+        default: true
+      vscode_repo_name:
+        type: str
+        default: code
+      vscode_repo_key_url:
+        type: str
+        default: https://packages.microsoft.com/keys/microsoft.asc
+      vscode_repo_key_dest:
+        type: str
+        default: /etc/apt/keyrings/packages.microsoft.asc
+      vscode_repo_deb_arch:
+        type: str
+      vscode_repo:
+        type: str
+      vscode_extensions_default:
+        type: list
+        elements: str
+      vscode_extensions_extra:
+        type: list
+        elements: str
+      vscode_extensions_remove:
+        type: list
+        elements: str
+      vscode_extensions_file:
+        type: str
+        default: ""
+      vscode_vsix_files:
+        type: list
+      vscode_manage_user_settings:
+        type: bool
+        default: false
+      vscode_user_settings:
+        type: dict
+      vscode_remove_extensions:
+        type: bool
+        default: false
+      vscode_remove_package:
+        type: bool
+        default: false
+      vscode_remove_repo:
+        type: bool
+        default: false

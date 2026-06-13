@@ -1,0 +1,35 @@
+---
+argument_specs:
+  main:
+    short_description: Install a GUI stack (GNOME or XFCE) on Ubuntu.
+    options:
+      gui_enabled:
+        type: bool
+        default: true
+      gui_variant:
+        type: str
+        default: gnome
+      gui_set_graphical_target:
+        type: bool
+        default: true
+      gui_enable_display_manager:
+        type: bool
+        default: true
+      gui_gnome_packages:
+        type: list
+        elements: str
+      gui_gnome_display_manager:
+        type: str
+        default: gdm3
+      gui_xfce_packages:
+        type: list
+        elements: str
+      gui_xfce_display_manager:
+        type: str
+        default: lightdm
+      gui_extra_packages:
+        type: list
+        elements: str
+      gui_no_log:
+        type: bool
+        default: false

@@ -1,0 +1,35 @@
+---
+# lit.ubuntu.xrdp
+# XRDP server role for Ubuntu.
+# IMPORTANT: This role NEVER enables repository sources.
+# Use lit.ubuntu.repos (or your internal mirror policy) to enable required repos.
+
+xrdp_enabled: true
+xrdp_fail_if_unavailable: true
+
+xrdp_listen_address: "0.0.0.0"
+xrdp_listen_port: 3389
+
+xrdp_firewalld_manage: true
+xrdp_firewalld_zone: "public"
+xrdp_firewalld_state: "enabled"
+
+xrdp_desktop: "auto"      # auto | gnome | xfce | custom
+xrdp_install_desktop: false
+xrdp_custom_startwm: ""
+
+xrdp_tls_enable: true
+xrdp_tls_cert_path: "/etc/xrdp/cert.pem"
+xrdp_tls_key_path: "/etc/xrdp/key.pem"
+xrdp_tls_generate_self_signed: true
+xrdp_tls_subject: "/CN={{ inventory_hostname }}"
+xrdp_tls_days: 825
+
+xrdp_packages:
+  - xrdp
+  - xorgxrdp
+
+xrdp_optional_packages:
+  - pulseaudio-module-xrdp
+
+xrdp_no_log: false

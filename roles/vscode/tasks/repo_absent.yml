@@ -1,0 +1,6 @@
+---
+- name: Remove Visual Studio Code apt repository
+  ansible.builtin.apt_repository:
+    repo: "{{ vscode_repo }}"
+    filename: "{{ vscode_repo_name }}"
+    state: absent

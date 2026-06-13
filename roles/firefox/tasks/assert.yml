@@ -1,0 +1,57 @@
+---
+- name: Ensure Firefox role inputs are valid
+  ansible.builtin.assert:
+    that:
+      - firefox_package_name | trim | length > 0
+      - firefox_install_state in ['present', 'latest']
+      - firefox_policy_dir | trim | length > 0
+      - firefox_policy_file_path | trim | length > 0
+      - firefox_proxy_mode in ['none', 'manual', 'autoConfig', 'autoDetect', 'system']
+      - firefox_proxy_socks_version in [4, 5]
+      - >-
+        not (firefox_proxy_enabled | bool and firefox_proxy_mode == 'autoConfig')
+        or firefox_proxy_autoconfig_url | trim | length > 0
+      - >-
+        not (
+          firefox_proxy_enabled | bool and
+          firefox_proxy_mode == 'manual' and
+          firefox_proxy_use_same_for_all | bool
+        )
+        or (
+          firefox_proxy_http_host | trim | length > 0 and
+          firefox_proxy_http_port | int > 0
+        )
+      - >-
+        not (
+          firefox_proxy_enabled | bool and
+          firefox_proxy_mode == 'manual' and
+          not firefox_proxy_use_same_for_all | bool
+        ) or (
+          (firefox_proxy_http_host | trim | length > 0 and firefox_proxy_http_port | int > 0) or
+          (firefox_proxy_https_host | trim | length > 0 and firefox_proxy_https_port | int > 0) or
+          (firefox_proxy_socks_host | trim | length > 0 and firefox_proxy_socks_port | int > 0)
+        )
+      - >-
+        not firefox_manage_user_profile | bool
+        or firefox_user | trim | length > 0
+        or firefox_profile_path | trim | length > 0
+  changed_when: false
+  when: firefox_enabled | bool
+
+- name: Ensure Firefox bookmark entries are valid
+  ansible.builtin.assert:
+    that:
+      - (item.name | default('') | trim | length) > 0
+      - (item.url | default('') | trim | length) > 0
+      - (item.location | default('toolbar')) in ['toolbar', 'menu']
+    fail_msg: >-
+      Each firefox_bookmarks item must define name, url, and optional location
+      of toolbar or menu.
+  loop: "{{ firefox_bookmarks }}"
+  loop_control:
+    label: "{{ item.name | default(item.url | default('bookmark')) }}"
+  changed_when: false
+  when:
+    - firefox_enabled | bool
+    - firefox_bookmarks_enabled | bool
+    - (firefox_bookmarks | default([], true) | length) > 0

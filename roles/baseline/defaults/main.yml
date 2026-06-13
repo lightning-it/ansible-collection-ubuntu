@@ -1,0 +1,9 @@
+---
+baseline_packages_present:
+  - vim
+  - jq
+  - tar
+  - bash-completion
+
+baseline_timezone: Etc/UTC
+baseline_locale: en_US.UTF-8

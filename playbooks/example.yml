@@ -1,0 +1,34 @@
+---
+# ansible-lint: disable=var-naming
+# Collection-level example playbook for lit.ubuntu.
+
+- name: Ubuntu foundational baseline example
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - role: lit.ubuntu.repos
+      vars:
+        repos_enabled: true
+        repos_update_cache: false
+
+    - role: lit.ubuntu.baseline
+      vars:
+        baseline_timezone: Etc/UTC
+        baseline_packages_present:
+          - vim
+          - jq
+          - tar
+          - bash-completion
+
+    - role: lit.ubuntu.automatic_updates
+      vars:
+        automatic_updates_enabled: false
+
+    - role: lit.ubuntu.users
+      vars:
+        users_accounts:
+          - name: ops-admin
+            groups: ["sudo"]
+            shell: /bin/bash

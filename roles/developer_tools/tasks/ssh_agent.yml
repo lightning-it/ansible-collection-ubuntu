@@ -1,0 +1,164 @@
+---
+- name: Ensure ssh-agent package is installed
+  ansible.builtin.package:
+    name: "{{ developer_tools_ssh_agent_package_name }}"
+    state: present
+
+- name: Gather passwd database for ssh-agent users
+  ansible.builtin.getent:
+    database: passwd
+    split: ':'
+  changed_when: false
+
+- name: Ensure configured ssh-agent users exist
+  ansible.builtin.assert:
+    that:
+      - item in ansible_facts.getent_passwd
+    fail_msg: "Configured ssh-agent user '{{ item }}' does not exist in the passwd database."
+    quiet: true
+  loop: "{{ developer_tools_ssh_agent_users }}"
+  changed_when: false
+
+- name: Initialize ssh-agent user info list
+  ansible.builtin.set_fact:
+    developer_tools_ssh_agent_user_infos: []
+  changed_when: false
+
+- name: Build ssh-agent user info list
+  ansible.builtin.set_fact:
+    developer_tools_ssh_agent_user_infos: >-
+      {{
+        developer_tools_ssh_agent_user_infos
+        + [
+            {
+              'name': item,
+              'uid': (ansible_facts.getent_passwd[item][1] | int),
+              'gid': (ansible_facts.getent_passwd[item][2] | int),
+              'home': ansible_facts.getent_passwd[item][4],
+              'shell': ansible_facts.getent_passwd[item][5]
+            }
+          ]
+      }}
+  loop: "{{ developer_tools_ssh_agent_users }}"
+  changed_when: false
+
+- name: Check linger state for ssh-agent users
+  ansible.builtin.stat:
+    path: "/var/lib/systemd/linger/{{ item.name }}"
+  loop: "{{ developer_tools_ssh_agent_user_infos }}"
+  register: developer_tools_ssh_agent_linger_stats
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Enable lingering for ssh-agent users
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ item.item.name }}"
+  loop: "{{ developer_tools_ssh_agent_linger_stats.results }}"
+  when: not (item.stat.exists | default(false))
+  changed_when: not (item.stat.exists | default(false))
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Ensure user managers are started for ssh-agent users
+  ansible.builtin.systemd_service:
+    name: "user@{{ item.uid }}.service"
+    state: started
+  loop: "{{ developer_tools_ssh_agent_user_infos }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure user systemd directories exist for ssh-agent users
+  ansible.builtin.file:
+    path: "{{ item.home }}/.config/systemd/user"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: "0700"
+  loop: "{{ developer_tools_ssh_agent_user_infos }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install ssh-agent user service units
+  ansible.builtin.copy:
+    dest: "{{ item.home }}/.config/systemd/user/{{ developer_tools_ssh_agent_service_name }}"
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=SSH agent
+
+      [Service]
+      Type=simple
+      Environment=SSH_AUTH_SOCK={{ developer_tools_ssh_agent_socket }}
+      ExecStart=/usr/bin/ssh-agent -D -a ${SSH_AUTH_SOCK}
+
+      [Install]
+      WantedBy=default.target
+  loop: "{{ developer_tools_ssh_agent_user_infos }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure ssh config directories exist for ssh-agent users
+  ansible.builtin.file:
+    path: "{{ item.home }}/.ssh"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: "0700"
+  loop: "{{ developer_tools_ssh_agent_user_infos }}"
+  when: developer_tools_ssh_agent_manage_ssh_config | bool
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Configure SSH client defaults for ssh-agent users
+  ansible.builtin.blockinfile:
+    path: "{{ item.home }}/.ssh/config"
+    create: true
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: "0600"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK developer_tools ssh-agent"
+    block: |
+      Host *
+      {% if developer_tools_ssh_agent_add_keys_to_agent | bool %}
+        AddKeysToAgent yes
+      {% endif %}
+      {% for identity_file in developer_tools_ssh_agent_identity_files %}
+        IdentityFile {{ identity_file }}
+      {% endfor %}
+  loop: "{{ developer_tools_ssh_agent_user_infos }}"
+  when: developer_tools_ssh_agent_manage_ssh_config | bool
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Export SSH_AUTH_SOCK in shell init files for ssh-agent users
+  ansible.builtin.blockinfile:
+    path: "{{ item.0.home }}/{{ item.1 }}"
+    create: true
+    owner: "{{ item.0.name }}"
+    group: "{{ item.0.name }}"
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK developer_tools ssh-agent"
+    block: |
+      export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
+  loop: "{{ developer_tools_ssh_agent_user_infos | product(developer_tools_ssh_agent_shell_init_files) | list }}"
+  when: developer_tools_ssh_agent_manage_shell_init | bool
+  loop_control:
+    label: "{{ item.0.name }}:{{ item.1 }}"
+
+- name: Enable and start ssh-agent user services
+  ansible.builtin.systemd_service:
+    name: "{{ developer_tools_ssh_agent_service_name }}"
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: started
+  become: true
+  become_user: "{{ item.name }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ item.uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ item.uid }}/bus"
+  loop: "{{ developer_tools_ssh_agent_user_infos }}"
+  loop_control:
+    label: "{{ item.name }}"

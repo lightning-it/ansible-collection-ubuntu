@@ -1,0 +1,18 @@
+---
+- name: Load shared VS Code state for target user removal
+  ansible.builtin.include_role:
+    name: lit.ubuntu.vscode
+    tasks_from: main.yml
+    public: true
+  vars:
+    vscode_user: "{{ _vscode_target_user }}"
+
+- name: Remove requested VS Code extensions for target user
+  ansible.builtin.include_role:
+    name: lit.ubuntu.vscode
+    tasks_from: extensions_absent.yml
+  vars:
+    vscode_user: "{{ _vscode_target_user }}"
+  when:
+    - _vscode_user_home_effective | trim | length > 0
+    - _vscode_code_path | trim | length > 0

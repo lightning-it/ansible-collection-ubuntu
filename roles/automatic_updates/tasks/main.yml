@@ -1,0 +1,27 @@
+---
+- name: Validate input variables
+  ansible.builtin.include_tasks: assert.yml
+
+- name: Build automatic updates cron job line
+  ansible.builtin.set_fact:
+    automatic_updates_job: "{{ automatic_updates_command }} >{{ automatic_updates_log_file }} 2>&1"
+  changed_when: false
+
+- name: Run initial system update (apt)  # noqa package-latest
+  ansible.builtin.apt:
+    name: "*"
+    state: latest
+    update_cache: true
+  when:
+    - automatic_updates_enabled | bool
+    - automatic_updates_initial_update | default(true) | bool
+
+- name: Manage automatic updates cron entry
+  ansible.builtin.cron:
+    name: "{{ automatic_updates_cron_name }}"
+    user: "{{ automatic_updates_user }}"
+    minute: "{{ automatic_updates_minute }}"
+    hour: "{{ automatic_updates_hour }}"
+    weekday: "{{ automatic_updates_weekday }}"
+    job: "{{ automatic_updates_job }}"
+    state: "{{ 'present' if automatic_updates_enabled | bool else 'absent' }}"

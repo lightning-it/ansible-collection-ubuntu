@@ -1,0 +1,50 @@
+---
+- name: Query installed VS Code extensions for removal
+  ansible.builtin.command:
+    argv:
+      - "{{ _vscode_code_path }}"
+      - --list-extensions
+      - --user-data-dir
+      - "{{ _vscode_user_data_dir_effective }}"
+      - --extensions-dir
+      - "{{ _vscode_extensions_dir_effective }}"
+  become: true
+  become_user: "{{ vscode_user }}"
+  environment:
+    HOME: "{{ _vscode_user_home_effective }}"
+    USER: "{{ vscode_user }}"
+  register: _vscode_installed_extensions_remove_cmd
+  changed_when: false
+
+- name: Set installed VS Code extensions removal fact
+  ansible.builtin.set_fact:
+    _vscode_installed_extensions: >-
+      {{
+        _vscode_installed_extensions_remove_cmd.stdout_lines
+        | default([])
+        | map('trim')
+        | map('lower')
+        | list
+      }}
+  changed_when: false
+
+- name: Remove requested VS Code extensions
+  ansible.builtin.command:
+    argv:
+      - "{{ _vscode_code_path }}"
+      - --uninstall-extension
+      - "{{ item }}"
+      - --user-data-dir
+      - "{{ _vscode_user_data_dir_effective }}"
+      - --extensions-dir
+      - "{{ _vscode_extensions_dir_effective }}"
+  become: true
+  become_user: "{{ vscode_user }}"
+  environment:
+    HOME: "{{ _vscode_user_home_effective }}"
+    USER: "{{ vscode_user }}"
+  loop: "{{ vscode_extensions_remove }}"
+  loop_control:
+    label: "{{ item }}"
+  when: item | lower in _vscode_installed_extensions
+  changed_when: true

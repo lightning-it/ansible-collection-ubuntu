@@ -1,0 +1,53 @@
+---
+- name: Verify automatic_updates
+  hosts: automatic_updates
+  become: false
+  gather_facts: false
+  vars:
+    cron_path: /var/spool/cron/crontabs/root
+    expected_job: "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade >/var/log/apt-auto-weekly.log 2>&1"
+
+  tasks:
+    - name: Read root cron after enabling
+      ansible.builtin.slurp:
+        src: "{{ cron_path }}"
+      register: cron_before
+      changed_when: false
+
+    - name: Assert cron entry is present
+      ansible.builtin.assert:
+        that:
+          - cron_before is defined
+          - expected_job in (cron_before.content | b64decode)
+        fail_msg: "Automatic updates cron entry not found"
+
+    - name: Disable automatic updates
+      ansible.builtin.include_role:
+        name: lit.ubuntu.automatic_updates
+      vars:
+        automatic_updates_enabled: false
+
+    - name: Check cron file after disabling
+      ansible.builtin.stat:
+        path: "{{ cron_path }}"
+      register: cron_after_stat
+      changed_when: false
+
+    - name: Read cron file content after disabling (if present)
+      ansible.builtin.slurp:
+        src: "{{ cron_path }}"
+      register: cron_after_slurp
+      changed_when: false
+      when: cron_after_stat.stat.exists
+
+    - name: Build post-disable cron content
+      ansible.builtin.set_fact:
+        cron_after_content: >-
+          {{ (cron_after_slurp.content | b64decode) if (cron_after_stat.stat.exists | default(false)) else '' }}
+      changed_when: false
+
+    - name: Assert cron entry is absent after disabling
+      ansible.builtin.assert:
+        that:
+          - expected_job not in cron_after_content
+        fail_msg: "Automatic updates cron entry still present after disabling"

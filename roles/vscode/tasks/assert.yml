@@ -1,0 +1,29 @@
+---
+- name: Ensure VS Code shared inputs are valid
+  ansible.builtin.assert:
+    that:
+      - vscode_package_name | trim | length > 0
+      - vscode_repo_name | trim | length > 0
+      - vscode_repo_description | trim | length > 0
+      - vscode_repo_baseurl | trim | length > 0
+      - vscode_repo_gpgkey | trim | length > 0
+      - vscode_users is sequence
+      - vscode_extensions_default is sequence
+      - vscode_extensions_extra is sequence
+      - vscode_extensions_remove is sequence
+      - vscode_vsix_files is sequence
+      - vscode_user_settings is mapping
+  changed_when: false
+
+- name: Ensure VSIX extension inputs are valid
+  ansible.builtin.assert:
+    that:
+      - item.path | default("") | trim | length > 0
+      - item.id | default("") | trim | length > 0
+    fail_msg: >-
+      Each vscode_vsix_files entry must be a mapping with path and id keys.
+  loop: "{{ vscode_vsix_files }}"
+  loop_control:
+    label: "{{ item.id | default(item.path | default('vsix')) }}"
+  changed_when: false
+  when: (vscode_vsix_files | default([], true) | length) > 0

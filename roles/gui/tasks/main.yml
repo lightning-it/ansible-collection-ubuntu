@@ -1,0 +1,69 @@
+---
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (gui_enabled | bool)
+
+- name: Validate gui_variant
+  ansible.builtin.assert:
+    that:
+      - gui_variant in ['gnome', 'xfce']
+    fail_msg: "gui_variant must be one of: gnome, xfce"
+  changed_when: false
+
+# --------------------------------------------------------------------
+# Install GNOME
+# --------------------------------------------------------------------
+- name: Install GNOME packages
+  ansible.builtin.package:
+    name: "{{ gui_gnome_packages }}"
+    state: present
+  when: gui_variant == 'gnome'
+  no_log: "{{ gui_no_log }}"
+
+# --------------------------------------------------------------------
+# Install XFCE (best effort)
+# --------------------------------------------------------------------
+- name: Install XFCE packages
+  ansible.builtin.package:
+    name: "{{ gui_xfce_packages }}"
+    state: present
+  when: gui_variant == 'xfce'
+  no_log: "{{ gui_no_log }}"
+
+# --------------------------------------------------------------------
+# Extras
+# --------------------------------------------------------------------
+- name: Install extra GUI packages (optional)
+  ansible.builtin.package:
+    name: "{{ gui_extra_packages }}"
+    state: present
+  when: (gui_extra_packages | default([]) | length) > 0
+  no_log: "{{ gui_no_log }}"
+
+# --------------------------------------------------------------------
+# Boot target & display manager
+# --------------------------------------------------------------------
+- name: Set default target to graphical.target
+  ansible.builtin.command: "systemctl set-default graphical.target"
+  changed_when: false
+  when: gui_set_graphical_target | bool
+
+- name: Enable display manager for GNOME
+  ansible.builtin.service:
+    name: "{{ gui_gnome_display_manager }}"
+    enabled: true
+    state: started
+  failed_when: false
+  when:
+    - gui_enable_display_manager | bool
+    - gui_variant == 'gnome'
+
+- name: Enable display manager for XFCE
+  ansible.builtin.service:
+    name: "{{ gui_xfce_display_manager }}"
+    enabled: true
+    state: started
+  failed_when: false
+  when:
+    - gui_enable_display_manager | bool
+    - gui_variant == 'xfce'

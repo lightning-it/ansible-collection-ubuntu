@@ -1,0 +1,174 @@
+---
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (xrdp_enabled | bool)
+
+- name: Gather installed packages (XRDP precheck)
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Set XRDP installed flag
+  ansible.builtin.set_fact:
+    _xrdp_installed: "{{ 'xrdp' in ansible_facts.packages }}"
+  changed_when: false
+
+- name: Precheck - verify XRDP packages are available in enabled repos
+  ansible.builtin.command: "apt-cache policy {{ xrdp_packages | join(' ') }}"
+  register: _xrdp_repo_check
+  changed_when: false
+  failed_when: false
+  when: not _xrdp_installed
+
+- name: Fail with guidance when XRDP packages are not available
+  ansible.builtin.fail:
+    msg: |
+      XRDP packages are not available in currently enabled repositories.
+      This role does NOT enable repos.
+
+      Fix:
+      - Enable the required apt repository or internal mirror using role: lit.ubuntu.repos
+        (or your repo policy of choice)
+      - Then rerun this role.
+
+      Debug:
+      - apt-cache policy xrdp xorgxrdp
+  when:
+    - xrdp_fail_if_unavailable | bool
+    - not _xrdp_installed
+    - _xrdp_repo_check is defined
+    - _xrdp_repo_check.rc != 0
+
+- name: Install XRDP packages
+  ansible.builtin.package:
+    name: "{{ xrdp_packages }}"
+    state: present
+  no_log: "{{ xrdp_no_log }}"
+
+- name: Install optional XRDP packages (best-effort)
+  ansible.builtin.package:
+    name: "{{ xrdp_optional_packages }}"
+    state: present
+  failed_when: false
+  no_log: "{{ xrdp_no_log }}"
+  when: (xrdp_optional_packages | default([]) | length) > 0
+
+- name: Determine effective desktop mode
+  ansible.builtin.set_fact:
+    _xrdp_desktop_effective: >-
+      {{
+        (xrdp_desktop | default('auto'))
+        if (xrdp_desktop | default('auto')) != 'auto'
+        else 'gnome'
+      }}
+  changed_when: false
+
+- name: Install GNOME desktop packages (optional)
+  ansible.builtin.package:
+    name:
+      - ubuntu-desktop-minimal
+    state: present
+  when:
+    - xrdp_install_desktop | bool
+    - _xrdp_desktop_effective == 'gnome'
+
+- name: Install XFCE desktop packages (optional)
+  ansible.builtin.package:
+    name:
+      - xfce4
+      - xfce4-goodies
+    state: present
+  when:
+    - xrdp_install_desktop | bool
+    - _xrdp_desktop_effective == 'xfce'
+
+- name: Check TLS certificate exists
+  ansible.builtin.stat:
+    path: "{{ xrdp_tls_cert_path }}"
+  register: _xrdp_cert
+  when: xrdp_tls_enable | bool
+
+- name: Generate self-signed cert/key for XRDP (when missing)
+  ansible.builtin.command: >
+    openssl req -x509 -nodes -newkey rsa:2048
+    -keyout {{ xrdp_tls_key_path }}
+    -out {{ xrdp_tls_cert_path }}
+    -days {{ xrdp_tls_days | int }}
+    -subj "{{ xrdp_tls_subject }}"
+  args:
+    creates: "{{ xrdp_tls_cert_path }}"
+  when:
+    - xrdp_tls_enable | bool
+    - xrdp_tls_generate_self_signed | bool
+    - _xrdp_cert is defined
+    - not _xrdp_cert.stat.exists
+  notify: Restart xrdp
+
+- name: Ensure permissions on XRDP TLS key
+  ansible.builtin.file:
+    path: "{{ xrdp_tls_key_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - xrdp_tls_enable | bool
+    - xrdp_tls_key_path | length > 0
+  notify: Restart xrdp
+
+- name: Assert XRDP listen address is set
+  ansible.builtin.assert:
+    that:
+      - xrdp_listen_address | default('') | length > 0
+    fail_msg: "xrdp_listen_address is empty; set net_ifaces.mgmt.ipv4 or override xrdp_listen_address."
+
+- name: Configure xrdp.ini
+  ansible.builtin.template:
+    src: xrdp.ini.j2
+    dest: /etc/xrdp/xrdp.ini
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart xrdp
+
+- name: Configure startwm.sh (session startup)
+  ansible.builtin.template:
+    src: startwm.sh.j2
+    dest: /etc/xrdp/startwm.sh
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart xrdp
+
+- name: Ensure firewalld is installed (when managing firewall)
+  ansible.builtin.package:
+    name: firewalld
+    state: present
+  when: xrdp_firewalld_manage | bool
+
+- name: Ensure firewalld is enabled and running (when managing firewall)
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+  when: xrdp_firewalld_manage | bool
+
+- name: Open RDP port in firewalld
+  ansible.posix.firewalld:
+    zone: "{{ xrdp_firewalld_zone }}"
+    port: "{{ xrdp_listen_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: "{{ xrdp_firewalld_state }}"
+  when: xrdp_firewalld_manage | bool
+
+- name: Enable and start xrdp service
+  ansible.builtin.service:
+    name: xrdp
+    state: started
+    enabled: true
+
+- name: Enable and start xrdp-sesman service (if present)
+  ansible.builtin.service:
+    name: xrdp-sesman
+    state: started
+    enabled: true
+  failed_when: false

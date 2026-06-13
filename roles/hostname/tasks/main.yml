@@ -1,0 +1,53 @@
+---
+- name: Determine effective FQDN
+  ansible.builtin.set_fact:
+    hostname_fqdn_effective: "{{ (hostname_fqdn | default('', true) | trim) | default(inventory_hostname, true) }}"
+  changed_when: false
+
+- name: Derive short hostname
+  ansible.builtin.set_fact:
+    hostname_short: "{{ (hostname_fqdn_effective | string).split('.')[0] }}"
+  changed_when: false
+
+- name: Ensure /etc/hosts has hostname entry
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "^{{ hostname_etc_hosts_ip | regex_escape() }}\\s+"
+    line: >-
+      {{ hostname_etc_hosts_ip }}
+      {{ hostname_fqdn_effective }}
+      {{ (hostname_add_shortname | bool and hostname_short != hostname_fqdn_effective)
+          | ternary(hostname_short, '') }}
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+    unsafe_writes: "{{ hostname_etc_hosts_unsafe_writes | bool }}"
+  when: hostname_manage_etc_hosts | bool
+
+- name: Set system hostname (module)
+  ansible.builtin.hostname:
+    name: "{{ hostname_fqdn_effective }}"
+  register: hostname_module_result
+  failed_when: false
+  changed_when: hostname_module_result.changed | default(false)
+
+- name: Ensure /etc/hostname is set
+  ansible.builtin.copy:
+    dest: /etc/hostname
+    content: "{{ hostname_fqdn_effective }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+    unsafe_writes: "{{ hostname_etc_hostname_unsafe_writes | bool }}"
+
+- name: Read current runtime hostname (fallback)
+  ansible.builtin.command: hostname
+  register: hostname_current
+  changed_when: false
+
+- name: Set runtime hostname (fallback)
+  ansible.builtin.command: "hostname {{ hostname_fqdn_effective }}"
+  changed_when: hostname_current.stdout | trim != hostname_fqdn_effective
+  when:
+    - hostname_current.stdout | trim != hostname_fqdn_effective

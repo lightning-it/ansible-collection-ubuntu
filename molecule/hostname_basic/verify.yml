@@ -1,0 +1,46 @@
+---
+- name: Verify ubuntu.hostname
+  hosts: hostname_instance
+  become: false
+  gather_facts: false
+  vars:
+    expected_fqdn: "node1.example.test"
+    expected_hosts_regex: "^127\\.0\\.1\\.1\\s+node1\\.example\\.test\\s+node1\\s*$"
+
+  tasks:
+    - name: Read /etc/hostname
+      ansible.builtin.slurp:
+        src: /etc/hostname
+      register: hostname_file
+      changed_when: false
+
+    - name: Assert /etc/hostname matches expected FQDN
+      ansible.builtin.assert:
+        that:
+          - hostname_file is defined
+          - (hostname_file.content | b64decode | trim) == expected_fqdn
+        fail_msg: "/etc/hostname does not match expected FQDN"
+
+    - name: Read kernel hostname
+      ansible.builtin.command: hostname
+      register: hostname_cmd
+      changed_when: false
+
+    - name: Assert kernel hostname matches expected FQDN
+      ansible.builtin.assert:
+        that:
+          - hostname_cmd.stdout | trim == expected_fqdn
+        fail_msg: "Kernel hostname does not match expected FQDN"
+
+    - name: Read /etc/hosts
+      ansible.builtin.slurp:
+        src: /etc/hosts
+      register: hosts_file
+      changed_when: false
+
+    - name: Assert /etc/hosts entry is present
+      ansible.builtin.assert:
+        that:
+          - hosts_file is defined
+          - hosts_file.content | b64decode is search(expected_hosts_regex, multiline=True)
+        fail_msg: "Expected /etc/hosts entry not found"

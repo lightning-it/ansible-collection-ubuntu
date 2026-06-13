@@ -1,0 +1,90 @@
+---
+- name: Normalize users_accounts to a list
+  ansible.builtin.set_fact:
+    users_accounts_effective: >-
+      {%- set ua = users_accounts | default([]) -%}
+      {%- if ua is mapping -%}
+        {{ ua | dict2items | map(attribute='value') | list }}
+      {%- elif ua is sequence and (ua is not string) -%}
+        {{ ua }}
+      {%- else -%}
+        []
+      {%- endif -%}
+  changed_when: false
+
+- name: Build group list from user definitions
+  ansible.builtin.set_fact:
+    users_groups_all: >-
+      {{
+        users_accounts_effective
+        | map(attribute='groups', default=[])
+        | sum(start=[])
+        | map('string')
+        | list
+      }}
+  when: users_manage_groups | bool and users_accounts_effective | length > 0
+
+- name: Ensure referenced groups exist
+  ansible.builtin.group:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ users_groups_all | default([]) | unique }}"
+  when:
+    - users_manage_groups | bool
+    - users_accounts_effective | length > 0
+
+- name: Manage users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default('present') }}"
+    uid: "{{ item.uid | default(omit) }}"
+    group: "{{ item.gid | default(omit) }}"
+    groups: "{{ item.groups | default(omit) }}"
+    append: "{{ (item.groups | default([])) | length > 0 }}"
+    shell: "{{ item.shell | default(omit) }}"
+    home: "{{ item.home | default(omit) }}"
+    create_home: "{{ item.create_home | default(omit) }}"
+    password: "{{ item.password | default(omit) }}"
+    update_password: "{{ item.update_password | default(omit) }}"
+    password_lock: "{{ item.password_lock | default(omit) }}"
+    remove: "{{ item.remove | default(false) }}"
+  loop: "{{ users_accounts_effective }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Build list of users with SSH keys in present state
+  ansible.builtin.set_fact:
+    ubuntu_users_with_ssh_keys: >-
+      {{
+        (
+          users_accounts_effective
+          | select('mapping')
+          | selectattr('ssh_keys', 'defined')
+          | rejectattr('ssh_keys', 'equalto', [])
+          | selectattr('state', 'undefined')
+          | list
+        )
+        +
+        (
+          users_accounts_effective
+          | select('mapping')
+          | selectattr('ssh_keys', 'defined')
+          | rejectattr('ssh_keys', 'equalto', [])
+          | selectattr('state', 'defined')
+          | selectattr('state', 'equalto', 'present')
+          | list
+        )
+      }}
+
+- name: Manage authorized keys for present users
+  ansible.posix.authorized_key:
+    user: "{{ item.0.name }}"
+    state: present
+    key: "{{ item.1 }}"
+    manage_dir: true
+  loop: "{{ ubuntu_users_with_ssh_keys | default([]) | subelements('ssh_keys') }}"
+  when:
+    - ubuntu_users_with_ssh_keys is defined
+    - ubuntu_users_with_ssh_keys | length > 0
+  loop_control:
+    label: "{{ item.0.name }}"

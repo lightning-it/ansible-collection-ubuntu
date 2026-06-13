@@ -1,0 +1,10 @@
+---
+# List of user definitions to manage on the host.
+# Each item supports:
+#   name (required), state (present|absent), uid, gid, groups (list),
+#   shell, home, create_home, update_password, password_lock (bool), remove (bool),
+#   ssh_keys (list of authorized keys for ~/.ssh/authorized_keys).
+users_accounts: []
+
+# Whether to ensure groups referenced in users exist before assignment.
+users_manage_groups: true

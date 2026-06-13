@@ -1,0 +1,10 @@
+---
+automatic_updates_enabled: true
+automatic_updates_minute: "0"
+automatic_updates_hour: "6"
+automatic_updates_weekday: "0"  # Sunday
+automatic_updates_user: "root"
+automatic_updates_log_file: "/var/log/apt-auto-weekly.log"
+automatic_updates_command: "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade"
+automatic_updates_cron_name: "Weekly automatic updates"
+automatic_updates_initial_update: true

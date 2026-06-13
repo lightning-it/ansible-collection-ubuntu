@@ -1,0 +1,114 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (developer_tools_enabled | bool)
+
+- name: Ensure developer packages are installed
+  ansible.builtin.package:
+    name: "{{ developer_tools_packages_present }}"
+    state: present
+  when: (developer_tools_packages_present | default([], true) | length) > 0
+
+- name: Ensure developer Python packages are installed
+  ansible.builtin.pip:
+    name: "{{ developer_tools_pip_packages_present }}"
+    state: present
+    executable: "{{ developer_tools_pip_executable }}"
+  when: (developer_tools_pip_packages_present | default([], true) | length) > 0
+
+- name: Ensure apt keyring directory exists for GitHub CLI
+  ansible.builtin.file:
+    path: "{{ developer_tools_github_cli_key_dest | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: developer_tools_github_cli_enabled | bool
+
+- name: Install GitHub CLI repository signing key
+  ansible.builtin.get_url:
+    url: "{{ developer_tools_github_cli_key_url }}"
+    dest: "{{ developer_tools_github_cli_key_dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: developer_tools_github_cli_enabled | bool
+
+- name: Configure GitHub CLI apt repository when enabled
+  ansible.builtin.apt_repository:
+    repo: "{{ developer_tools_github_cli_repo }}"
+    filename: github-cli
+    state: present
+    update_cache: true
+  when: developer_tools_github_cli_enabled | bool
+
+- name: Ensure GitHub CLI is installed when enabled
+  ansible.builtin.package:
+    name: "{{ developer_tools_github_cli_package_name }}"
+    state: present
+  when: developer_tools_github_cli_enabled | bool
+
+- name: Ensure Argo CD CLI is installed when enabled
+  ansible.builtin.get_url:
+    url: "{{ developer_tools_argocd_cli_url }}"
+    dest: "{{ developer_tools_argocd_cli_dest }}"
+    mode: "0755"
+  when: developer_tools_argocd_cli_enabled | bool
+
+- name: Ensure Terragrunt CLI is installed when enabled
+  ansible.builtin.get_url:
+    url: "{{ developer_tools_terragrunt_url }}"
+    dest: "{{ developer_tools_terragrunt_dest }}"
+    mode: "0755"
+  when: developer_tools_terragrunt_enabled | bool
+
+- name: Ensure OpenShift CLI archive is downloaded when enabled
+  ansible.builtin.get_url:
+    url: "{{ developer_tools_oc_cli_archive_url }}"
+    dest: "{{ developer_tools_oc_cli_archive_path }}"
+    mode: "0644"
+  when: developer_tools_oc_cli_enabled | bool
+
+- name: Ensure OpenShift CLI extract directory exists when enabled
+  ansible.builtin.file:
+    path: "{{ developer_tools_oc_cli_extract_dir }}"
+    state: directory
+    mode: "0755"
+  when: developer_tools_oc_cli_enabled | bool
+
+- name: Ensure OpenShift CLI archive is unpacked when enabled
+  ansible.builtin.unarchive:
+    src: "{{ developer_tools_oc_cli_archive_path }}"
+    dest: "{{ developer_tools_oc_cli_extract_dir }}"
+    remote_src: true
+  when: developer_tools_oc_cli_enabled | bool
+
+- name: Ensure oc CLI is installed when enabled
+  ansible.builtin.copy:
+    src: "{{ developer_tools_oc_cli_extract_dir }}/oc"
+    dest: "{{ developer_tools_oc_cli_dest }}"
+    remote_src: true
+    mode: "0755"
+  when: developer_tools_oc_cli_enabled | bool
+
+- name: Ensure kubectl CLI from OpenShift client archive is installed when enabled
+  ansible.builtin.copy:
+    src: "{{ developer_tools_oc_cli_extract_dir }}/kubectl"
+    dest: "{{ developer_tools_kubectl_cli_dest }}"
+    remote_src: true
+    mode: "0755"
+  when:
+    - developer_tools_oc_cli_enabled | bool
+    - developer_tools_kubectl_cli_enabled | bool
+
+- name: Configure persistent ssh-agent for developer users
+  ansible.builtin.import_tasks: ssh_agent.yml
+  when: developer_tools_ssh_agent_enabled | bool
+
+- name: Configure Vault-backed SSH private keys for developer users
+  ansible.builtin.import_tasks: ssh_private_keys.yml
+  when: developer_tools_ssh_private_keys_enabled | bool

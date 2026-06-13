@@ -1,0 +1,89 @@
+---
+- name: Ensure developer tools role inputs are valid
+  ansible.builtin.assert:
+    that:
+      - developer_tools_pip_executable | trim | length > 0
+      - developer_tools_github_cli_package_name | trim | length > 0
+      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo_name | trim | length > 0
+      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo_description | trim | length > 0
+      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo_baseurl | trim | length > 0
+      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo_gpgkey | trim | length > 0
+      - developer_tools_argocd_cli_dest | trim | length > 0
+      - not developer_tools_terragrunt_enabled | bool or developer_tools_terragrunt_version | trim | length > 0
+      - not developer_tools_terragrunt_enabled | bool or developer_tools_terragrunt_url | trim | length > 0
+      - developer_tools_terragrunt_dest | trim | length > 0
+      - developer_tools_oc_cli_archive_path | trim | length > 0
+      - developer_tools_oc_cli_extract_dir | trim | length > 0
+      - developer_tools_oc_cli_dest | trim | length > 0
+      - developer_tools_kubectl_cli_dest | trim | length > 0
+      - not developer_tools_argocd_cli_enabled | bool or developer_tools_argocd_cli_url | trim | length > 0
+      - not developer_tools_oc_cli_enabled | bool or developer_tools_oc_cli_archive_url | trim | length > 0
+      - not developer_tools_ssh_agent_enabled | bool or developer_tools_ssh_agent_service_name | trim | length > 0
+      - not developer_tools_ssh_agent_enabled | bool or developer_tools_ssh_agent_socket | trim | length > 0
+      - not developer_tools_ssh_agent_enabled | bool or developer_tools_ssh_agent_package_name | trim | length > 0
+      - not developer_tools_ssh_agent_enabled | bool or developer_tools_ssh_agent_users is sequence
+      - not developer_tools_ssh_agent_enabled | bool or developer_tools_ssh_agent_users is not string
+      - not developer_tools_ssh_agent_enabled | bool or (developer_tools_ssh_agent_users | length) > 0
+      - >-
+        not developer_tools_ssh_agent_enabled | bool
+        or (
+          developer_tools_ssh_agent_users
+          | map('trim')
+          | reject('equalto', '')
+          | list
+          | length
+        ) == (developer_tools_ssh_agent_users | length)
+      - >-
+        not developer_tools_ssh_agent_manage_shell_init | bool
+        or developer_tools_ssh_agent_shell_init_files is sequence
+      - >-
+        not developer_tools_ssh_agent_manage_shell_init | bool
+        or developer_tools_ssh_agent_shell_init_files is not string
+      - >-
+        not developer_tools_ssh_agent_manage_shell_init | bool
+        or (
+          developer_tools_ssh_agent_shell_init_files
+          | map('trim')
+          | reject('equalto', '')
+          | list
+          | length
+        ) == (developer_tools_ssh_agent_shell_init_files | length)
+      - >-
+        not developer_tools_ssh_agent_manage_ssh_config | bool
+        or developer_tools_ssh_agent_identity_files is sequence
+      - >-
+        not developer_tools_ssh_agent_manage_ssh_config | bool
+        or developer_tools_ssh_agent_identity_files is not string
+      - >-
+        not developer_tools_ssh_agent_manage_ssh_config | bool
+        or (
+          developer_tools_ssh_agent_identity_files
+          | map('trim')
+          | reject('equalto', '')
+          | list
+          | length
+        ) == (developer_tools_ssh_agent_identity_files | length)
+      - not developer_tools_ssh_private_keys_enabled | bool or developer_tools_ssh_private_keys is sequence
+      - not developer_tools_ssh_private_keys_enabled | bool or developer_tools_ssh_private_keys is not string
+      - >-
+        not developer_tools_ssh_private_keys_enabled | bool
+        or (developer_tools_ssh_private_keys | length) > 0
+      - >-
+        not developer_tools_ssh_private_keys_enabled | bool
+        or developer_tools_ssh_private_keys_path | trim | length > 0
+      - >-
+        not developer_tools_ssh_private_keys_enabled | bool
+        or developer_tools_ssh_private_keys_type in ['rsa', 'dsa', 'rsa1', 'ecdsa', 'ed25519']
+      - >-
+        not developer_tools_ssh_private_keys_enabled | bool
+        or developer_tools_ssh_private_keys_vault_addr | trim | length > 0
+      - >-
+        not developer_tools_ssh_private_keys_enabled | bool
+        or developer_tools_ssh_private_keys_vault_kv_mount | trim | length > 0
+      - >-
+        not developer_tools_ssh_private_keys_enabled | bool
+        or developer_tools_ssh_private_keys_vault_auth_ok | bool
+      - developer_tools_ssh_private_keys_known_hosts_entries is sequence
+      - developer_tools_ssh_private_keys_known_hosts_entries is not string
+  changed_when: false
+  when: developer_tools_enabled | bool

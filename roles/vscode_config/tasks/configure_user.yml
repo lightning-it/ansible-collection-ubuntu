@@ -1,0 +1,36 @@
+---
+- name: Load shared VS Code state for target user
+  ansible.builtin.include_role:
+    name: lit.ubuntu.vscode
+    tasks_from: main.yml
+    public: true
+  vars:
+    vscode_user: "{{ _vscode_target_user }}"
+
+- name: Ensure per-user VS Code config inputs are valid
+  ansible.builtin.assert:
+    that:
+      - _vscode_user_home_effective | trim | length > 0
+      - _vscode_code_path | trim | length > 0
+    fail_msg: >-
+      Could not resolve a usable home directory or code CLI for VS Code user
+      {{ _vscode_target_user }}.
+  changed_when: false
+
+- name: Ensure requested VS Code extensions are present for target user
+  ansible.builtin.include_role:
+    name: lit.ubuntu.vscode
+    tasks_from: extensions_present.yml
+  vars:
+    vscode_user: "{{ _vscode_target_user }}"
+  when:
+    - (_vscode_extensions_effective | default([], true) | length) > 0
+      or (vscode_vsix_files | default([], true) | length) > 0
+
+- name: Ensure VS Code user settings are managed for target user
+  ansible.builtin.include_role:
+    name: lit.ubuntu.vscode
+    tasks_from: user_settings.yml
+  vars:
+    vscode_user: "{{ _vscode_target_user }}"
+  when: vscode_manage_user_settings | bool

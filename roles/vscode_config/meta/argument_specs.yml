@@ -1,0 +1,8 @@
+---
+argument_specs:
+  main:
+    short_description: Configure Visual Studio Code extensions and user settings on Ubuntu.
+    options:
+      vscode_config_enabled:
+        type: bool
+        default: true

@@ -1,0 +1,27 @@
+---
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (vscode_config_enabled | bool)
+
+- name: Load shared VS Code state
+  ansible.builtin.include_role:
+    name: lit.ubuntu.vscode
+    tasks_from: main.yml
+    public: true
+
+- name: Ensure VS Code config inputs are valid
+  ansible.builtin.assert:
+    that:
+      - (_vscode_users_effective | default([], true) | length) > 0
+      - _vscode_code_path | trim | length > 0
+    fail_msg: >-
+      lit.ubuntu.vscode_config requires at least one target user and an installed
+      code CLI. Set vscode_users and run lit.ubuntu.vscode_deploy first.
+  changed_when: false
+
+- name: Configure VS Code for each target user
+  ansible.builtin.include_tasks: configure_user.yml
+  loop: "{{ _vscode_users_effective }}"
+  loop_control:
+    loop_var: _vscode_target_user
+    label: "{{ _vscode_target_user }}"

@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: users
+  namespace: lit
+  author: Lightning IT
+  description: Manage local users, groups, and authorized SSH keys on Ubuntu
+    hosts.
+  company: Lightning IT
+  license: GPL-3.0-only
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions: ["jammy", "noble"]
+  galaxy_tags:
+    - ubuntu
+    - users
+    - ssh
+    - accounts
+    - security
+dependencies: []

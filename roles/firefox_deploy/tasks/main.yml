@@ -1,0 +1,16 @@
+---
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when:
+    - not (firefox_deploy_enabled | bool)
+      or not (firefox_enabled | bool)
+
+- name: Load shared Firefox state
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: main.yml
+
+- name: Install Firefox
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: install.yml

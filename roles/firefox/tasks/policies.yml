@@ -1,0 +1,19 @@
+---
+- name: Ensure Firefox enterprise policy directory exists
+  ansible.builtin.file:
+    path: "{{ firefox_policy_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Build Firefox enterprise policy payload
+  ansible.builtin.import_tasks: policies_build.yml
+
+- name: Render Firefox enterprise policy file
+  ansible.builtin.template:
+    src: policies.json.j2
+    dest: "{{ firefox_policy_file_path }}"
+    owner: root
+    group: root
+    mode: "0644"

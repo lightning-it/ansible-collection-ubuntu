@@ -1,0 +1,35 @@
+---
+# lit.ubuntu.gui
+# Install a GUI stack on Ubuntu. Useful for XRDP or console usage.
+
+gui_enabled: true
+
+# Choose GUI stack:
+# - gnome: Ubuntu desktop metapackage
+# - xfce: XFCE desktop packages
+gui_variant: gnome   # gnome | xfce
+
+# If true, set default boot target to graphical.target
+gui_set_graphical_target: true
+
+# If true, enable a display manager when appropriate
+gui_enable_display_manager: true
+
+# GNOME
+gui_gnome_packages:
+  - ubuntu-desktop-minimal
+gui_gnome_display_manager: gdm3
+
+# XFCE
+gui_xfce_packages:
+  - xfce4
+  - xfce4-goodies
+  - xfce4-terminal
+  - xorg
+gui_xfce_display_manager: lightdm
+
+# Additional useful packages (optional)
+gui_extra_packages:
+  - xterm
+
+gui_no_log: false

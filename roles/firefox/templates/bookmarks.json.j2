@@ -1,0 +1,19 @@
+[
+{% for bookmark in firefox_bookmarks %}
+  {
+    "Title": {{ bookmark.name | to_json }},
+    "URL": {{ bookmark.url | to_json }},
+    "Placement": {{ (bookmark.location | default('toolbar')) | to_json }},
+    "Folder": {{
+      (
+        bookmark.folder
+        | default(
+            (bookmark.location | default('toolbar')) == 'menu'
+            | ternary(firefox_bookmarks_menu_name, firefox_bookmarks_toolbar_name)
+          )
+      ) | to_json
+    }}{% if bookmark.favicon is defined and bookmark.favicon | trim | length > 0 %},
+    "Favicon": {{ bookmark.favicon | to_json }}{% endif %}
+  }{% if not loop.last %},{% endif %}
+{% endfor %}
+]
