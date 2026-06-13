@@ -1,8 +1,8 @@
 # lit.ubuntu.incus
 
-Install Incus and related virtualization packages on Ubuntu, enable the Incus
-services, optionally initialize Incus with minimal defaults, and add users to
-runtime groups such as `incus-admin` and `kvm`.
+Configure an Ubuntu host as an Incus host for system containers and virtual
+machines. For VM workloads, Incus manages the instance lifecycle while QEMU/KVM
+provides hardware virtualization.
 
 ## Requirements
 
@@ -27,8 +27,8 @@ None.
 
 ```yaml
 ---
-- name: Configure Incus
-  hosts: ubuntu
+- name: Configure Incus hosts
+  hosts: incus_hosts
   become: true
   roles:
     - role: lit.ubuntu.incus
