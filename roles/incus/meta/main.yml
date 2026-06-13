@@ -1,9 +1,9 @@
 ---
 galaxy_info:
-  role_name: github_runner
+  role_name: incus
   namespace: lit
   author: Rene Osorio
-  description: Install and register a GitHub Actions self-hosted runner on Ubuntu.
+  description: Install and initialize Incus on Ubuntu hosts.
   company: Lightning IT
   license: GPL-3.0-only
   min_ansible_version: "2.15"
@@ -15,10 +15,10 @@ galaxy_info:
         - noble
 
   galaxy_tags:
-    - github
-    - actions
-    - runner
+    - incus
     - ubuntu
-    - ci
+    - virtualization
+    - containers
+    - qemu
 
 dependencies: []

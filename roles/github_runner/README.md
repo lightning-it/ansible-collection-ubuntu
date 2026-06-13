@@ -1,7 +1,6 @@
 # lit.ubuntu.github_runner
 
-Install and register a GitHub Actions self-hosted runner on Ubuntu. The role can
-optionally install Incus and QEMU packages for nested virtualization workloads.
+Install and register a GitHub Actions self-hosted runner on Ubuntu.
 
 ## Requirements
 
@@ -19,8 +18,7 @@ See `defaults/main.yml` for the full interface. Key variables:
 - `github_runner_registration_token` (string, default: `""`): Short-lived registration token.
 - `github_runner_name` (string, default: inventory host short name): Runner name in GitHub.
 - `github_runner_labels` (list): Labels passed to `config.sh`.
-- `github_runner_incus_enabled` (bool, default: `false`): Install Incus/QEMU packages and add runner user to
-  `incus-admin` and `kvm`.
+- `github_runner_user_groups_extra` (list, default: `[]`): Extra groups for the runner user.
 - `github_runner_replace` (bool, default: `false`): Remove and recreate an existing runner registration.
 - `github_runner_manage_service` (bool, default: `true`): Install and manage the systemd service.
 
@@ -35,7 +33,11 @@ None.
 - name: Configure GitHub Actions runner
   hosts: github_runners
   become: true
+  vars:
+    incus_enabled: true
+    github_runner_user_groups_extra: "{{ incus_user_groups | default(['incus-admin', 'kvm']) }}"
   roles:
+    - role: lit.ubuntu.incus
     - role: lit.ubuntu.github_runner
       vars:
         github_runner_url: "https://github.com/example-org/example-repo"
@@ -44,8 +46,6 @@ None.
           - self-hosted
           - linux
           - x64
-          - incus
-        github_runner_incus_enabled: true
 ```
 
 ## License

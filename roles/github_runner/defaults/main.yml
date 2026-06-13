@@ -28,26 +28,7 @@ github_runner_packages:
 
 github_runner_update_apt_cache: true
 
-github_runner_incus_enabled: false
-github_runner_incus_initialize: true
-github_runner_incus_packages:
-  - bridge-utils
-  - incus
-  - incus-client
-  - qemu-system-x86
-  - qemu-utils
-  - uidmap
-
 github_runner_user_groups_extra: []
-github_runner_user_groups_effective: >-
-  {{
-    github_runner_user_groups_extra
-    + (
-      ['incus-admin', 'kvm']
-      if (github_runner_incus_enabled | bool)
-      else []
-    )
-  }}
 
 github_runner_register: true
 github_runner_replace: false

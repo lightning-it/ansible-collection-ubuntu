@@ -1,0 +1,15 @@
+---
+- name: Validate Incus role inputs
+  ansible.builtin.assert:
+    that:
+      - incus_packages is sequence
+      - incus_packages is not string
+      - incus_services is sequence
+      - incus_services is not string
+      - incus_users is sequence
+      - incus_users is not string
+      - incus_user_groups is sequence
+      - incus_user_groups is not string
+    fail_msg: "Incus role variables are invalid."
+  changed_when: false
+  when: incus_enabled | bool

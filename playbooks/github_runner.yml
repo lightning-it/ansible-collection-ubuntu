@@ -4,5 +4,10 @@
   become: true
   vars:
     github_runner_registration_token: "{{ lookup('ansible.builtin.env', 'GITHUB_RUNNER_TOKEN') }}"
+    incus_enabled: false
+    github_runner_user_groups_extra: >-
+      {{ (incus_user_groups | default(['incus-admin', 'kvm'])) if (incus_enabled | bool) else [] }}
   roles:
+    - role: lit.ubuntu.incus
+      when: incus_enabled | bool
     - role: lit.ubuntu.github_runner

@@ -13,8 +13,6 @@
       - github_runner_archive_path | trim | length > 0
       - github_runner_packages is sequence
       - github_runner_packages is not string
-      - github_runner_incus_packages is sequence
-      - github_runner_incus_packages is not string
       - github_runner_user_groups_extra is sequence
       - github_runner_user_groups_extra is not string
       - github_runner_labels is sequence

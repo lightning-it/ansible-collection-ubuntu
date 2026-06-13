@@ -13,13 +13,6 @@
     state: present
     update_cache: "{{ github_runner_update_apt_cache | bool }}"
 
-- name: Ensure Incus runner packages are installed when enabled
-  ansible.builtin.apt:
-    name: "{{ github_runner_incus_packages }}"
-    state: present
-    update_cache: "{{ github_runner_update_apt_cache | bool }}"
-  when: github_runner_incus_enabled | bool
-
 - name: Ensure GitHub runner group exists
   ansible.builtin.group:
     name: "{{ github_runner_group }}"
@@ -29,7 +22,7 @@
   ansible.builtin.user:
     name: "{{ github_runner_user }}"
     group: "{{ github_runner_group }}"
-    groups: "{{ github_runner_user_groups_effective }}"
+    groups: "{{ github_runner_user_groups_extra }}"
     append: true
     home: "{{ github_runner_home }}"
     shell: /bin/bash
@@ -228,32 +221,3 @@
     - github_runner_manage_service | bool
     - github_runner_register | bool
     - github_runner_service_name.content | default('', true) | b64decode | trim | length > 0
-
-- name: Ensure Incus services are enabled
-  ansible.builtin.systemd_service:
-    name: "{{ item }}"
-    state: started
-    enabled: true
-  loop:
-    - incus.socket
-    - incus-startup.service
-  when: github_runner_incus_enabled | bool
-
-- name: Check Incus initialization state
-  ansible.builtin.command:
-    cmd: incus admin init --dump
-  register: github_runner_incus_init_state
-  changed_when: false
-  failed_when: false
-  when:
-    - github_runner_incus_enabled | bool
-    - github_runner_incus_initialize | bool
-
-- name: Initialize Incus with minimal defaults
-  ansible.builtin.command:
-    cmd: incus admin init --minimal
-  changed_when: true
-  when:
-    - github_runner_incus_enabled | bool
-    - github_runner_incus_initialize | bool
-    - github_runner_incus_init_state.rc != 0
