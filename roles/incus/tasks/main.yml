@@ -20,10 +20,10 @@
     enabled: true
   loop: "{{ incus_services }}"
 
-- name: Check Incus initialization state
+- name: Check Incus storage pools
   ansible.builtin.command:
-    cmd: incus admin init --dump
-  register: incus_init_state
+    cmd: incus storage list --format csv
+  register: incus_storage_pools
   changed_when: false
   failed_when: false
   when: incus_initialize | bool
@@ -34,7 +34,7 @@
   changed_when: true
   when:
     - incus_initialize | bool
-    - incus_init_state.rc != 0
+    - incus_storage_pools.rc != 0 or (incus_storage_pools.stdout | trim | length == 0)
 
 - name: Ensure Incus users are in runtime groups
   ansible.builtin.user:
