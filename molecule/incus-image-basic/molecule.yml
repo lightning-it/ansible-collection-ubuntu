@@ -25,14 +25,5 @@ provisioner:
     converge: converge.yml
     verify: verify.yml
 
-scenario:
-  name: incus-image-basic
-  test_sequence:
-    - dependency
-    - syntax
-    - converge
-    - idempotence
-    - verify
-
 verifier:
   name: ansible
