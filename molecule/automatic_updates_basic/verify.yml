@@ -5,7 +5,9 @@
   gather_facts: false
   vars:
     cron_path: /var/spool/cron/crontabs/root
-    expected_job: "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade >/var/log/apt-auto-weekly.log 2>&1"
+    expected_job: >-
+      apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
+      >/var/log/apt-auto-weekly.log 2>&1
 
   tasks:
     - name: Read root cron after enabling
