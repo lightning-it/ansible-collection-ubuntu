@@ -1,9 +1,11 @@
 ---
 - name: Verify incus_image
-  hosts: localhost
-  connection: local
+  hosts: incus_image
+  become: false
   gather_facts: false
   vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
     incus_image_molecule_ephemeral_dir: >-
       {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') | default('/tmp/lit-incus-image-basic', true) }}
     incus_image_molecule_root: "{{ incus_image_molecule_ephemeral_dir }}/incus-image"

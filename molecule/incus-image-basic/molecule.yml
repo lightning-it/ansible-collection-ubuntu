@@ -1,21 +1,26 @@
 ---
 driver:
-  name: delegated
+  name: docker
 
 dependency:
-  name: shell
-  command: ":"
+  name: galaxy
+  options:
+    requirements-file: "${MOLECULE_PROJECT_DIRECTORY}/collections/requirements.yml"
 
 platforms:
-  - name: localhost
-    managed: false
+  - name: incus_image
+    image: ubuntu:24.04
+    pre_build_image: true
+    command: sleep infinity
 
 provisioner:
   name: ansible
   inventory:
-    host_vars:
-      localhost:
-        ansible_connection: local
+    hosts:
+      all:
+        hosts:
+          incus_image:
+            ansible_connection: docker
   playbooks:
     converge: converge.yml
     verify: verify.yml

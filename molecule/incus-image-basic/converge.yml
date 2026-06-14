@@ -1,9 +1,11 @@
 ---
 - name: Converge incus_image
-  hosts: localhost
-  connection: local
+  hosts: incus_image
+  become: false
   gather_facts: false
   vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
     incus_image_molecule_ephemeral_dir: >-
       {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') | default('/tmp/lit-incus-image-basic', true) }}
     incus_image_molecule_root: "{{ incus_image_molecule_ephemeral_dir }}/incus-image"
@@ -11,6 +13,13 @@
     incus_image_molecule_metadata: "{{ incus_image_molecule_root }}/metadata.tar.xz"
     incus_image_molecule_rootfs: "{{ incus_image_molecule_root }}/rootfs.qcow2"
   pre_tasks:
+    - name: Ensure python3 is present
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get update && apt-get -y install python3
+        fi
+      changed_when: false
+
     - name: Ensure molecule Incus image directories exist
       ansible.builtin.file:
         path: "{{ item }}"
@@ -63,7 +72,7 @@
         content: "rootfs"
         mode: "0644"
   roles:
-    - role: incus_image
+    - role: lit.ubuntu.incus_image
       vars:
         incus_image_binary: "{{ incus_image_molecule_bin }}"
         incus_image_items:
