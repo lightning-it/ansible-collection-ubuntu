@@ -1,0 +1,15 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Skip Incus image role when disabled
+  ansible.builtin.meta: end_host
+  when: not (incus_image_enabled | bool)
+
+- name: Import configured Incus images
+  ansible.builtin.include_tasks: image.yml
+  loop: "{{ incus_image_items }}"
+  loop_control:
+    loop_var: incus_image_item
+    label: "{{ incus_image_item.alias | default('incus-image') }}"

@@ -1,0 +1,24 @@
+---
+incus_image_enabled: true
+
+incus_image_binary: incus
+incus_image_force_local: true
+incus_image_command_user: ""
+
+incus_image_default_project: ""
+incus_image_default_replace: false
+incus_image_default_public: false
+incus_image_default_properties: {}
+
+# List of images to import into the local Incus image store.
+# Each item needs at least:
+# - alias: local Incus image alias without remote prefix
+# - metadata: path or URL to the Incus image metadata tarball
+# Optional:
+# - rootfs: path or URL to rootfs/qcow2 payload
+# - replace: use incus image import --reuse
+# - public: make image public
+# - project: Incus project
+# - properties: image properties passed as key=value import arguments
+incus_image_items: []
+incus_image_results: []

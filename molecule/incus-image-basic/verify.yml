@@ -1,0 +1,22 @@
+---
+- name: Verify incus_image
+  hosts: incus_image
+  become: false
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    incus_image_molecule_ephemeral_dir: >-
+      {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') | default('/tmp/lit-incus-image-basic', true) }}
+    incus_image_molecule_root: "{{ incus_image_molecule_ephemeral_dir }}/incus-image"
+  tasks:
+    - name: Check fake Incus image alias state
+      ansible.builtin.stat:
+        path: "{{ incus_image_molecule_root }}/state/molecule-rhel10"
+      register: incus_image_molecule_alias
+
+    - name: Assert fake Incus image alias was created
+      ansible.builtin.assert:
+        that:
+          - incus_image_molecule_alias.stat.exists
+        quiet: true

@@ -1,0 +1,7 @@
+---
+- name: Import Incus images
+  hosts: "{{ incus_image_target | default('incus_hosts') }}"
+  become: true
+  gather_facts: false
+  roles:
+    - role: lit.ubuntu.incus_image
