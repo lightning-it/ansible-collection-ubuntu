@@ -1,0 +1,75 @@
+---
+- name: Build Firefox shared proxy facts for teardown
+  ansible.builtin.import_tasks: proxy.yml
+
+- name: Build Firefox shared bookmark facts for teardown
+  ansible.builtin.import_tasks: bookmarks.yml
+
+- name: Build Firefox enterprise policy payload for teardown
+  ansible.builtin.import_tasks: policies_build.yml
+  when: firefox_manage_system_policies | bool
+
+- name: Remove Firefox per-user user.js
+  ansible.builtin.file:
+    path: "{{ _firefox_user_js_path_effective }}"
+    state: absent
+  when:
+    - firefox_remove_config | bool
+    - _firefox_user_js_path_effective | trim | length > 0
+
+- name: Remove Firefox enterprise policy file
+  ansible.builtin.file:
+    path: "{{ firefox_policy_file_path }}"
+    state: absent
+  when:
+    - firefox_manage_system_policies | bool
+    - firefox_remove_policies | bool
+
+- name: Remove Firefox bookmark policy entries while keeping other policies
+  ansible.builtin.set_fact:
+    _firefox_policy_dict_without_bookmarks:
+      policies: >-
+        {{
+          _firefox_policy_dict.policies
+          | dict2items
+          | rejectattr('key', 'equalto', 'Bookmarks')
+          | rejectattr('key', 'equalto', 'NoDefaultBookmarks')
+          | list
+          | items2dict
+        }}
+  changed_when: false
+  when:
+    - firefox_manage_system_policies | bool
+    - firefox_remove_bookmarks | bool
+    - not firefox_remove_policies | bool
+
+- name: Rewrite Firefox policy file without managed bookmarks
+  ansible.builtin.template:
+    src: policies.json.j2
+    dest: "{{ firefox_policy_file_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    _firefox_policy_dict: "{{ _firefox_policy_dict_without_bookmarks }}"
+  when:
+    - firefox_manage_system_policies | bool
+    - firefox_remove_bookmarks | bool
+    - not firefox_remove_policies | bool
+    - (_firefox_policy_dict_without_bookmarks.policies | default({}) | length) > 0
+
+- name: Remove Firefox policy file when only managed bookmarks were present
+  ansible.builtin.file:
+    path: "{{ firefox_policy_file_path }}"
+    state: absent
+  when:
+    - firefox_manage_system_policies | bool
+    - firefox_remove_bookmarks | bool
+    - not firefox_remove_policies | bool
+    - (_firefox_policy_dict_without_bookmarks.policies | default({}) | length) == 0
+
+- name: Remove Firefox package
+  ansible.builtin.package:
+    name: "{{ firefox_package_name }}"
+    state: absent
+  when: firefox_remove_package | bool

@@ -1,0 +1,8 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy Visual Studio Code package and repository state on Ubuntu.
+    options:
+      vscode_deploy_enabled:
+        type: bool
+        default: true

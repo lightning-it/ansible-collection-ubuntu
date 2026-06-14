@@ -1,0 +1,46 @@
+---
+github_runner_enabled: true
+
+github_runner_user: github-runner
+github_runner_group: "{{ github_runner_user }}"
+github_runner_home: "/home/{{ github_runner_user }}"
+github_runner_dir: /opt/actions-runner
+github_runner_work_dir: _work
+
+github_runner_version: "2.335.1"
+github_runner_arch: >-
+  {{
+    'arm64'
+    if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
+    else 'x64'
+  }}
+github_runner_archive_url: >-
+  https://github.com/actions/runner/releases/download/v{{ github_runner_version }}/actions-runner-linux-{{
+  github_runner_arch }}-{{ github_runner_version }}.tar.gz
+github_runner_archive_path: "/var/tmp/actions-runner-linux-{{ github_runner_arch }}-{{ github_runner_version }}.tar.gz"
+
+github_runner_packages:
+  - ca-certificates
+  - curl
+  - git
+  - sudo
+  - tar
+
+github_runner_update_apt_cache: true
+
+github_runner_user_groups_extra: []
+
+github_runner_register: true
+github_runner_replace: false
+github_runner_url: ""
+github_runner_name: "{{ inventory_hostname_short | default(inventory_hostname) }}"
+github_runner_labels:
+  - self-hosted
+  - linux
+  - x64
+github_runner_labels_effective: "{{ github_runner_labels | join(',') }}"
+github_runner_registration_token: ""
+
+github_runner_manage_service: true
+github_runner_service_user: "{{ github_runner_user }}"
+github_runner_service_state: started

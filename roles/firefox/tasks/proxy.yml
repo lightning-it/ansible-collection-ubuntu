@@ -1,0 +1,190 @@
+---
+- name: Initialize Firefox proxy helper facts
+  ansible.builtin.set_fact:
+    _firefox_proxy_passthrough_string: "{{ firefox_proxy_passthrough | default([], true) | map('string') | join(',') }}"
+    _firefox_policy_proxy:
+      Mode: none
+      Locked: "{{ firefox_proxy_locked | bool }}"
+    _firefox_user_proxy_prefs:
+      network.proxy.type: 0
+  changed_when: false
+
+- name: Build Firefox manual proxy helper facts
+  ansible.builtin.set_fact:
+    _firefox_policy_proxy: >-
+      {{
+        {'Mode': 'manual', 'Locked': firefox_proxy_locked | bool}
+        | combine(
+            (
+              firefox_proxy_http_host | trim | length > 0 and firefox_proxy_http_port | int > 0
+            )
+            | ternary(
+                {'HTTPProxy': firefox_proxy_http_host ~ ':' ~ (firefox_proxy_http_port | string)},
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (firefox_proxy_use_same_for_all | bool)
+            | ternary({'UseHTTPProxyForAllProtocols': true}, {}),
+            recursive=True
+          )
+        | combine(
+            (
+              not firefox_proxy_use_same_for_all | bool and
+              firefox_proxy_https_host | trim | length > 0 and
+              firefox_proxy_https_port | int > 0
+            )
+            | ternary(
+                {'SSLProxy': firefox_proxy_https_host ~ ':' ~ (firefox_proxy_https_port | string)},
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (
+              not firefox_proxy_use_same_for_all | bool and
+              firefox_proxy_socks_host | trim | length > 0 and
+              firefox_proxy_socks_port | int > 0
+            )
+            | ternary(
+                {
+                  'SOCKSProxy': firefox_proxy_socks_host ~ ':' ~ (firefox_proxy_socks_port | string),
+                  'SOCKSVersion': firefox_proxy_socks_version | int,
+                  'UseProxyForDNS': firefox_proxy_use_proxy_for_dns | bool
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (_firefox_proxy_passthrough_string | length > 0)
+            | ternary({'Passthrough': _firefox_proxy_passthrough_string}, {}),
+            recursive=True
+          )
+        | combine(
+            (firefox_proxy_auto_login | bool)
+            | ternary({'AutoLogin': true}, {}),
+            recursive=True
+          )
+      }}
+    _firefox_user_proxy_prefs: >-
+      {{
+        {'network.proxy.type': 1}
+        | combine(
+            {'network.proxy.share_proxy_settings': firefox_proxy_use_same_for_all | bool},
+            recursive=True
+          )
+        | combine(
+            (_firefox_proxy_passthrough_string | length > 0)
+            | ternary({'network.proxy.no_proxies_on': _firefox_proxy_passthrough_string}, {}),
+            recursive=True
+          )
+        | combine(
+            (
+              firefox_proxy_http_host | trim | length > 0 and firefox_proxy_http_port | int > 0
+            )
+            | ternary(
+                {
+                  'network.proxy.http': firefox_proxy_http_host,
+                  'network.proxy.http_port': firefox_proxy_http_port | int
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (
+              firefox_proxy_use_same_for_all | bool and
+              firefox_proxy_http_host | trim | length > 0 and
+              firefox_proxy_http_port | int > 0
+            )
+            | ternary(
+                {
+                  'network.proxy.ssl': firefox_proxy_http_host,
+                  'network.proxy.ssl_port': firefox_proxy_http_port | int
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (
+              not firefox_proxy_use_same_for_all | bool and
+              firefox_proxy_https_host | trim | length > 0 and
+              firefox_proxy_https_port | int > 0
+            )
+            | ternary(
+                {
+                  'network.proxy.ssl': firefox_proxy_https_host,
+                  'network.proxy.ssl_port': firefox_proxy_https_port | int
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (
+              not firefox_proxy_use_same_for_all | bool and
+              firefox_proxy_socks_host | trim | length > 0 and
+              firefox_proxy_socks_port | int > 0
+            )
+            | ternary(
+                {
+                  'network.proxy.socks': firefox_proxy_socks_host,
+                  'network.proxy.socks_port': firefox_proxy_socks_port | int,
+                  'network.proxy.socks_version': firefox_proxy_socks_version | int,
+                  'network.proxy.socks_remote_dns': firefox_proxy_use_proxy_for_dns | bool
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (firefox_proxy_auto_login | bool)
+            | ternary({'signon.autologin.proxy': true}, {}),
+            recursive=True
+          )
+      }}
+  changed_when: false
+  when:
+    - firefox_proxy_enabled | bool
+    - firefox_proxy_mode == 'manual'
+
+- name: Build Firefox auto-config proxy helper facts
+  ansible.builtin.set_fact:
+    _firefox_policy_proxy:
+      Mode: autoConfig
+      Locked: "{{ firefox_proxy_locked | bool }}"
+      AutoConfigURL: "{{ firefox_proxy_autoconfig_url }}"
+    _firefox_user_proxy_prefs:
+      network.proxy.type: 2
+      network.proxy.autoconfig_url: "{{ firefox_proxy_autoconfig_url }}"
+  changed_when: false
+  when:
+    - firefox_proxy_enabled | bool
+    - firefox_proxy_mode == 'autoConfig'
+
+- name: Build Firefox auto-detect proxy helper facts
+  ansible.builtin.set_fact:
+    _firefox_policy_proxy:
+      Mode: autoDetect
+      Locked: "{{ firefox_proxy_locked | bool }}"
+    _firefox_user_proxy_prefs:
+      network.proxy.type: 4
+  changed_when: false
+  when:
+    - firefox_proxy_enabled | bool
+    - firefox_proxy_mode == 'autoDetect'
+
+- name: Build Firefox system proxy helper facts
+  ansible.builtin.set_fact:
+    _firefox_policy_proxy:
+      Mode: system
+      Locked: "{{ firefox_proxy_locked | bool }}"
+    _firefox_user_proxy_prefs:
+      network.proxy.type: 5
+  changed_when: false
+  when:
+    - firefox_proxy_enabled | bool
+    - firefox_proxy_mode == 'system'

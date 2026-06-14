@@ -1,0 +1,109 @@
+---
+- name: Fail when Firefox profile is required but unavailable
+  ansible.builtin.fail:
+    msg: >-
+      Firefox profile discovery did not find a usable profile for {{ firefox_user }}.
+      Launch Firefox once for the target user or set firefox_profile_path explicitly.
+  when:
+    - firefox_manage_user_profile | bool
+    - firefox_profile_required | bool
+    - firefox_user | trim | length > 0
+    - _firefox_profile_path_effective | trim | length == 0
+
+- name: Report skipped per-user Firefox profile management
+  ansible.builtin.debug:
+    msg: >-
+      Skipping per-user Firefox profile management because no profile path was
+      discovered. Set firefox_profile_path or launch Firefox once as {{ firefox_user }}.
+  when:
+    - firefox_manage_user_profile | bool
+    - firefox_user | trim | length > 0
+    - _firefox_profile_path_effective | trim | length == 0
+    - not firefox_profile_required | bool
+
+- name: Build Firefox per-user preference payload
+  ansible.builtin.set_fact:
+    _firefox_user_prefs: >-
+      {{
+        {}
+        | combine(_firefox_user_proxy_prefs, recursive=True)
+        | combine(
+            (firefox_homepage | trim | length > 0)
+            | ternary(
+                {
+                  'browser.startup.homepage': firefox_homepage,
+                  'browser.startup.page': 1
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (firefox_disable_default_browser_check | bool)
+            | ternary({'browser.shell.checkDefaultBrowser': false}, {}),
+            recursive=True
+          )
+        | combine(
+            (firefox_disable_password_manager | bool)
+            | ternary({'signon.rememberSignons': false}, {}),
+            recursive=True
+          )
+        | combine(
+            (firefox_disable_telemetry | bool)
+            | ternary(
+                {
+                  'toolkit.telemetry.enabled': false,
+                  'toolkit.telemetry.unified': false,
+                  'browser.newtabpage.activity-stream.feeds.telemetry': false,
+                  'browser.ping-centre.telemetry': false,
+                  'datareporting.healthreport.uploadEnabled': false
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            {
+              'network.trr.mode': (
+                (firefox_enable_dns_over_https | bool)
+                | ternary(2, 5)
+              )
+            },
+            recursive=True
+          )
+        | combine(
+            (firefox_dns_over_https_provider_url | trim | length > 0)
+            | ternary({'network.trr.uri': firefox_dns_over_https_provider_url}, {}),
+            recursive=True
+          )
+        | combine(
+            (firefox_download_directory | trim | length > 0)
+            | ternary(
+                {
+                  'browser.download.dir': firefox_download_directory,
+                  'browser.download.folderList': 2
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            {'browser.download.useDownloadDir': not (firefox_prompt_for_download_location | bool)},
+            recursive=True
+          )
+      }}
+  changed_when: false
+  when:
+    - firefox_manage_user_profile | bool
+    - _firefox_profile_path_effective | trim | length > 0
+
+- name: Render Firefox per-user user.js
+  ansible.builtin.template:
+    src: user.js.j2
+    dest: "{{ _firefox_user_js_path_effective }}"
+    owner: "{{ firefox_user }}"
+    group: "{{ _firefox_user_gid | string }}"
+    mode: "0644"
+  when:
+    - firefox_manage_user_profile | bool
+    - _firefox_profile_path_effective | trim | length > 0

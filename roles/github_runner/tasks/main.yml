@@ -1,0 +1,223 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (github_runner_enabled | bool)
+
+- name: Ensure GitHub runner packages are installed
+  ansible.builtin.apt:
+    name: "{{ github_runner_packages }}"
+    state: present
+    update_cache: "{{ github_runner_update_apt_cache | bool }}"
+
+- name: Ensure GitHub runner group exists
+  ansible.builtin.group:
+    name: "{{ github_runner_group }}"
+    state: present
+
+- name: Ensure GitHub runner user exists
+  ansible.builtin.user:
+    name: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    groups: "{{ github_runner_user_groups_extra }}"
+    append: true
+    home: "{{ github_runner_home }}"
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: Ensure GitHub runner directory exists
+  ansible.builtin.file:
+    path: "{{ github_runner_dir }}"
+    state: directory
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    mode: "0755"
+
+- name: Check installed GitHub runner version file
+  ansible.builtin.stat:
+    path: "{{ github_runner_dir }}/.runner-version"
+  register: github_runner_installed_version_stat
+  changed_when: false
+
+- name: Read installed GitHub runner version
+  ansible.builtin.slurp:
+    src: "{{ github_runner_dir }}/.runner-version"
+  register: github_runner_installed_version_file
+  changed_when: false
+  when: github_runner_installed_version_stat.stat.exists
+
+- name: Determine whether GitHub runner archive must be installed
+  ansible.builtin.set_fact:
+    github_runner_install_required: >-
+      {{
+        (not github_runner_installed_version_stat.stat.exists)
+        or ((github_runner_installed_version_file.content | default('') | b64decode | trim) != github_runner_version)
+      }}
+  changed_when: false
+
+- name: Download GitHub runner archive
+  ansible.builtin.get_url:
+    url: "{{ github_runner_archive_url }}"
+    dest: "{{ github_runner_archive_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: github_runner_install_required | bool
+
+- name: Extract GitHub runner archive
+  ansible.builtin.unarchive:
+    src: "{{ github_runner_archive_path }}"
+    dest: "{{ github_runner_dir }}"
+    remote_src: true
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+  when: github_runner_install_required | bool
+
+- name: Record installed GitHub runner version
+  ansible.builtin.copy:
+    dest: "{{ github_runner_dir }}/.runner-version"
+    content: "{{ github_runner_version }}\n"
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    mode: "0644"
+
+- name: Ensure GitHub runner directory ownership
+  ansible.builtin.file:
+    path: "{{ github_runner_dir }}"
+    state: directory
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    recurse: true
+
+- name: Check GitHub runner registration config
+  ansible.builtin.stat:
+    path: "{{ github_runner_dir }}/.runner"
+  register: github_runner_config_file
+  changed_when: false
+
+- name: Check GitHub runner service config
+  ansible.builtin.stat:
+    path: "{{ github_runner_dir }}/.service"
+  register: github_runner_service_file
+  changed_when: false
+
+- name: Read GitHub runner service name when present
+  ansible.builtin.slurp:
+    src: "{{ github_runner_dir }}/.service"
+  register: github_runner_service_name_read
+  changed_when: false
+  when: github_runner_service_file.stat.exists
+
+- name: Stop GitHub runner service before replacement
+  ansible.builtin.systemd_service:
+    name: "{{ github_runner_service_name_read.content | b64decode | trim }}"
+    state: stopped
+  when:
+    - github_runner_replace | bool
+    - github_runner_service_file.stat.exists
+    - github_runner_manage_service | bool
+
+- name: Fail when registration token is required
+  ansible.builtin.fail:
+    msg: >-
+      github_runner_registration_token is required when registering a new runner or replacing an existing runner.
+  when:
+    - github_runner_register | bool
+    - github_runner_registration_token | trim | length == 0
+    - (not github_runner_config_file.stat.exists) or (github_runner_replace | bool)
+
+- name: Remove existing GitHub runner registration when replacing
+  ansible.builtin.command:
+    argv:
+      - sudo
+      - -n
+      - -u
+      - "{{ github_runner_user }}"
+      - ./config.sh
+      - remove
+      - --token
+      - "{{ github_runner_registration_token }}"
+    chdir: "{{ github_runner_dir }}"
+  no_log: true
+  changed_when: true
+  when:
+    - github_runner_register | bool
+    - github_runner_replace | bool
+    - github_runner_config_file.stat.exists
+
+- name: Configure GitHub runner registration
+  ansible.builtin.command:
+    argv:
+      - sudo
+      - -n
+      - -u
+      - "{{ github_runner_user }}"
+      - ./config.sh
+      - --url
+      - "{{ github_runner_url }}"
+      - --token
+      - "{{ github_runner_registration_token }}"
+      - --name
+      - "{{ github_runner_name }}"
+      - --labels
+      - "{{ github_runner_labels_effective }}"
+      - --work
+      - "{{ github_runner_work_dir }}"
+      - --unattended
+      - --replace
+    chdir: "{{ github_runner_dir }}"
+  no_log: true
+  changed_when: true
+  when:
+    - github_runner_register | bool
+    - (not github_runner_config_file.stat.exists) or (github_runner_replace | bool)
+
+- name: Check GitHub runner registration config after registration
+  ansible.builtin.stat:
+    path: "{{ github_runner_dir }}/.runner"
+  register: github_runner_config_file_after_registration
+  changed_when: false
+
+- name: Check GitHub runner service config after registration
+  ansible.builtin.stat:
+    path: "{{ github_runner_dir }}/.service"
+  register: github_runner_service_file_after_registration
+  changed_when: false
+
+- name: Install GitHub runner service
+  ansible.builtin.command:
+    argv:
+      - ./svc.sh
+      - install
+      - "{{ github_runner_service_user }}"
+    chdir: "{{ github_runner_dir }}"
+    creates: "{{ github_runner_dir }}/.service"
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_register | bool
+    - github_runner_service_state in ['started', 'stopped']
+    - github_runner_config_file_after_registration.stat.exists
+
+- name: Read GitHub runner service name after install
+  ansible.builtin.slurp:
+    src: "{{ github_runner_dir }}/.service"
+  register: github_runner_service_name
+  changed_when: false
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_register | bool
+    - github_runner_service_state in ['started', 'stopped', 'restarted', 'reloaded']
+
+- name: Manage GitHub runner service
+  ansible.builtin.systemd_service:
+    name: "{{ github_runner_service_name.content | b64decode | trim }}"
+    state: "{{ github_runner_service_state }}"
+    enabled: "{{ github_runner_service_state == 'started' }}"
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_register | bool
+    - github_runner_service_name.content | default('', true) | b64decode | trim | length > 0

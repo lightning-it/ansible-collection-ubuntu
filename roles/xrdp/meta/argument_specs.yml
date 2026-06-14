@@ -1,0 +1,24 @@
+---
+argument_specs:
+  main:
+    short_description: Install and configure XRDP server on Ubuntu (without enabling repos).
+    options:
+      xrdp_enabled: {type: bool, default: true}
+      xrdp_fail_if_unavailable: {type: bool, default: true}
+      xrdp_listen_address: {type: str, default: "0.0.0.0"}
+      xrdp_listen_port: {type: int, default: 3389}
+      xrdp_firewalld_manage: {type: bool, default: true}
+      xrdp_firewalld_zone: {type: str, default: "public"}
+      xrdp_firewalld_state: {type: str, default: "enabled"}
+      xrdp_desktop: {type: str, default: "auto"}
+      xrdp_install_desktop: {type: bool, default: false}
+      xrdp_custom_startwm: {type: str, default: ""}
+      xrdp_tls_enable: {type: bool, default: true}
+      xrdp_tls_cert_path: {type: str, default: "/etc/xrdp/cert.pem"}
+      xrdp_tls_key_path: {type: str, default: "/etc/xrdp/key.pem"}
+      xrdp_tls_generate_self_signed: {type: bool, default: true}
+      xrdp_tls_subject: {type: str, default: "/CN={{ inventory_hostname }}"}
+      xrdp_tls_days: {type: int, default: 825}
+      xrdp_packages: {type: list, elements: str}
+      xrdp_optional_packages: {type: list, elements: str}
+      xrdp_no_log: {type: bool, default: false}

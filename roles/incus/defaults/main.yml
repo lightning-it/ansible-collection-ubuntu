@@ -1,0 +1,22 @@
+---
+incus_enabled: true
+
+incus_packages:
+  - bridge-utils
+  - incus
+  - incus-client
+  - qemu-system-x86
+  - qemu-utils
+  - uidmap
+
+incus_update_apt_cache: true
+incus_initialize: true
+
+incus_services:
+  - incus.socket
+  - incus-startup.service
+
+incus_users: []
+incus_user_groups:
+  - incus-admin
+  - kvm

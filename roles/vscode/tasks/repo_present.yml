@@ -1,0 +1,26 @@
+---
+- name: Ensure apt keyring directory exists for Visual Studio Code
+  ansible.builtin.file:
+    path: "{{ vscode_repo_key_dest | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: vscode_repo_enabled | bool
+
+- name: Install Visual Studio Code repository signing key
+  ansible.builtin.get_url:
+    url: "{{ vscode_repo_key_url }}"
+    dest: "{{ vscode_repo_key_dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: vscode_repo_enabled | bool
+
+- name: Configure Visual Studio Code apt repository
+  ansible.builtin.apt_repository:
+    repo: "{{ vscode_repo }}"
+    filename: "{{ vscode_repo_name }}"
+    state: present
+    update_cache: true
+  when: vscode_repo_enabled | bool

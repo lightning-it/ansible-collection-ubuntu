@@ -1,0 +1,18 @@
+---
+- name: Verify incus
+  hosts: incus
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: Check Incus binary
+      ansible.builtin.stat:
+        path: /usr/bin/incus
+      register: incus_binary
+      changed_when: false
+
+    - name: Assert disabled role did not install Incus
+      ansible.builtin.assert:
+        that:
+          - not incus_binary.stat.exists
+        fail_msg: "Disabled incus role installed Incus"

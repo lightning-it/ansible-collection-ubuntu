@@ -1,0 +1,154 @@
+---
+argument_specs:
+  main:
+    short_description: Shared Firefox defaults, discovery, policy helpers, and teardown helpers for Ubuntu.
+    options:
+      firefox_enabled:
+        type: bool
+        default: true
+      firefox_package_name:
+        type: str
+        default: firefox
+      firefox_install_state:
+        type: str
+        default: present
+        choices: [present, latest]
+      firefox_user:
+        type: str
+        default: ""
+      firefox_manage_user_profile:
+        type: bool
+        default: false
+      firefox_profiles_ini_path:
+        type: str
+        default: ""
+      firefox_profile_path:
+        type: str
+        default: ""
+      firefox_user_js_path:
+        type: str
+        default: ""
+      firefox_profile_required:
+        type: bool
+        default: false
+      firefox_manage_system_policies:
+        type: bool
+        default: true
+      firefox_policy_dir:
+        type: str
+        default: /etc/firefox/policies
+      firefox_policy_file_path:
+        type: str
+        default: "{{ firefox_policy_dir }}/policies.json"
+      firefox_proxy_enabled:
+        type: bool
+        default: false
+      firefox_proxy_mode:
+        type: str
+        default: none
+        choices: [none, manual, autoConfig, autoDetect, system]
+      firefox_proxy_locked:
+        type: bool
+        default: false
+      firefox_proxy_http_host:
+        type: str
+        default: ""
+      firefox_proxy_http_port:
+        type: int
+        default: 0
+      firefox_proxy_https_host:
+        type: str
+        default: ""
+      firefox_proxy_https_port:
+        type: int
+        default: 0
+      firefox_proxy_socks_host:
+        type: str
+        default: ""
+      firefox_proxy_socks_port:
+        type: int
+        default: 0
+      firefox_proxy_socks_version:
+        type: int
+        default: 5
+      firefox_proxy_passthrough:
+        type: list
+        elements: str
+      firefox_proxy_use_same_for_all:
+        type: bool
+        default: true
+      firefox_proxy_autoconfig_url:
+        type: str
+        default: ""
+      firefox_proxy_auto_login:
+        type: bool
+        default: false
+      firefox_proxy_use_proxy_for_dns:
+        type: bool
+        default: false
+      firefox_bookmarks_enabled:
+        type: bool
+        default: false
+      firefox_bookmarks_toolbar_name:
+        type: str
+        default: Corporate
+      firefox_bookmarks_menu_name:
+        type: str
+        default: Corporate
+      firefox_bookmarks:
+        type: list
+        elements: dict
+      firefox_no_default_bookmarks:
+        type: bool
+        default: false
+      firefox_homepage:
+        type: str
+        default: ""
+      firefox_homepage_locked:
+        type: bool
+        default: false
+      firefox_homepage_additional:
+        type: list
+        elements: str
+      firefox_disable_telemetry:
+        type: bool
+        default: false
+      firefox_disable_default_browser_check:
+        type: bool
+        default: false
+      firefox_disable_password_manager:
+        type: bool
+        default: false
+      firefox_enable_dns_over_https:
+        type: bool
+        default: false
+      firefox_dns_over_https_locked:
+        type: bool
+        default: false
+      firefox_dns_over_https_provider_url:
+        type: str
+        default: ""
+      firefox_dns_over_https_excluded_domains:
+        type: list
+        elements: str
+      firefox_dns_over_https_fallback:
+        type: bool
+        default: true
+      firefox_download_directory:
+        type: str
+        default: ""
+      firefox_prompt_for_download_location:
+        type: bool
+        default: false
+      firefox_remove_package:
+        type: bool
+        default: false
+      firefox_remove_config:
+        type: bool
+        default: false
+      firefox_remove_policies:
+        type: bool
+        default: false
+      firefox_remove_bookmarks:
+        type: bool
+        default: false

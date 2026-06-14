@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  author: Lightning IT
+  description: Shared VS Code defaults, discovery, repository helpers, and extension helpers for Ubuntu.
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+dependencies: []

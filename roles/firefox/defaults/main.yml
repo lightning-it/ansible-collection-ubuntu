@@ -1,0 +1,60 @@
+---
+firefox_enabled: true
+
+firefox_package_name: firefox
+firefox_install_state: present
+
+firefox_user: ""
+firefox_manage_user_profile: false
+firefox_profiles_ini_path: ""
+firefox_profile_path: ""
+firefox_user_js_path: ""
+firefox_profile_required: false
+
+firefox_manage_system_policies: true
+firefox_policy_dir: /etc/firefox/policies
+firefox_policy_file_path: "{{ firefox_policy_dir }}/policies.json"
+
+firefox_proxy_enabled: false
+firefox_proxy_mode: none
+firefox_proxy_locked: false
+firefox_proxy_http_host: ""
+firefox_proxy_http_port: 0
+firefox_proxy_https_host: ""
+firefox_proxy_https_port: 0
+firefox_proxy_socks_host: ""
+firefox_proxy_socks_port: 0
+firefox_proxy_socks_version: 5
+firefox_proxy_passthrough: []
+firefox_proxy_use_same_for_all: true
+firefox_proxy_autoconfig_url: ""
+firefox_proxy_auto_login: false
+firefox_proxy_use_proxy_for_dns: false
+
+firefox_bookmarks_enabled: false
+firefox_bookmarks_toolbar_name: Corporate
+firefox_bookmarks_menu_name: Corporate
+firefox_bookmarks: []
+firefox_no_default_bookmarks: false
+
+firefox_homepage: ""
+firefox_homepage_locked: false
+firefox_homepage_additional: []
+
+firefox_disable_telemetry: false
+firefox_disable_default_browser_check: false
+firefox_disable_password_manager: false
+
+firefox_enable_dns_over_https: false
+firefox_dns_over_https_locked: false
+firefox_dns_over_https_provider_url: ""
+firefox_dns_over_https_excluded_domains: []
+firefox_dns_over_https_fallback: true
+
+firefox_download_directory: ""
+firefox_prompt_for_download_location: false
+
+firefox_remove_package: false
+firefox_remove_config: false
+firefox_remove_policies: false
+firefox_remove_bookmarks: false

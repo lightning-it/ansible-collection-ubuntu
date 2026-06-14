@@ -1,0 +1,14 @@
+---
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (firefox_destroy_enabled | bool)
+
+- name: Load shared Firefox state
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: main.yml
+
+- name: Remove managed Firefox state
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: remove.yml

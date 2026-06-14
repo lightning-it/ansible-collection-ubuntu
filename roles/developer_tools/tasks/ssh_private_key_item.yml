@@ -1,0 +1,311 @@
+---
+- name: Ensure SSH directory exists for private key user
+  ansible.builtin.file:
+    path: "{{ developer_tools_ssh_private_key_user_info.home }}/.ssh"
+    state: directory
+    owner: "{{ developer_tools_ssh_private_key_user_info.name }}"
+    group: "{{ developer_tools_ssh_private_key_user_info.name }}"
+    mode: "0700"
+
+- name: Read SSH private key material from Vault KV2
+  delegate_to: localhost
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ developer_tools_ssh_private_keys_vault_addr }}"
+    validate_certs: "{{ developer_tools_ssh_private_keys_vault_validate_certs | bool }}"
+    engine_mount_point: "{{ developer_tools_ssh_private_keys_vault_kv_mount }}"
+    path: "{{ developer_tools_ssh_private_key_user_info.vault_kv_path }}"
+    auth_method: "{{ developer_tools_ssh_private_keys_vault_auth_method }}"
+    token: >-
+      {{
+        (developer_tools_ssh_private_keys_vault_token | default(omit, true))
+        if (developer_tools_ssh_private_keys_vault_use_token | bool)
+        else omit
+      }}
+    role_id: >-
+      {{
+        (developer_tools_ssh_private_keys_vault_role_id | default(omit, true))
+        if not (developer_tools_ssh_private_keys_vault_use_token | bool)
+        else omit
+      }}
+    secret_id: >-
+      {{
+        (developer_tools_ssh_private_keys_vault_secret_id | default(omit, true))
+        if not (developer_tools_ssh_private_keys_vault_use_token | bool)
+        else omit
+      }}
+  register: developer_tools_ssh_private_key_vault_read
+  failed_when: false
+  no_log: "{{ developer_tools_ssh_private_keys_no_log | bool }}"
+
+- name: Fail when SSH private key Vault read failed for non-missing-secret reasons
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (_developer_tools_ssh_private_key_read_failed | bool)
+        or (_developer_tools_ssh_private_key_read_missing | bool)
+    fail_msg: >-
+      Failed reading SSH private key from Vault path
+      {{ developer_tools_ssh_private_keys_vault_kv_mount }}/data/{{
+      developer_tools_ssh_private_key_user_info.vault_kv_path }}:
+      {{ _developer_tools_ssh_private_key_read_msg }}.
+    quiet: true
+  vars:
+    _developer_tools_ssh_private_key_read_has_payload: >-
+      {{
+        (developer_tools_ssh_private_key_vault_read.raw is defined)
+        or (developer_tools_ssh_private_key_vault_read.secret is defined)
+        or (
+          developer_tools_ssh_private_key_vault_read.data is defined
+          and developer_tools_ssh_private_key_vault_read.data.data is defined
+        )
+      }}
+    _developer_tools_ssh_private_key_read_failed: >-
+      {{
+        (developer_tools_ssh_private_key_vault_read.failed | default(false) | bool)
+        or (
+          not (_developer_tools_ssh_private_key_read_has_payload | bool)
+          and (_developer_tools_ssh_private_key_read_msg | trim | length > 0)
+        )
+      }}
+    _developer_tools_ssh_private_key_read_msg: >-
+      {{ developer_tools_ssh_private_key_vault_read.msg | default('unknown Vault read error') | string }}
+    _developer_tools_ssh_private_key_read_missing: >-
+      {{
+        ("doesn't seem to exist" in (_developer_tools_ssh_private_key_read_msg | lower))
+        or ('status code was 404' in (_developer_tools_ssh_private_key_read_msg | lower))
+        or ('404 client error' in (_developer_tools_ssh_private_key_read_msg | lower))
+        or ('invalid or missing path' in (_developer_tools_ssh_private_key_read_msg | lower))
+        or ('missing path' in (_developer_tools_ssh_private_key_read_msg | lower))
+      }}
+
+- name: Capture existing SSH private key secret from Vault
+  ansible.builtin.set_fact:
+    developer_tools_ssh_private_key_existing_secret: >-
+      {{
+        developer_tools_ssh_private_key_vault_read.secret
+        | default(developer_tools_ssh_private_key_vault_read.data.data | default({}), true)
+      }}
+  no_log: "{{ developer_tools_ssh_private_keys_no_log | bool }}"
+  changed_when: false
+
+- name: Derive SSH private key Vault secret state
+  ansible.builtin.set_fact:
+    developer_tools_ssh_private_key_secret_present: >-
+      {{
+        (
+          developer_tools_ssh_private_key_existing_secret.get('private_key', '')
+          | string
+          | trim
+          | length
+        ) > 0
+        and
+        (
+          developer_tools_ssh_private_key_existing_secret.get('public_key', '')
+          | string
+          | trim
+          | length
+        ) > 0
+      }}
+    developer_tools_ssh_private_key_secret_partial: >-
+      {{
+        (
+          (
+            developer_tools_ssh_private_key_existing_secret.get('private_key', '')
+            | string
+            | trim
+            | length
+          ) > 0
+        )
+        !=
+        (
+          (
+            developer_tools_ssh_private_key_existing_secret.get('public_key', '')
+            | string
+            | trim
+            | length
+          ) > 0
+        )
+      }}
+  no_log: "{{ developer_tools_ssh_private_keys_no_log | bool }}"
+  changed_when: false
+
+- name: Ensure SSH private key secret in Vault is complete
+  ansible.builtin.assert:
+    that:
+      - not (developer_tools_ssh_private_key_secret_partial | bool)
+    fail_msg: >-
+      Vault path {{ developer_tools_ssh_private_keys_vault_kv_mount }}/data/{{
+      developer_tools_ssh_private_key_user_info.vault_kv_path }} contains incomplete SSH key material.
+      Refusing to replace it automatically.
+    quiet: true
+
+- name: Fail in check mode when SSH private key secret is absent
+  ansible.builtin.fail:
+    msg: >-
+      SSH private key secret is absent at
+      {{ developer_tools_ssh_private_keys_vault_kv_mount }}/data/{{
+      developer_tools_ssh_private_key_user_info.vault_kv_path }}.
+      Re-run without --check to generate and store it.
+  when:
+    - ansible_check_mode
+    - not (developer_tools_ssh_private_key_secret_present | bool)
+
+- name: Generate and store SSH private key material when Vault secret is absent
+  when:
+    - not ansible_check_mode
+    - not (developer_tools_ssh_private_key_secret_present | bool)
+  no_log: "{{ developer_tools_ssh_private_keys_no_log | bool }}"
+  block:
+    - name: Create temporary directory for SSH private key generation
+      delegate_to: localhost
+      become: false
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: "developer-tools-ssh-key-"
+      register: developer_tools_ssh_private_key_tempdir
+
+    - name: Generate SSH private key locally
+      delegate_to: localhost
+      become: false
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      community.crypto.openssh_keypair:
+        path: "{{ developer_tools_ssh_private_key_tempdir.path }}/id"
+        type: "{{ developer_tools_ssh_private_key_user_info.key_type }}"
+        comment: "{{ developer_tools_ssh_private_key_user_info.comment }}"
+        passphrase: >-
+          {{
+            (developer_tools_ssh_private_key_user_info.passphrase | default(omit, true))
+            if (developer_tools_ssh_private_key_user_info.passphrase | string | length > 0)
+            else omit
+          }}
+        mode: "0600"
+        regenerate: never
+
+    - name: Read generated SSH private key
+      delegate_to: localhost
+      become: false
+      ansible.builtin.slurp:
+        src: "{{ developer_tools_ssh_private_key_tempdir.path }}/id"
+      register: developer_tools_ssh_private_key_generated_private
+
+    - name: Read generated SSH public key
+      delegate_to: localhost
+      become: false
+      ansible.builtin.slurp:
+        src: "{{ developer_tools_ssh_private_key_tempdir.path }}/id.pub"
+      register: developer_tools_ssh_private_key_generated_public
+
+    - name: Cache generated SSH key material
+      ansible.builtin.set_fact:
+        developer_tools_ssh_private_key_generated_secret:
+          private_key: "{{ developer_tools_ssh_private_key_generated_private.content | b64decode }}"
+          public_key: "{{ developer_tools_ssh_private_key_generated_public.content | b64decode }}"
+          key_type: "{{ developer_tools_ssh_private_key_user_info.key_type }}"
+          comment: "{{ developer_tools_ssh_private_key_user_info.comment }}"
+          user: "{{ developer_tools_ssh_private_key_user_info.name }}"
+          host: "{{ inventory_hostname }}"
+      changed_when: false
+
+    - name: Store generated SSH key material in Vault KV2
+      delegate_to: localhost
+      become: false
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      community.hashi_vault.vault_kv2_write:
+        url: "{{ developer_tools_ssh_private_keys_vault_addr }}"
+        validate_certs: "{{ developer_tools_ssh_private_keys_vault_validate_certs | bool }}"
+        engine_mount_point: "{{ developer_tools_ssh_private_keys_vault_kv_mount }}"
+        path: "{{ developer_tools_ssh_private_key_user_info.vault_kv_path }}"
+        auth_method: "{{ developer_tools_ssh_private_keys_vault_auth_method }}"
+        token: >-
+          {{
+            (developer_tools_ssh_private_keys_vault_token | default(omit, true))
+            if (developer_tools_ssh_private_keys_vault_use_token | bool)
+            else omit
+          }}
+        role_id: >-
+          {{
+            (developer_tools_ssh_private_keys_vault_role_id | default(omit, true))
+            if not (developer_tools_ssh_private_keys_vault_use_token | bool)
+            else omit
+          }}
+        secret_id: >-
+          {{
+            (developer_tools_ssh_private_keys_vault_secret_id | default(omit, true))
+            if not (developer_tools_ssh_private_keys_vault_use_token | bool)
+            else omit
+          }}
+        read_before_write: true
+        data:
+          private_key: "{{ developer_tools_ssh_private_key_generated_secret.private_key }}"
+          public_key: "{{ developer_tools_ssh_private_key_generated_secret.public_key }}"
+          key_type: "{{ developer_tools_ssh_private_key_generated_secret.key_type }}"
+          comment: "{{ developer_tools_ssh_private_key_generated_secret.comment }}"
+          user: "{{ developer_tools_ssh_private_key_generated_secret.user }}"
+          host: "{{ developer_tools_ssh_private_key_generated_secret.host }}"
+          source: generated
+          created_at: "{{ ansible_date_time.iso8601 }}"
+      register: developer_tools_ssh_private_key_vault_write
+      failed_when: developer_tools_ssh_private_key_vault_write is failed
+  always:
+    - name: Remove temporary SSH key generation directory
+      delegate_to: localhost
+      become: false
+      ansible.builtin.file:
+        path: "{{ developer_tools_ssh_private_key_tempdir.path }}"
+        state: absent
+      when:
+        - developer_tools_ssh_private_key_tempdir is defined
+        - developer_tools_ssh_private_key_tempdir.path is defined
+
+- name: Select effective SSH private key material
+  ansible.builtin.set_fact:
+    developer_tools_ssh_private_key_effective_secret: >-
+      {{
+        developer_tools_ssh_private_key_existing_secret
+        if (developer_tools_ssh_private_key_secret_present | bool)
+        else developer_tools_ssh_private_key_generated_secret
+      }}
+  no_log: "{{ developer_tools_ssh_private_keys_no_log | bool }}"
+  changed_when: false
+
+- name: Install SSH private key for user
+  ansible.builtin.copy:
+    dest: "{{ developer_tools_ssh_private_key_user_info.private_key_path }}"
+    owner: "{{ developer_tools_ssh_private_key_user_info.name }}"
+    group: "{{ developer_tools_ssh_private_key_user_info.name }}"
+    mode: "0600"
+    content: >-
+      {{
+        (
+          developer_tools_ssh_private_key_effective_secret.private_key
+          | string
+          | regex_replace('\r', '')
+          | replace('\\n', '\n')
+          | regex_replace('\n+$', '')
+        ) ~ '\n'
+      }}
+  no_log: "{{ developer_tools_ssh_private_keys_no_log | bool }}"
+
+- name: Install SSH public key for user
+  ansible.builtin.copy:
+    dest: "{{ developer_tools_ssh_private_key_user_info.public_key_path }}"
+    owner: "{{ developer_tools_ssh_private_key_user_info.name }}"
+    group: "{{ developer_tools_ssh_private_key_user_info.name }}"
+    mode: "0644"
+    content: >-
+      {{
+        (
+          developer_tools_ssh_private_key_effective_secret.public_key
+          | string
+          | regex_replace('\r', '')
+          | replace('\\n', '\n')
+          | regex_replace('\n+$', '')
+        ) ~ '\n'
+      }}
+  when: developer_tools_ssh_private_key_user_info.manage_public_key | bool
+  no_log: "{{ developer_tools_ssh_private_keys_no_log | bool }}"

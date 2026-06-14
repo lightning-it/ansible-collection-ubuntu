@@ -1,0 +1,47 @@
+---
+vscode_users: []
+vscode_user_home: ""
+
+vscode_package_name: code
+
+vscode_repo_enabled: true
+vscode_repo_name: code
+vscode_repo_description: Visual Studio Code
+vscode_repo_key_url: https://packages.microsoft.com/keys/microsoft.asc
+vscode_repo_key_dest: /etc/apt/keyrings/packages.microsoft.asc
+vscode_repo_deb_arch: >-
+  {{ 'arm64'
+     if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
+     else 'amd64' }}
+vscode_repo: >-
+  deb [arch={{ vscode_repo_deb_arch }} signed-by={{ vscode_repo_key_dest }}]
+  https://packages.microsoft.com/repos/code stable main
+
+vscode_extensions_default:
+  - redhat.ansible
+  - redhat.vscode-yaml
+  - redhat.vscode-xml
+  - ms-python.python
+  - ms-python.vscode-pylance
+  - hashicorp.terraform
+  - ms-kubernetes-tools.vscode-kubernetes-tools
+  - tim-koehler.helm-intellisense
+  - ms-azuretools.vscode-docker
+  - eamodio.gitlens
+  - github.vscode-github-actions
+  - editorconfig.editorconfig
+  - streetsidesoftware.code-spell-checker
+  - gruntfuggly.todo-tree
+
+vscode_extensions_extra: []
+vscode_extensions_remove: []
+vscode_extensions_file: ""
+
+vscode_vsix_files: []
+
+vscode_manage_user_settings: false
+vscode_user_settings: {}
+
+vscode_remove_extensions: false
+vscode_remove_package: false
+vscode_remove_repo: false

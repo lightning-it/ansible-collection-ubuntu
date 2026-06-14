@@ -1,0 +1,6 @@
+---
+podman_packages:
+  - podman
+  - buildah
+
+podman_registries_conf_dir: /etc/containers

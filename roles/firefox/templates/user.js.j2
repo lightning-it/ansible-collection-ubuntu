@@ -1,0 +1,13 @@
+// -----------------------------------------------------------------------------
+// Ansible managed by lit.ubuntu.firefox
+// Target profile: {{ _firefox_profile_path_effective }}
+// -----------------------------------------------------------------------------
+{% for pref_key, pref_value in _firefox_user_prefs | dictsort %}
+{% if pref_value is boolean %}
+user_pref("{{ pref_key }}", {{ pref_value | lower }});
+{% elif pref_value is number %}
+user_pref("{{ pref_key }}", {{ pref_value }});
+{% else %}
+user_pref("{{ pref_key }}", {{ pref_value | to_json }});
+{% endif %}
+{% endfor %}

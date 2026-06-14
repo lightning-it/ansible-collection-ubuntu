@@ -1,0 +1,129 @@
+---
+- name: Gather passwd database for SSH private key users
+  ansible.builtin.getent:
+    database: passwd
+    split: ':'
+  changed_when: false
+
+- name: Ensure configured SSH private key users exist
+  ansible.builtin.assert:
+    that:
+      - item.user | default('', true) | string | trim | length > 0
+      - (item.user | string) in ansible_facts.getent_passwd
+    fail_msg: >-
+      Configured SSH private key user '{{ item.user | default('') }}' does not
+      exist in the passwd database.
+    quiet: true
+  loop: "{{ developer_tools_ssh_private_keys }}"
+  loop_control:
+    label: "{{ item.user | default('missing-user') }}"
+  changed_when: false
+
+- name: Initialize SSH private key user info list
+  ansible.builtin.set_fact:
+    developer_tools_ssh_private_key_user_infos: []
+  changed_when: false
+
+- name: Build SSH private key user info list
+  ansible.builtin.set_fact:
+    developer_tools_ssh_private_key_user_infos: >-
+      {{
+        developer_tools_ssh_private_key_user_infos
+        + [
+            {
+              'name': (item.user | string | trim),
+              'uid': (ansible_facts.getent_passwd[item.user][1] | int),
+              'gid': (ansible_facts.getent_passwd[item.user][2] | int),
+              'home': ansible_facts.getent_passwd[item.user][4],
+              'shell': ansible_facts.getent_passwd[item.user][5],
+              'private_key_path': _developer_tools_ssh_private_key_path,
+              'public_key_path': _developer_tools_ssh_private_key_path ~ '.pub',
+              'manage_public_key': (
+                item.manage_public_key
+                | default(developer_tools_ssh_private_keys_manage_public_keys, true)
+                | bool
+              ),
+              'comment': (
+                item.comment
+                | default((item.user | string | trim) ~ '@' ~ inventory_hostname, true)
+                | string
+                | trim
+              ),
+              'key_type': (
+                item.type
+                | default(developer_tools_ssh_private_keys_type, true)
+                | string
+                | trim
+              ),
+              'passphrase': (
+                item.passphrase
+                | default('', true)
+                | string
+              ),
+              'vault_kv_path': (
+                item.vault_kv_path
+                | default(_developer_tools_ssh_private_key_default_vault_path, true)
+                | string
+                | trim
+              )
+            }
+          ]
+      }}
+  vars:
+    _developer_tools_ssh_private_key_relative_path: >-
+      {{
+        item.path
+        | default(developer_tools_ssh_private_keys_path, true)
+        | string
+        | trim
+      }}
+    _developer_tools_ssh_private_key_path: >-
+      {{
+        _developer_tools_ssh_private_key_relative_path
+        if (_developer_tools_ssh_private_key_relative_path.startswith('/'))
+        else (ansible_facts.getent_passwd[item.user][4] ~ '/' ~ _developer_tools_ssh_private_key_relative_path)
+      }}
+    _developer_tools_ssh_private_key_default_vault_path: >-
+      {{
+        (
+          developer_tools_ssh_private_keys_vault_path_prefix
+          | string
+          | trim
+          | regex_replace('/+$', '')
+        ) ~ '/' ~ (item.user | string | trim)
+      }}
+  loop: "{{ developer_tools_ssh_private_keys }}"
+  loop_control:
+    label: "{{ item.user }}"
+  no_log: "{{ developer_tools_ssh_private_keys_no_log | bool }}"
+  changed_when: false
+
+- name: Configure Vault-backed SSH private keys for users
+  ansible.builtin.include_tasks: ssh_private_key_item.yml
+  loop: "{{ developer_tools_ssh_private_key_user_infos }}"
+  loop_control:
+    loop_var: developer_tools_ssh_private_key_user_info
+    label: "{{ developer_tools_ssh_private_key_user_info.name }}"
+
+- name: Install known_hosts entries for SSH private key users
+  ansible.builtin.known_hosts:
+    path: "{{ item.0.home }}/.ssh/known_hosts"
+    name: "{{ item.1.name }}"
+    key: "{{ item.1.key }}"
+    hash_host: "{{ item.1.hash_host | default(false) | bool }}"
+    state: present
+  become: true
+  become_user: "{{ item.0.name }}"
+  loop: >-
+    {{
+      developer_tools_ssh_private_key_user_infos
+      | product(developer_tools_ssh_private_keys_known_hosts_entries)
+      | list
+    }}
+  when:
+    - (developer_tools_ssh_private_keys_known_hosts_entries | length) > 0
+    - item.1.name | default('', true) | string | trim | length > 0
+    - item.1.key | default('', true) | string | trim | length > 0
+    - item.1.users is not defined or item.0.name in item.1.users
+  loop_control:
+    label: "{{ item.0.name }}:{{ item.1.name }}"

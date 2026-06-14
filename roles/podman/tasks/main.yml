@@ -1,0 +1,11 @@
+---
+- name: Install podman toolchain
+  ansible.builtin.package:
+    name: "{{ podman_packages }}"
+    state: present
+
+- name: Ensure registries.conf directory exists
+  ansible.builtin.file:
+    path: "{{ podman_registries_conf_dir }}"
+    state: directory
+    mode: "0755"

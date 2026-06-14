@@ -1,0 +1,199 @@
+---
+argument_specs:
+  main:
+    short_description: Install developer packages, pip packages, and optional CLI tools on Ubuntu.
+    options:
+      developer_tools_enabled:
+        type: bool
+        default: true
+      developer_tools_packages_present:
+        type: list
+        elements: str
+      developer_tools_pip_executable:
+        type: str
+        default: pip3
+      developer_tools_pip_packages_present:
+        type: list
+        elements: str
+      developer_tools_github_cli_enabled:
+        type: bool
+        default: false
+      developer_tools_github_cli_package_name:
+        type: str
+        default: gh
+      developer_tools_github_cli_key_url:
+        type: str
+        default: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+      developer_tools_github_cli_key_dest:
+        type: str
+        default: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+      developer_tools_github_cli_repo:
+        type: str
+        default: >-
+          deb [arch={{ developer_tools_github_cli_deb_arch }} signed-by={{
+          developer_tools_github_cli_key_dest }}] https://cli.github.com/packages stable main
+      developer_tools_github_cli_deb_arch:
+        type: str
+        default: >-
+          {{ 'arm64'
+             if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
+             else 'amd64' }}
+      developer_tools_argocd_cli_enabled:
+        type: bool
+        default: false
+      developer_tools_argocd_cli_version:
+        type: str
+        default: v3.3.3
+      developer_tools_argocd_cli_url:
+        type: str
+        default: >-
+          https://github.com/argoproj/argo-cd/releases/download/{{
+          developer_tools_argocd_cli_version }}/argocd-linux-amd64
+      developer_tools_argocd_cli_dest:
+        type: str
+        default: /usr/local/bin/argocd
+      developer_tools_terragrunt_enabled:
+        type: bool
+        default: false
+      developer_tools_terragrunt_version:
+        type: str
+        default: v0.93.8
+      developer_tools_terragrunt_arch:
+        type: str
+        default: >-
+          {{ 'arm64'
+             if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
+             else 'amd64' }}
+      developer_tools_terragrunt_url:
+        type: str
+        default: >-
+          https://github.com/gruntwork-io/terragrunt/releases/download/{{
+          developer_tools_terragrunt_version }}/terragrunt_linux_{{
+          developer_tools_terragrunt_arch }}
+      developer_tools_terragrunt_dest:
+        type: str
+        default: /usr/local/bin/terragrunt
+      developer_tools_oc_cli_enabled:
+        type: bool
+        default: false
+      developer_tools_oc_cli_version:
+        type: str
+        default: 4.18.24
+      developer_tools_oc_cli_archive_url:
+        type: str
+        default: >-
+          https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{
+          developer_tools_oc_cli_version
+          }}/openshift-client-linux-amd64-{{
+          developer_tools_oc_cli_version }}.tar.gz
+      developer_tools_oc_cli_archive_path:
+        type: str
+        default: >-
+          /var/tmp/openshift-client-linux-amd64-{{
+          developer_tools_oc_cli_version }}.tar.gz
+      developer_tools_oc_cli_extract_dir:
+        type: str
+        default: "/var/tmp/openshift-client-{{ developer_tools_oc_cli_version }}"
+      developer_tools_oc_cli_dest:
+        type: str
+        default: /usr/local/bin/oc
+      developer_tools_kubectl_cli_enabled:
+        type: bool
+        default: false
+      developer_tools_kubectl_cli_dest:
+        type: str
+        default: /usr/local/bin/kubectl
+      developer_tools_ssh_agent_enabled:
+        type: bool
+        default: false
+      developer_tools_ssh_agent_users:
+        type: list
+        elements: str
+      developer_tools_ssh_agent_identity_files:
+        type: list
+        elements: str
+        default:
+          - ~/.ssh/id_ed25519
+      developer_tools_ssh_agent_package_name:
+        type: str
+        default: openssh-client
+      developer_tools_ssh_agent_service_name:
+        type: str
+        default: ssh-agent.service
+      developer_tools_ssh_agent_socket:
+        type: str
+        default: "%t/ssh-agent.socket"
+      developer_tools_ssh_agent_manage_shell_init:
+        type: bool
+        default: true
+      developer_tools_ssh_agent_shell_init_files:
+        type: list
+        elements: str
+        default:
+          - .bash_profile
+          - .bashrc
+      developer_tools_ssh_agent_manage_ssh_config:
+        type: bool
+        default: true
+      developer_tools_ssh_agent_add_keys_to_agent:
+        type: bool
+        default: true
+      developer_tools_ssh_private_keys_enabled:
+        type: bool
+        default: false
+      developer_tools_ssh_private_keys:
+        type: list
+        elements: dict
+      developer_tools_ssh_private_keys_no_log:
+        type: bool
+        default: true
+      developer_tools_ssh_private_keys_path:
+        type: str
+        default: .ssh/id_ed25519
+      developer_tools_ssh_private_keys_type:
+        type: str
+        default: ed25519
+      developer_tools_ssh_private_keys_manage_public_keys:
+        type: bool
+        default: true
+      developer_tools_ssh_private_keys_known_hosts_entries:
+        type: list
+        elements: dict
+      developer_tools_ssh_private_keys_vault_addr:
+        type: str
+        default: ""
+      developer_tools_ssh_private_keys_vault_validate_certs:
+        type: bool
+        default: false
+      developer_tools_ssh_private_keys_vault_kv_mount:
+        type: str
+        default: ""
+      developer_tools_ssh_private_keys_vault_token:
+        type: str
+        default: ""
+      developer_tools_ssh_private_keys_vault_role_id:
+        type: str
+        default: ""
+      developer_tools_ssh_private_keys_vault_secret_id:
+        type: str
+        default: ""
+      developer_tools_ssh_private_keys_vault_use_token:
+        type: bool
+        default: "{{ (developer_tools_ssh_private_keys_vault_token | string | trim | length) > 0 }}"
+      developer_tools_ssh_private_keys_vault_auth_method:
+        type: str
+        default: >-
+          {{ 'token' if (developer_tools_ssh_private_keys_vault_use_token | bool) else 'approle' }}
+      developer_tools_ssh_private_keys_vault_auth_ok:
+        type: bool
+        default: >-
+          {{
+            (developer_tools_ssh_private_keys_vault_token | string | trim | length > 0)
+            or (
+              (developer_tools_ssh_private_keys_vault_role_id | string | trim | length > 0)
+              and (developer_tools_ssh_private_keys_vault_secret_id | string | trim | length > 0)
+            )
+          }}
+      developer_tools_ssh_private_keys_vault_path_prefix:
+        type: str
+        default: "{{ inventory_hostname }}/developer_tools/ssh_keys"

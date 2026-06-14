@@ -1,0 +1,24 @@
+---
+# lit.ubuntu.repos
+# Central role to prepare apt repository sources and apt proxy policy.
+
+repos_enabled: true
+
+# Proxy (optional)
+repos_proxy_enabled: false
+repos_proxy_url: ""          # e.g. http://proxy.corp.l-it.io:3128
+repos_proxy_file: /etc/apt/apt.conf.d/90proxy
+
+# Additional apt repositories.
+# Example:
+# repos_custom:
+#   - repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/example.gpg] https://example.invalid/apt stable main"
+#     filename: example
+#     state: present
+#     key_url: https://example.invalid/key.gpg
+#     key_dest: /etc/apt/keyrings/example.gpg
+repos_custom: []
+
+repos_keyring_dir: /etc/apt/keyrings
+repos_update_cache: true
+repos_no_log: false

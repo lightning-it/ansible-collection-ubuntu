@@ -1,0 +1,191 @@
+---
+- name: Initialize Firefox enterprise policy payload
+  ansible.builtin.set_fact:
+    _firefox_policy_dict:
+      policies: {}
+  changed_when: false
+
+- name: Add Firefox homepage policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine(
+            {
+              'policies': {
+                'Homepage': {
+                  'URL': firefox_homepage,
+                  'Locked': firefox_homepage_locked | bool,
+                  'StartPage': (
+                    (firefox_homepage_locked | bool)
+                    | ternary('homepage-locked', 'homepage')
+                  )
+                }
+              }
+            },
+            recursive=True
+          )
+      }}
+  changed_when: false
+  when: firefox_homepage | trim | length > 0
+
+- name: Add Firefox additional homepage entries
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine(
+            {
+              'policies': {
+                'Homepage': {
+                  'Additional': firefox_homepage_additional
+                }
+              }
+            },
+            recursive=True
+          )
+      }}
+  changed_when: false
+  when: (firefox_homepage_additional | default([], true) | length) > 0
+
+- name: Add Firefox telemetry disable policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine({'policies': {'DisableTelemetry': true}}, recursive=True)
+      }}
+  changed_when: false
+  when: firefox_disable_telemetry | bool
+
+- name: Add Firefox default browser check policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine({'policies': {'DontCheckDefaultBrowser': true}}, recursive=True)
+      }}
+  changed_when: false
+  when: firefox_disable_default_browser_check | bool
+
+- name: Add Firefox password manager policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine({'policies': {'PasswordManagerEnabled': false}}, recursive=True)
+      }}
+  changed_when: false
+  when: firefox_disable_password_manager | bool
+
+- name: Add Firefox DNS over HTTPS policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine(
+            {
+              'policies': {
+                'DNSOverHTTPS': {
+                  'Enabled': firefox_enable_dns_over_https | bool,
+                  'Locked': firefox_dns_over_https_locked | bool,
+                  'Fallback': firefox_dns_over_https_fallback | bool
+                }
+              }
+            },
+            recursive=True
+          )
+        | combine(
+            (
+              firefox_dns_over_https_provider_url | trim | length > 0
+            )
+            | ternary(
+                {
+                  'policies': {
+                    'DNSOverHTTPS': {
+                      'ProviderURL': firefox_dns_over_https_provider_url
+                    }
+                  }
+                },
+                {}
+              ),
+            recursive=True
+          )
+        | combine(
+            (
+              firefox_dns_over_https_excluded_domains | default([], true) | length > 0
+            )
+            | ternary(
+                {
+                  'policies': {
+                    'DNSOverHTTPS': {
+                      'ExcludedDomains': firefox_dns_over_https_excluded_domains
+                    }
+                  }
+                },
+                {}
+              ),
+            recursive=True
+          )
+      }}
+  changed_when: false
+
+- name: Add Firefox download directory policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine(
+            {'policies': {'DownloadDirectory': firefox_download_directory}},
+            recursive=True
+          )
+      }}
+  changed_when: false
+  when: firefox_download_directory | trim | length > 0
+
+- name: Add Firefox prompt-for-download-location policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine(
+            {'policies': {'PromptForDownloadLocation': firefox_prompt_for_download_location | bool}},
+            recursive=True
+          )
+      }}
+  changed_when: false
+  when: firefox_prompt_for_download_location | bool
+
+- name: Add Firefox proxy policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine({'policies': {'Proxy': _firefox_policy_proxy}}, recursive=True)
+      }}
+  changed_when: false
+
+- name: Add Firefox bookmarks policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine(
+            {'policies': {'Bookmarks': _firefox_policy_bookmarks}},
+            recursive=True
+          )
+      }}
+  changed_when: false
+  when:
+    - firefox_bookmarks_enabled | bool
+    - (_firefox_policy_bookmarks | default([], true) | length) > 0
+
+- name: Add Firefox no-default-bookmarks policy
+  ansible.builtin.set_fact:
+    _firefox_policy_dict: >-
+      {{
+        _firefox_policy_dict
+        | combine({'policies': {'NoDefaultBookmarks': true}}, recursive=True)
+      }}
+  changed_when: false
+  when: firefox_no_default_bookmarks | bool

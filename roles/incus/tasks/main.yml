@@ -1,0 +1,44 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (incus_enabled | bool)
+
+- name: Ensure Incus packages are installed
+  ansible.builtin.apt:
+    name: "{{ incus_packages }}"
+    state: present
+    update_cache: "{{ incus_update_apt_cache | bool }}"
+
+- name: Ensure Incus services are enabled
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop: "{{ incus_services }}"
+
+- name: Check Incus storage pools
+  ansible.builtin.command:
+    cmd: incus storage list --format csv
+  register: incus_storage_pools
+  changed_when: false
+  failed_when: false
+  when: incus_initialize | bool
+
+- name: Initialize Incus with minimal defaults
+  ansible.builtin.command:
+    cmd: incus admin init --minimal
+  changed_when: true
+  when:
+    - incus_initialize | bool
+    - incus_storage_pools.rc != 0 or (incus_storage_pools.stdout | trim | length == 0)
+
+- name: Ensure Incus users are in runtime groups
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: "{{ incus_user_groups }}"
+    append: true
+  loop: "{{ incus_users }}"

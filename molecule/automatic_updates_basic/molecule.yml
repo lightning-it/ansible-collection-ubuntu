@@ -1,0 +1,29 @@
+---
+driver:
+  name: docker
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: "${MOLECULE_PROJECT_DIRECTORY}/collections/requirements.yml"
+
+platforms:
+  - name: automatic_updates
+    image: ubuntu:24.04
+    pre_build_image: true
+    command: sleep infinity
+
+provisioner:
+  name: ansible
+  inventory:
+    hosts:
+      all:
+        hosts:
+          automatic_updates:
+            ansible_connection: docker
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+
+verifier:
+  name: ansible

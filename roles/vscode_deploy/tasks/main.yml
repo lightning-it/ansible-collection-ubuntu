@@ -1,0 +1,29 @@
+---
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (vscode_deploy_enabled | bool)
+
+- name: Load shared VS Code state
+  ansible.builtin.include_role:
+    name: lit.ubuntu.vscode
+    tasks_from: main.yml
+    public: true
+
+- name: Ensure VS Code repository is configured
+  ansible.builtin.include_role:
+    name: lit.ubuntu.vscode
+    tasks_from: repo_present.yml
+  when: vscode_repo_enabled | bool
+
+- name: Ensure VS Code package is installed
+  ansible.builtin.package:
+    name: "{{ vscode_package_name }}"
+    state: present
+
+- name: Verify VS Code CLI is available
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - command -v code
+  changed_when: false

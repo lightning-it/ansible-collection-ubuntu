@@ -1,0 +1,24 @@
+---
+- name: Converge hostname
+  hosts: hostname_instance
+  become: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    hostname_fqdn: "node1.example.test"
+    hostname_manage_etc_hosts: true
+    hostname_etc_hosts_ip: "127.0.1.1"
+    hostname_add_shortname: true
+    hostname_etc_hosts_unsafe_writes: true
+    hostname_etc_hostname_unsafe_writes: true
+
+  pre_tasks:
+    - name: Ensure python3 is present
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get update && apt-get -y install python3
+        fi
+      changed_when: false
+
+  roles:
+    - role: lit.ubuntu.hostname

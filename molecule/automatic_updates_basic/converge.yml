@@ -1,0 +1,25 @@
+---
+- name: Converge automatic_updates
+  hosts: automatic_updates
+  become: false
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    automatic_updates_initial_update: false
+
+  pre_tasks:
+    - name: Ensure python3 is present
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get update && apt-get -y install python3
+        fi
+      changed_when: false
+
+    - name: Ensure cron is installed
+      ansible.builtin.package:
+        name: cron
+        state: present
+
+  roles:
+    - role: lit.ubuntu.automatic_updates

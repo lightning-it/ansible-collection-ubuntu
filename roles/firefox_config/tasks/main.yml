@@ -1,0 +1,33 @@
+---
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when:
+    - not (firefox_config_enabled | bool)
+      or not (firefox_enabled | bool)
+
+- name: Load shared Firefox state
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: main.yml
+
+- name: Build shared Firefox proxy data
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: proxy.yml
+
+- name: Build shared Firefox bookmark data
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: bookmarks.yml
+
+- name: Manage Firefox enterprise policies
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: policies.yml
+  when: firefox_manage_system_policies | bool
+
+- name: Manage Firefox per-user profile preferences
+  ansible.builtin.include_role:
+    name: lit.ubuntu.firefox
+    tasks_from: profile.yml
+  when: firefox_manage_user_profile | bool

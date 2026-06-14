@@ -1,0 +1,39 @@
+#!/bin/sh
+# Ansible managed by lit.ubuntu.xrdp
+
+if [ -r /etc/profile ]; then
+  . /etc/profile
+fi
+
+{% if xrdp_desktop == 'custom' and (xrdp_custom_startwm | length) > 0 %}
+{{ xrdp_custom_startwm }}
+exit $?
+{% endif %}
+
+case "{{ xrdp_desktop }}" in
+  gnome)
+    if command -v gnome-session >/dev/null 2>&1; then
+      exec gnome-session
+    fi
+    ;;
+  xfce)
+    if command -v startxfce4 >/dev/null 2>&1; then
+      exec startxfce4
+    fi
+    ;;
+  auto|*)
+    if command -v gnome-session >/dev/null 2>&1; then
+      exec gnome-session
+    fi
+    if command -v startxfce4 >/dev/null 2>&1; then
+      exec startxfce4
+    fi
+    ;;
+esac
+
+if command -v xterm >/dev/null 2>&1; then
+  exec xterm
+fi
+
+echo "No supported desktop session found for XRDP."
+exit 1

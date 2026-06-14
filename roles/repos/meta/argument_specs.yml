@@ -1,0 +1,16 @@
+---
+argument_specs:
+  main:
+    short_description: Configure apt repositories and apt proxy policy for Ubuntu.
+    options:
+      repos_enabled: {type: bool, default: true}
+      repos_proxy_enabled: {type: bool, default: false}
+      repos_proxy_url: {type: str, default: ""}
+      repos_proxy_file: {type: str, default: /etc/apt/apt.conf.d/90proxy}
+      repos_custom:
+        type: list
+        elements: dict
+        default: []
+      repos_keyring_dir: {type: str, default: /etc/apt/keyrings}
+      repos_update_cache: {type: bool, default: true}
+      repos_no_log: {type: bool, default: false}

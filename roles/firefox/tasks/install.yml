@@ -1,0 +1,14 @@
+---
+- name: Ensure Firefox package is installed
+  ansible.builtin.package:
+    name: "{{ firefox_package_name }}"
+    state: "{{ firefox_install_state }}"
+
+- name: Ensure Firefox enterprise policy directory exists
+  ansible.builtin.file:
+    path: "{{ firefox_policy_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: firefox_manage_system_policies | bool

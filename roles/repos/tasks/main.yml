@@ -1,0 +1,67 @@
+---
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (repos_enabled | bool)
+
+- name: Ensure apt keyring directory exists
+  ansible.builtin.file:
+    path: "{{ repos_keyring_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure apt proxy
+  ansible.builtin.copy:
+    dest: "{{ repos_proxy_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Acquire::http::Proxy "{{ repos_proxy_url }}";
+      Acquire::https::Proxy "{{ repos_proxy_url }}";
+  when:
+    - repos_proxy_enabled | bool
+    - repos_proxy_url | length > 0
+
+- name: Remove apt proxy when disabled
+  ansible.builtin.file:
+    path: "{{ repos_proxy_file }}"
+    state: absent
+  when: not (repos_proxy_enabled | bool)
+
+- name: Install repository signing keys
+  ansible.builtin.get_url:
+    url: "{{ item.key_url }}"
+    dest: "{{ item.key_dest | default(repos_keyring_dir ~ '/' ~ item.filename ~ '.gpg') }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ repos_custom }}"
+  loop_control:
+    label: "{{ item.filename | default(item.repo | default('repo')) }}"
+  no_log: "{{ repos_no_log }}"
+  when:
+    - item.key_url is defined
+    - item.key_url | length > 0
+
+- name: Configure custom apt repositories
+  ansible.builtin.apt_repository:
+    repo: "{{ item.repo }}"
+    filename: "{{ item.filename | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+    update_cache: false
+  loop: "{{ repos_custom }}"
+  loop_control:
+    label: "{{ item.filename | default(item.repo) }}"
+  no_log: "{{ repos_no_log }}"
+  when:
+    - repos_custom | length > 0
+    - item.repo is defined
+    - item.repo | length > 0
+
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: repos_update_cache | bool

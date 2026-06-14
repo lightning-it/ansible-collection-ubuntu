@@ -1,0 +1,91 @@
+---
+- name: Gather installed package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Set Firefox package installed fact
+  ansible.builtin.set_fact:
+    _firefox_installed: "{{ firefox_package_name in ansible_facts.packages }}"
+  changed_when: false
+
+- name: Initialize Firefox shared discovery facts
+  ansible.builtin.set_fact:
+    _firefox_user_home: ""
+    _firefox_user_uid: ""
+    _firefox_user_gid: ""
+    _firefox_profiles_ini_path_effective: ""
+    _firefox_profile_path_effective: "{{ firefox_profile_path | default('', true) }}"
+    _firefox_user_js_path_effective: "{{ firefox_user_js_path | default('', true) }}"
+  changed_when: false
+
+- name: Query Firefox target user account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ firefox_user }}"
+  when: firefox_user | trim | length > 0
+
+- name: Set Firefox target user facts
+  ansible.builtin.set_fact:
+    _firefox_user_uid: "{{ getent_passwd[firefox_user][1] }}"
+    _firefox_user_gid: "{{ getent_passwd[firefox_user][2] }}"
+    _firefox_user_home: "{{ getent_passwd[firefox_user][4] }}"
+    _firefox_profiles_ini_path_effective: >-
+      {{
+        firefox_profiles_ini_path
+        if firefox_profiles_ini_path | trim | length > 0
+        else getent_passwd[firefox_user][4] ~ '/.mozilla/firefox/profiles.ini'
+      }}
+  changed_when: false
+  when: firefox_user | trim | length > 0
+
+- name: Check Firefox profile root directory
+  ansible.builtin.stat:
+    path: "{{ _firefox_user_home }}/.mozilla/firefox"
+  register: _firefox_profiles_root
+  when:
+    - firefox_user | trim | length > 0
+    - firefox_profile_path | trim | length == 0
+
+- name: Discover Firefox profile directories
+  ansible.builtin.find:
+    paths: "{{ _firefox_user_home }}/.mozilla/firefox"
+    file_type: directory
+    recurse: false
+    patterns:
+      - "*.default*"
+  register: _firefox_profile_dirs
+  when:
+    - firefox_user | trim | length > 0
+    - firefox_profile_path | trim | length == 0
+    - _firefox_profiles_root.stat.exists | default(false)
+
+- name: Set effective Firefox profile path
+  ansible.builtin.set_fact:
+    _firefox_profile_path_effective: >-
+      {{
+        firefox_profile_path
+        if firefox_profile_path | trim | length > 0
+        else (
+          _firefox_profile_dirs.files
+          | default([])
+          | sort(attribute='path')
+          | map(attribute='path')
+          | list
+          | first
+          | default('')
+        )
+      }}
+  changed_when: false
+
+- name: Set effective Firefox user.js path
+  ansible.builtin.set_fact:
+    _firefox_user_js_path_effective: >-
+      {{
+        firefox_user_js_path
+        if firefox_user_js_path | trim | length > 0
+        else (
+          (_firefox_profile_path_effective | trim | length > 0)
+          | ternary(_firefox_profile_path_effective ~ '/user.js', '')
+        )
+      }}
+  changed_when: false

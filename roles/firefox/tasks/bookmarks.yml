@@ -1,0 +1,13 @@
+---
+- name: Initialize Firefox bookmark helper facts
+  ansible.builtin.set_fact:
+    _firefox_policy_bookmarks: []
+  changed_when: false
+
+- name: Build Firefox enterprise bookmark payload
+  ansible.builtin.set_fact:
+    _firefox_policy_bookmarks: "{{ lookup('ansible.builtin.template', 'bookmarks.json.j2') | from_json }}"
+  changed_when: false
+  when:
+    - firefox_bookmarks_enabled | bool
+    - (firefox_bookmarks | default([], true) | length) > 0

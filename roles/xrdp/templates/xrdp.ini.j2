@@ -1,0 +1,90 @@
+; ------------------------------------------------------------------------------
+; Ansible managed by lit.ubuntu.xrdp
+; Template: xrdp.ini.j2
+;
+; Notes:
+; - Bind to mgmt IP via: port=tcp://<ip>:3389  (preferred / supported)
+; - Logging keys are: LogFile, LogLevel, EnableSyslog  (case sensitive)
+; - Provide an enabled [Xorg] session (xorgxrdp)
+; ------------------------------------------------------------------------------
+
+[Globals]
+; xrdp.ini file version number
+ini_version=1
+
+; fork a new process for each incoming connection
+fork=true
+
+; Listen socket
+; IMPORTANT: bind to a specific IP via tcp://IP:port (not via "address=").
+port=tcp://{{ xrdp_listen_address | default('0.0.0.0') }}:{{ xrdp_listen_port | default(3389) }}
+
+; Run daemon unprivileged
+runtime_user=xrdp
+runtime_group=xrdp
+
+tcp_nodelay=true
+tcp_keepalive=true
+
+; security layer can be 'tls', 'rdp' or 'negotiate'
+; 'negotiate' is usually the most compatible
+security_layer={{ xrdp_security_layer | default('negotiate') }}
+
+; encryption level for classic RDP encryption (TLS is configured below)
+crypt_level=high
+
+; TLS certificate and key (role should ensure these exist)
+certificate={{ xrdp_tls_cert | default('/etc/xrdp/cert.pem') }}
+key_file={{ xrdp_tls_key | default('/etc/xrdp/key.pem') }}
+
+; TLS protocols
+ssl_protocols={{ xrdp_ssl_protocols | default('TLSv1.2, TLSv1.3') }}
+
+; Session / performance defaults
+allow_channels=true
+allow_multimon={{ (xrdp_allow_multimon | default(true)) | ternary('true','false') }}
+bitmap_cache=true
+bitmap_compression=true
+bulk_compression=true
+max_bpp=32
+new_cursors=true
+use_fastpath=both
+
+; Optional: avoid auto-login
+autorun=
+
+[Logging]
+; IMPORTANT: these are the keys XRDP expects (not log_file/log_level)
+LogFile={{ xrdp_log_file | default('/var/log/xrdp.log') }}
+LogLevel={{ xrdp_log_level | default('DEBUG') }}
+EnableSyslog={{ (xrdp_enable_syslog | default(true)) | ternary('true','false') }}
+
+[Channels]
+; Common RDP channels
+rdpdr=true
+rdpsnd=true
+drdynvc=true
+cliprdr=true
+rail=true
+xrdpvr=true
+
+; ------------------------------------------------------------------------------
+; Session types
+; ------------------------------------------------------------------------------
+
+[Xorg]
+name=Xorg
+lib=libxup.so
+username=ask
+password=ask
+port=-1
+code=20
+
+; If you later want Xvnc instead of Xorg, enable this:
+;[Xvnc]
+;name=Xvnc
+;lib=libvnc.so
+;username=ask
+;password=ask
+;port=-1
+;code=1
