@@ -15,3 +15,6 @@ Sunday at 06:00 and writes output to `/var/log/apt-auto-weekly.log`.
 - `automatic_updates_command` (string): Command to run.
 - `automatic_updates_cron_name` (string, default: `"Weekly automatic updates"`): Cron entry name.
 - `automatic_updates_initial_update` (bool, default: `true`): Run an initial apt upgrade when the role executes.
+- `automatic_updates_manage_cron_package` (bool, default: `true`): Install the cron package when enabled.
+- `automatic_updates_cron_package` (string, default: `"cron"`): Package that provides `crontab` on Ubuntu.
+- `automatic_updates_crontab_paths` (list): Paths used to detect whether `crontab` is available.

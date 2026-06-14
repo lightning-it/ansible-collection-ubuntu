@@ -8,3 +8,10 @@ automatic_updates_log_file: "/var/log/apt-auto-weekly.log"
 automatic_updates_command: "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade"
 automatic_updates_cron_name: "Weekly automatic updates"
 automatic_updates_initial_update: true
+automatic_updates_manage_cron_package: true
+automatic_updates_cron_package: cron
+automatic_updates_crontab_paths:
+  - /usr/bin/crontab
+  - /bin/crontab
+  - /usr/sbin/crontab
+  - /sbin/crontab

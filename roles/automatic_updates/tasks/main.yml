@@ -7,6 +7,43 @@
     automatic_updates_job: "{{ automatic_updates_command }} >{{ automatic_updates_log_file }} 2>&1"
   changed_when: false
 
+- name: Ensure cron package is present when automatic updates are enabled
+  ansible.builtin.package:
+    name: "{{ automatic_updates_cron_package }}"
+    state: present
+  when:
+    - automatic_updates_enabled | bool
+    - automatic_updates_manage_cron_package | bool
+
+- name: Check crontab command availability
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ automatic_updates_crontab_paths }}"
+  register: automatic_updates_crontab_path_stats
+  changed_when: false
+
+- name: Record crontab command availability
+  ansible.builtin.set_fact:
+    automatic_updates_crontab_available: >-
+      {{
+        automatic_updates_crontab_path_stats.results
+        | selectattr('stat.exists', 'defined')
+        | selectattr('stat.exists')
+        | list
+        | length > 0
+      }}
+  changed_when: false
+
+- name: Fail when automatic updates are enabled without crontab
+  ansible.builtin.fail:
+    msg: >-
+      The crontab executable is required when automatic_updates_enabled=true.
+      Install {{ automatic_updates_cron_package }} or set
+      automatic_updates_manage_cron_package=true.
+  when:
+    - automatic_updates_enabled | bool
+    - not automatic_updates_crontab_available | bool
+
 - name: Run initial system update (apt)  # noqa package-latest
   ansible.builtin.apt:
     name: "*"
@@ -25,3 +62,4 @@
     weekday: "{{ automatic_updates_weekday }}"
     job: "{{ automatic_updates_job }}"
     state: "{{ 'present' if automatic_updates_enabled | bool else 'absent' }}"
+  when: automatic_updates_enabled | bool or automatic_updates_crontab_available | bool

@@ -8,4 +8,8 @@
       - automatic_updates_user | string | length > 0
       - automatic_updates_command | string | length > 0
       - automatic_updates_log_file | string | length > 0
+      - automatic_updates_manage_cron_package is boolean
+      - automatic_updates_cron_package | string | length > 0
+      - automatic_updates_crontab_paths is sequence
+      - automatic_updates_crontab_paths is not string
     fail_msg: "Automatic updates schedule/command variables are invalid."
