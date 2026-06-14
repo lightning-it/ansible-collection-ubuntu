@@ -1,0 +1,41 @@
+---
+- name: Validate Incus image role inputs
+  ansible.builtin.assert:
+    that:
+      - incus_image_enabled is boolean
+      - incus_image_binary | trim | length > 0
+      - incus_image_force_local is boolean
+      - incus_image_command_user is string
+      - incus_image_default_project is string
+      - incus_image_default_replace is boolean
+      - incus_image_default_public is boolean
+      - incus_image_default_properties is mapping
+      - incus_image_items is sequence
+      - incus_image_items is not string
+      - incus_image_results is sequence
+      - incus_image_results is not string
+    fail_msg: "Invalid configuration for lit.ubuntu.incus_image."
+    quiet: true
+  changed_when: false
+  when: incus_image_enabled | bool
+
+- name: Validate Incus image item definitions
+  ansible.builtin.assert:
+    that:
+      - incus_image_item is mapping
+      - incus_image_item.alias | default('', true) | trim | length > 0
+      - "':' not in incus_image_item.alias"
+      - incus_image_item.metadata | default('', true) | trim | length > 0
+      - incus_image_item.rootfs | default('', true) is string
+      - incus_image_item.project | default(incus_image_default_project) is string
+      - incus_image_item.properties | default(incus_image_default_properties) is mapping
+    fail_msg: >-
+      Invalid Incus image item. Each item requires alias without remote prefix
+      and metadata path or URL.
+    quiet: true
+  changed_when: false
+  loop: "{{ incus_image_items }}"
+  loop_control:
+    loop_var: incus_image_item
+    label: "{{ incus_image_item.alias | default('incus-image') }}"
+  when: incus_image_enabled | bool

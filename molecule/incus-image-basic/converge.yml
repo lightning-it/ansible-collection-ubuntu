@@ -1,0 +1,74 @@
+---
+- name: Converge incus_image
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    incus_image_molecule_ephemeral_dir: >-
+      {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') | default('/tmp/lit-incus-image-basic', true) }}
+    incus_image_molecule_root: "{{ incus_image_molecule_ephemeral_dir }}/incus-image"
+    incus_image_molecule_bin: "{{ incus_image_molecule_root }}/bin/incus"
+    incus_image_molecule_metadata: "{{ incus_image_molecule_root }}/metadata.tar.xz"
+    incus_image_molecule_rootfs: "{{ incus_image_molecule_root }}/rootfs.qcow2"
+  pre_tasks:
+    - name: Ensure molecule Incus image directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ incus_image_molecule_root }}"
+        - "{{ incus_image_molecule_root }}/bin"
+        - "{{ incus_image_molecule_root }}/state"
+
+    - name: Create fake Incus command
+      ansible.builtin.copy:
+        dest: "{{ incus_image_molecule_bin }}"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          state_dir="{{ incus_image_molecule_root }}/state"
+          args=("$@")
+
+          alias_name=""
+          if [[ "${args[*]}" == *"image info local:molecule-rhel10"* ]]; then
+            test -f "${state_dir}/molecule-rhel10"
+            exit $?
+          fi
+
+          if [[ "${args[*]}" == *"image import"* ]]; then
+            for idx in "${!args[@]}"; do
+              if [ "${args[$idx]}" = "--alias" ]; then
+                alias_name="${args[$((idx + 1))]}"
+              fi
+            done
+            test -n "${alias_name}"
+            touch "${state_dir}/${alias_name}"
+            exit 0
+          fi
+
+          exit 1
+
+    - name: Create molecule Incus image metadata
+      ansible.builtin.copy:
+        dest: "{{ incus_image_molecule_metadata }}"
+        content: "metadata"
+        mode: "0644"
+
+    - name: Create molecule Incus image rootfs
+      ansible.builtin.copy:
+        dest: "{{ incus_image_molecule_rootfs }}"
+        content: "rootfs"
+        mode: "0644"
+  roles:
+    - role: incus_image
+      vars:
+        incus_image_binary: "{{ incus_image_molecule_bin }}"
+        incus_image_items:
+          - alias: molecule-rhel10
+            metadata: "{{ incus_image_molecule_metadata }}"
+            rootfs: "{{ incus_image_molecule_rootfs }}"
+            properties:
+              description: molecule image

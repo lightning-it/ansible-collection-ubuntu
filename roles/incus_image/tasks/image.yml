@@ -1,0 +1,112 @@
+---
+- name: Resolve Incus image settings
+  ansible.builtin.set_fact:
+    incus_image_alias: "{{ incus_image_item.alias | trim }}"
+    incus_image_metadata: "{{ incus_image_item.metadata | trim }}"
+    incus_image_rootfs: "{{ incus_image_item.rootfs | default('', true) | trim }}"
+    incus_image_project: "{{ incus_image_item.project | default(incus_image_default_project) | trim }}"
+    incus_image_replace: "{{ incus_image_item.replace | default(incus_image_default_replace) | bool }}"
+    incus_image_public: "{{ incus_image_item.public | default(incus_image_default_public) | bool }}"
+    incus_image_properties: "{{ incus_image_default_properties | combine(incus_image_item.properties | default({})) }}"
+
+- name: Build base Incus command arguments
+  ansible.builtin.set_fact:
+    incus_image_base_argv: >-
+      {{
+        [incus_image_binary]
+        + (['--force-local'] if incus_image_force_local | bool else [])
+        + (['--project', incus_image_project] if incus_image_project | length > 0 else [])
+      }}
+    incus_image_info_ref: "local:{{ incus_image_alias }}"
+
+- name: Check Incus image metadata artifact
+  ansible.builtin.stat:
+    path: "{{ incus_image_metadata }}"
+  register: incus_image_metadata_stat
+  when: (incus_image_metadata | regex_search('^https?://')) is none
+
+- name: Assert Incus image metadata artifact exists
+  ansible.builtin.assert:
+    that:
+      - incus_image_metadata_stat.stat.exists | default(false)
+    fail_msg: "Incus image metadata artifact is missing: {{ incus_image_metadata }}"
+    quiet: true
+  when: (incus_image_metadata | regex_search('^https?://')) is none
+
+- name: Check Incus image rootfs artifact
+  ansible.builtin.stat:
+    path: "{{ incus_image_rootfs }}"
+  register: incus_image_rootfs_stat
+  when:
+    - incus_image_rootfs | length > 0
+    - (incus_image_rootfs | regex_search('^https?://')) is none
+
+- name: Assert Incus image rootfs artifact exists
+  ansible.builtin.assert:
+    that:
+      - incus_image_rootfs_stat.stat.exists | default(false)
+    fail_msg: "Incus image rootfs artifact is missing: {{ incus_image_rootfs }}"
+    quiet: true
+  when:
+    - incus_image_rootfs | length > 0
+    - (incus_image_rootfs | regex_search('^https?://')) is none
+
+- name: Check current Incus image alias
+  ansible.builtin.command:
+    argv: "{{ incus_image_base_argv + ['image', 'info', incus_image_info_ref] }}"
+  become: "{{ incus_image_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_image_command_user if incus_image_command_user | trim | length > 0 else omit }}"
+  register: incus_image_info
+  changed_when: false
+  failed_when: false
+
+- name: Initialize Incus image property arguments
+  ansible.builtin.set_fact:
+    incus_image_property_args: []
+
+- name: Build Incus image property arguments
+  ansible.builtin.set_fact:
+    incus_image_property_args: "{{ incus_image_property_args + [item.key ~ '=' ~ (item.value | string)] }}"
+  loop: "{{ incus_image_properties | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Import Incus image
+  ansible.builtin.command:
+    argv: >-
+      {{
+        incus_image_base_argv
+        + ['image', 'import', incus_image_metadata]
+        + ([incus_image_rootfs] if incus_image_rootfs | length > 0 else [])
+        + ['--alias', incus_image_alias]
+        + (['--public'] if incus_image_public else [])
+        + (['--reuse'] if incus_image_replace else [])
+        + incus_image_property_args
+      }}
+  become: "{{ incus_image_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_image_command_user if incus_image_command_user | trim | length > 0 else omit }}"
+  register: incus_image_import
+  changed_when: true
+  when: incus_image_replace or incus_image_info.rc != 0
+
+- name: Verify Incus image alias
+  ansible.builtin.command:
+    argv: "{{ incus_image_base_argv + ['image', 'info', incus_image_info_ref] }}"
+  become: "{{ incus_image_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_image_command_user if incus_image_command_user | trim | length > 0 else omit }}"
+  register: incus_image_verify
+  changed_when: false
+
+- name: Record Incus image result
+  ansible.builtin.set_fact:
+    incus_image_results: >-
+      {{
+        incus_image_results
+        + [
+          {
+            'alias': incus_image_alias,
+            'info_ref': incus_image_info_ref,
+            'imported': incus_image_import is changed
+          }
+        ]
+      }}
