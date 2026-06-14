@@ -2,9 +2,11 @@
 - name: Converge automatic_updates
   hosts: automatic_updates
   become: false
+  gather_facts: false
   vars:
     ansible_user: root
     ansible_python_interpreter: /usr/bin/python3
+    automatic_updates_initial_update: false
 
   pre_tasks:
     - name: Ensure python3 is present

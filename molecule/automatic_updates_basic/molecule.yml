@@ -9,8 +9,9 @@ dependency:
 
 platforms:
   - name: automatic_updates
-    image: quay.io/rockylinux/rockylinux:9
+    image: ubuntu:24.04
     pre_build_image: true
+    command: sleep infinity
 
 provisioner:
   name: ansible
