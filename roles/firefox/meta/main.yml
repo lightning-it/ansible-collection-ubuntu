@@ -5,7 +5,7 @@ galaxy_info:
   author: Lightning IT
   description: Shared Firefox helper role for deploy, config, and destroy lifecycle roles on Ubuntu.
   company: Lightning IT
-  license: GPL-3.0-only
+  license: MIT
   min_ansible_version: "2.18"
   platforms:
     - name: Ubuntu

@@ -5,7 +5,7 @@ galaxy_info:
   author: Lightning IT
   description: Install baseline packages and configure timezone and locale.
   company: Lightning IT
-  license: GPL-3.0-only
+  license: MIT
   min_ansible_version: "2.15"
   platforms:
     - name: Ubuntu

@@ -9,7 +9,7 @@ repository: https://github.com/lightning-it/ansible-collection-ubuntu
 authors:
   - Lightning IT
 license:
-  - GPL-3.0-only
+  - MIT
 tags:
   - modulix
   - ubuntu

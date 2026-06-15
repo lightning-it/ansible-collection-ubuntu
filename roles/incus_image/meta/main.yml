@@ -5,7 +5,7 @@ galaxy_info:
   author: Rene Osorio
   description: Import and manage local Incus image aliases on Ubuntu Incus hosts.
   company: Lightning IT
-  license: GPL-3.0-only
+  license: MIT
   min_ansible_version: "2.15"
 
   platforms:
