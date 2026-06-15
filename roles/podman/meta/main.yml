@@ -5,7 +5,7 @@ galaxy_info:
   author: Lightning IT
   company: Lightning IT
   description: Install Podman tooling and prepare container registries config.
-  license: GPL-3.0-only
+  license: MIT
   min_ansible_version: "2.15"
   platforms:
     - name: Ubuntu

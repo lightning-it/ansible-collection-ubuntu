@@ -58,4 +58,4 @@ Each `incus_image_items` entry supports:
 
 ## License
 
-GPL-3.0-only
+MIT

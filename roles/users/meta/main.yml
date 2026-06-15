@@ -6,7 +6,7 @@ galaxy_info:
   description: Manage local users, groups, and authorized SSH keys on Ubuntu
     hosts.
   company: Lightning IT
-  license: GPL-3.0-only
+  license: MIT
   min_ansible_version: "2.15"
   platforms:
     - name: Ubuntu
