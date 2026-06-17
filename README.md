@@ -22,6 +22,13 @@ Ubuntu-native package and repository management.
 - `lit.ubuntu.developer_tools`
   Install developer packages, Python packages, optional GitHub CLI, Argo CD,
   Terragrunt, OpenShift CLI, and SSH agent/private key helpers.
+- `lit.ubuntu.incus`
+  Configure an Ubuntu host as an Incus host.
+- `lit.ubuntu.incus_image`
+  Import Incus image artifacts and manage local image aliases.
+- `lit.ubuntu.incus_instance`
+  Manage Incus instance lifecycle, cloud-init injection, readiness waits, and
+  optional generated inventory output.
 - `lit.ubuntu.podman`, `lit.ubuntu.gui`, `lit.ubuntu.xrdp`,
   `lit.ubuntu.firefox`, and `lit.ubuntu.vscode`
   Provide optional workstation and remote desktop building blocks.

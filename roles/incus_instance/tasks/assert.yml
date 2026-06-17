@@ -1,0 +1,100 @@
+---
+- name: Validate Incus instance role inputs
+  ansible.builtin.assert:
+    that:
+      - incus_instance_enabled is boolean
+      - incus_instance_binary | trim | length > 0
+      - incus_instance_force_local is boolean
+      - incus_instance_command_user is string
+      - incus_instance_default_project is string
+      - incus_instance_default_type in ['vm', 'container']
+      - incus_instance_default_state in ['running', 'present', 'stopped', 'absent']
+      - incus_instance_default_profiles is sequence
+      - incus_instance_default_profiles is not string
+      - incus_instance_default_config is mapping
+      - incus_instance_default_devices is mapping
+      - incus_instance_default_limits is mapping
+      - incus_instance_default_wait_for_ip is boolean
+      - incus_instance_default_wait_for_ssh is boolean
+      - incus_instance_default_wait_timeout | int > 0
+      - incus_instance_default_wait_delay | int > 0
+      - incus_instance_default_ssh_user | trim | length > 0
+      - incus_instance_default_ssh_public_keys is sequence
+      - incus_instance_default_ssh_public_keys is not string
+      - incus_instance_default_cloud_init_enabled is boolean
+      - incus_instance_default_cloud_init_manage_etc_hosts is boolean
+      - incus_instance_default_cloud_init_disable_root is boolean
+      - incus_instance_default_cloud_init_ssh_pwauth is boolean
+      - incus_instance_default_cloud_init_groups is sequence
+      - incus_instance_default_cloud_init_groups is not string
+      - incus_instance_default_cloud_init_sudo is string
+      - incus_instance_default_network_config is string
+      - incus_instance_inventory_path is string
+      - incus_instance_inventory_group | trim | length > 0
+      - incus_instance_inventory_mode is string
+      - incus_instance_items is sequence
+      - incus_instance_items is not string
+      - incus_instance_results is sequence
+      - incus_instance_results is not string
+    fail_msg: "Invalid configuration for lit.ubuntu.incus_instance."
+    quiet: true
+  changed_when: false
+  when: incus_instance_enabled | bool
+
+- name: Validate Incus instance item definitions
+  ansible.builtin.assert:
+    that:
+      - incus_instance_item is mapping
+      - incus_instance_item.name | default('', true) | trim | length > 0
+      - incus_instance_item.state | default(incus_instance_default_state) in ['running', 'present', 'stopped', 'absent']
+      - incus_instance_item.type | default(incus_instance_default_type) in ['vm', 'container']
+      - incus_instance_item.image | default('', true) is string
+      - incus_instance_item.image_candidates | default([], true) is sequence
+      - incus_instance_item.image_candidates | default([], true) is not string
+      - >-
+        (incus_instance_item.image | default('', true) | trim | length > 0)
+        or (incus_instance_item.image_candidates | default([], true) | length > 0)
+        or (incus_instance_item.state | default(incus_instance_default_state)) == 'absent'
+      - incus_instance_item.project | default(incus_instance_default_project) is string
+      - incus_instance_item.profiles | default(incus_instance_default_profiles) is sequence
+      - incus_instance_item.profiles | default(incus_instance_default_profiles) is not string
+      - incus_instance_item.config | default(incus_instance_default_config) is mapping
+      - incus_instance_item.devices | default(incus_instance_default_devices) is mapping
+      - incus_instance_item.limits | default(incus_instance_default_limits) is mapping
+      - incus_instance_item.ssh_user | default(incus_instance_default_ssh_user) | trim | length > 0
+      - incus_instance_item.ssh_public_keys | default(incus_instance_default_ssh_public_keys) is sequence
+      - incus_instance_item.ssh_public_keys | default(incus_instance_default_ssh_public_keys) is not string
+      - incus_instance_item.cloud_init_enabled | default(incus_instance_default_cloud_init_enabled) is boolean
+      - incus_instance_item.wait_for_ip | default(incus_instance_default_wait_for_ip) is boolean
+      - incus_instance_item.wait_for_ssh | default(incus_instance_default_wait_for_ssh) is boolean
+    fail_msg: >-
+      Invalid Incus instance item. Each non-absent item needs a name and either
+      image or image_candidates.
+    quiet: true
+  changed_when: false
+  loop: "{{ incus_instance_items }}"
+  loop_control:
+    loop_var: incus_instance_item
+    label: "{{ incus_instance_item.name | default('incus-instance') }}"
+  when: incus_instance_enabled | bool
+
+- name: Validate Incus instance device definitions
+  ansible.builtin.assert:
+    that:
+      - incus_instance_device_item.value is mapping
+      - incus_instance_device_item.value.type | default('', true) | trim | length > 0
+    fail_msg: "Each Incus instance device needs a mapping with a type value."
+    quiet: true
+  changed_when: false
+  loop: >-
+    {{
+      incus_instance_items
+      | map(attribute='devices')
+      | select('defined')
+      | map('dict2items')
+      | flatten
+    }}
+  loop_control:
+    loop_var: incus_instance_device_item
+    label: "{{ incus_instance_device_item.key | default('incus-device') }}"
+  when: incus_instance_enabled | bool

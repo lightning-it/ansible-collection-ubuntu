@@ -1,0 +1,48 @@
+---
+- name: Verify incus_instance
+  hosts: incus_instance
+  become: false
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    incus_instance_molecule_ephemeral_dir: >-
+      {{
+        lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY')
+        | default('/tmp/lit-incus-instance-basic', true)
+      }}
+    incus_instance_molecule_root: "{{ incus_instance_molecule_ephemeral_dir }}/incus-instance"
+    incus_instance_molecule_inventory: "{{ incus_instance_molecule_root }}/generated-inventory.yml"
+  tasks:
+    - name: Check fake Incus instance state
+      ansible.builtin.stat:
+        path: "{{ incus_instance_molecule_root }}/state/molecule-rhel10.exists"
+      register: incus_instance_molecule_exists
+
+    - name: Read fake Incus instance status
+      ansible.builtin.slurp:
+        src: "{{ incus_instance_molecule_root }}/state/molecule-rhel10.status"
+      register: incus_instance_molecule_status
+
+    - name: Check generated cloud-init user-data
+      ansible.builtin.slurp:
+        src: "{{ incus_instance_molecule_root }}/state/molecule-rhel10.cloud-init.user-data"
+      register: incus_instance_molecule_user_data
+
+    - name: Check generated inventory file
+      ansible.builtin.slurp:
+        src: "{{ incus_instance_molecule_inventory }}"
+      register: incus_instance_molecule_inventory_file
+
+    - name: Assert fake Incus instance lifecycle worked
+      ansible.builtin.assert:
+        that:
+          - incus_instance_molecule_exists.stat.exists
+          - (incus_instance_molecule_status.content | b64decode | trim) == 'Running'
+          - "'molecule-rhel10.example.com' in (incus_instance_molecule_user_data.content | b64decode)"
+          - >-
+            'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeMoleculeKey'
+            in (incus_instance_molecule_user_data.content | b64decode)
+          - "'10.10.10.50' in (incus_instance_molecule_inventory_file.content | b64decode)"
+          - "'cloud-user' in (incus_instance_molecule_inventory_file.content | b64decode)"
+        quiet: true

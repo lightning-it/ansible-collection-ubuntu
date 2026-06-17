@@ -1,0 +1,38 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Skip Incus instance role when disabled
+  ansible.builtin.meta: end_host
+  when: not (incus_instance_enabled | bool)
+
+- name: Manage configured Incus instances
+  ansible.builtin.include_tasks: instance.yml
+  loop: "{{ incus_instance_items }}"
+  loop_control:
+    loop_var: incus_instance_item
+    label: "{{ incus_instance_item.name | default('incus-instance') }}"
+
+- name: Write Incus instance inventory on controller
+  ansible.builtin.copy:
+    dest: "{{ incus_instance_inventory_path }}"
+    mode: "{{ incus_instance_inventory_mode }}"
+    content: |
+      ---
+      all:
+        children:
+          {{ incus_instance_inventory_group }}:
+            hosts:
+      {% for incus_instance_result in incus_instance_results | default([]) %}
+      {% if incus_instance_result.ip | default('', true) | trim | length > 0 %}
+              {{ incus_instance_result.name }}:
+                ansible_host: {{ incus_instance_result.ip }}
+                ansible_user: {{ incus_instance_result.ssh_user }}
+      {% endif %}
+      {% endfor %}
+  delegate_to: localhost
+  become: false
+  when:
+    - incus_instance_inventory_path | trim | length > 0
+    - incus_instance_results | length > 0

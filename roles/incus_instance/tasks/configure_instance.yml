@@ -1,0 +1,94 @@
+---
+- name: Build generated Incus cloud-init user-data
+  ansible.builtin.set_fact:
+    incus_instance_generated_user_data:
+      hostname: "{{ incus_instance_hostname }}"
+      fqdn: "{{ incus_instance_fqdn }}"
+      manage_etc_hosts: "{{ incus_instance_default_cloud_init_manage_etc_hosts | bool }}"
+      ssh_pwauth: "{{ incus_instance_default_cloud_init_ssh_pwauth | bool }}"
+      disable_root: "{{ incus_instance_default_cloud_init_disable_root | bool }}"
+      users:
+        - default
+        - name: "{{ incus_instance_ssh_user }}"
+          shell: /bin/bash
+          lock_passwd: true
+          groups: "{{ incus_instance_item.cloud_init_groups | default(incus_instance_default_cloud_init_groups) }}"
+          sudo: "{{ incus_instance_item.cloud_init_sudo | default(incus_instance_default_cloud_init_sudo) }}"
+          ssh_authorized_keys: "{{ incus_instance_ssh_public_keys }}"
+      runcmd:
+        - [sh, -lc, "systemctl enable --now sshd || systemctl enable --now ssh || true"]
+  when: incus_instance_cloud_init_enabled | bool
+
+- name: Apply Incus cloud-init user-data
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['config', 'set', incus_instance_name, 'cloud-init.user-data', '-'] }}"
+    stdin: >-
+      {{
+        incus_instance_item.cloud_init_user_data
+        | default(
+          '#cloud-config' ~ "\n"
+          ~ (incus_instance_generated_user_data | to_nice_yaml),
+          true
+        )
+      }}
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  changed_when: true
+  when: incus_instance_cloud_init_enabled | bool
+
+- name: Apply Incus cloud-init network-config
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['config', 'set', incus_instance_name, 'cloud-init.network-config', '-'] }}"
+    stdin: >-
+      {{
+        incus_instance_item.cloud_init_network_config
+        | default(incus_instance_default_network_config, true)
+      }}
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  changed_when: true
+  when: incus_instance_cloud_init_enabled | bool
+
+- name: Add Incus cloud-init config device
+  ansible.builtin.command:
+    argv: >-
+      {{
+        incus_instance_base_argv
+        + ['config', 'device', 'add', incus_instance_name, 'cloud-init', 'disk', 'source=cloud-init:config']
+      }}
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_cloud_init_device
+  changed_when: incus_instance_cloud_init_device.rc == 0
+  failed_when:
+    - incus_instance_cloud_init_device.rc != 0
+    - "'already exists' not in (incus_instance_cloud_init_device.stderr | default(''))"
+  when: incus_instance_cloud_init_enabled | bool
+
+- name: Apply Incus instance config values
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['config', 'set', incus_instance_name, item.key, item.value | string] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  changed_when: true
+  loop: "{{ incus_instance_config | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Apply Incus instance limit values
+  ansible.builtin.command:
+    argv: >-
+      {{ incus_instance_base_argv + ['config', 'set', incus_instance_name, 'limits.' ~ item.key, item.value | string] }}
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  changed_when: true
+  loop: "{{ incus_instance_limits | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Add Incus instance devices
+  ansible.builtin.include_tasks: device.yml
+  loop: "{{ incus_instance_devices | dict2items }}"
+  loop_control:
+    loop_var: incus_instance_device_item
+    label: "{{ incus_instance_device_item.key }}"

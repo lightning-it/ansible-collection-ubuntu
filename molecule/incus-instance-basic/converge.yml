@@ -1,0 +1,131 @@
+---
+- name: Converge incus_instance
+  hosts: incus_instance
+  become: false
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    incus_instance_molecule_ephemeral_dir: >-
+      {{
+        lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY')
+        | default('/tmp/lit-incus-instance-basic', true)
+      }}
+    incus_instance_molecule_root: "{{ incus_instance_molecule_ephemeral_dir }}/incus-instance"
+    incus_instance_molecule_bin: "{{ incus_instance_molecule_root }}/bin/incus"
+    incus_instance_molecule_inventory: "{{ incus_instance_molecule_root }}/generated-inventory.yml"
+  pre_tasks:
+    - name: Ensure python3 is present
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get update && apt-get -y install python3
+        fi
+      changed_when: false
+
+    - name: Ensure molecule Incus instance directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ incus_instance_molecule_root }}"
+        - "{{ incus_instance_molecule_root }}/bin"
+        - "{{ incus_instance_molecule_root }}/state"
+
+    - name: Create fake Incus command
+      ansible.builtin.copy:
+        dest: "{{ incus_instance_molecule_bin }}"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          state_dir="{{ incus_instance_molecule_root }}/state"
+          args=("$@")
+
+          if [ "${args[0]:-}" = "--force-local" ]; then
+            args=("${args[@]:1}")
+          fi
+
+          instance="${args[1]:-}"
+
+          case "${args[0]:-}" in
+            image)
+              if [ "${args[1]:-}" = "info" ] && [ "${args[2]:-}" = "local:rhel10-ci" ]; then
+                exit 0
+              fi
+              exit 1
+              ;;
+            info)
+              test -f "${state_dir}/${instance}.exists"
+              ;;
+            init)
+              image="${args[1]:-}"
+              instance="${args[2]:-}"
+              test "${image}" = "local:rhel10-ci"
+              touch "${state_dir}/${instance}.exists"
+              printf 'Stopped\n' > "${state_dir}/${instance}.status"
+              ;;
+            config)
+              if [ "${args[1]:-}" = "set" ]; then
+                instance="${args[2]:-}"
+                key="${args[3]:-}"
+                cat > "${state_dir}/${instance}.${key}"
+                exit 0
+              fi
+              if [ "${args[1]:-}" = "device" ] && [ "${args[2]:-}" = "add" ]; then
+                instance="${args[3]:-}"
+                device="${args[4]:-}"
+                touch "${state_dir}/${instance}.device.${device}"
+                exit 0
+              fi
+              exit 1
+              ;;
+            list)
+              instance="${args[1]:-}"
+              status="Stopped"
+              if [ -f "${state_dir}/${instance}.status" ]; then
+                status="$(cat "${state_dir}/${instance}.status")"
+              fi
+              STATUS="${status}" INSTANCE="${instance}" python3 -c '
+          import json
+          import os
+          status = os.environ["STATUS"]
+          instance = os.environ["INSTANCE"]
+          network = {}
+          if status == "Running":
+              network = {"eth0": {"addresses": [{"family": "inet", "address": "10.10.10.50"}]}}
+          print(json.dumps([{"name": instance, "status": status, "state": {"network": network}}]))
+          '
+              ;;
+            start)
+              printf 'Running\n' > "${state_dir}/${instance}.status"
+              ;;
+            stop)
+              printf 'Stopped\n' > "${state_dir}/${instance}.status"
+              ;;
+            delete)
+              rm -f "${state_dir}/${instance}".*
+              ;;
+            *)
+              exit 1
+              ;;
+          esac
+  roles:
+    - role: lit.ubuntu.incus_instance
+      vars:
+        incus_instance_binary: "{{ incus_instance_molecule_bin }}"
+        incus_instance_inventory_path: "{{ incus_instance_molecule_inventory }}"
+        incus_instance_default_wait_for_ssh: false
+        incus_instance_default_ssh_public_keys:
+          - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeMoleculeKey molecule@example.com
+        incus_instance_items:
+          - name: molecule-rhel10
+            image_candidates:
+              - local:rhel10-ci
+            type: vm
+            state: running
+            fqdn: molecule-rhel10.example.com
+            limits:
+              cpu: "2"
+              memory: 4GiB
