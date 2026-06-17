@@ -14,6 +14,19 @@
     loop_var: incus_instance_item
     label: "{{ incus_instance_item.name | default('incus-instance') }}"
 
+- name: Ensure Incus instance inventory directory exists on controller
+  ansible.builtin.file:
+    path: "{{ incus_instance_inventory_path | dirname }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+  when:
+    - incus_instance_inventory_path | trim | length > 0
+    - (incus_instance_inventory_path | dirname) | trim | length > 0
+    - (incus_instance_inventory_path | dirname) != '.'
+    - incus_instance_results | length > 0
+
 - name: Write Incus instance inventory on controller
   ansible.builtin.copy:
     dest: "{{ incus_instance_inventory_path }}"
