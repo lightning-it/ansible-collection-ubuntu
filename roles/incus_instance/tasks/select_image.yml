@@ -1,0 +1,39 @@
+---
+- name: Initialize Incus selected image
+  ansible.builtin.set_fact:
+    incus_instance_selected_image: ""
+
+- name: Check Incus image candidates
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['image', 'info', incus_instance_image_candidate] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_image_candidate_result
+  changed_when: false
+  failed_when: false
+  loop: "{{ incus_instance_image_candidates }}"
+  loop_control:
+    loop_var: incus_instance_image_candidate
+    label: "{{ incus_instance_image_candidate }}"
+
+- name: Select first available Incus image
+  ansible.builtin.set_fact:
+    incus_instance_selected_image: >-
+      {{
+        (
+          incus_instance_image_candidate_result.results
+          | selectattr('rc', 'equalto', 0)
+          | map(attribute='incus_instance_image_candidate')
+          | list
+          | first
+        ) | default('', true)
+      }}
+
+- name: Require available Incus image
+  ansible.builtin.assert:
+    that:
+      - incus_instance_selected_image | trim | length > 0
+    fail_msg: >-
+      No usable Incus image found for {{ incus_instance_name }}.
+      Checked candidates: {{ incus_instance_image_candidates | join(', ') }}.
+    quiet: true

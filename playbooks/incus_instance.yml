@@ -1,0 +1,7 @@
+---
+- name: Manage Incus instances
+  hosts: "{{ incus_instance_target | default('incus_hosts') }}"
+  become: true
+  gather_facts: false
+  roles:
+    - role: lit.ubuntu.incus_instance

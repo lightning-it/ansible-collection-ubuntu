@@ -1,0 +1,200 @@
+---
+- name: Resolve Incus instance settings
+  ansible.builtin.set_fact:
+    incus_instance_name: "{{ incus_instance_item.name | trim }}"
+    incus_instance_state: "{{ incus_instance_item.state | default(incus_instance_default_state) }}"
+    incus_instance_type: "{{ incus_instance_item.type | default(incus_instance_default_type) }}"
+    incus_instance_project: "{{ incus_instance_item.project | default(incus_instance_default_project) | trim }}"
+    incus_instance_profiles: "{{ incus_instance_item.profiles | default(incus_instance_default_profiles) }}"
+    incus_instance_config: "{{ incus_instance_default_config | combine(incus_instance_item.config | default({})) }}"
+    incus_instance_devices: "{{ incus_instance_default_devices | combine(incus_instance_item.devices | default({})) }}"
+    incus_instance_limits: "{{ incus_instance_default_limits | combine(incus_instance_item.limits | default({})) }}"
+    incus_instance_wait_for_ip: >-
+      {{ incus_instance_item.wait_for_ip | default(incus_instance_default_wait_for_ip) | bool }}
+    incus_instance_wait_for_ssh: >-
+      {{ incus_instance_item.wait_for_ssh | default(incus_instance_default_wait_for_ssh) | bool }}
+    incus_instance_wait_timeout: >-
+      {{ incus_instance_item.wait_timeout | default(incus_instance_default_wait_timeout) | int }}
+    incus_instance_wait_delay: "{{ incus_instance_item.wait_delay | default(incus_instance_default_wait_delay) | int }}"
+    incus_instance_ssh_user: "{{ incus_instance_item.ssh_user | default(incus_instance_default_ssh_user) | trim }}"
+    incus_instance_ssh_public_keys: >-
+      {{ incus_instance_item.ssh_public_keys | default(incus_instance_default_ssh_public_keys) }}
+    incus_instance_hostname: >-
+      {{ incus_instance_item.hostname | default(incus_instance_item.name, true) | trim }}
+    incus_instance_fqdn: >-
+      {{
+        incus_instance_item.fqdn
+        | default(incus_instance_item.hostname | default(incus_instance_item.name, true), true)
+        | trim
+      }}
+    incus_instance_cloud_init_enabled: >-
+      {{ incus_instance_item.cloud_init_enabled | default(incus_instance_default_cloud_init_enabled) | bool }}
+
+- name: Build base Incus command arguments
+  ansible.builtin.set_fact:
+    incus_instance_base_argv: >-
+      {{
+        [incus_instance_binary]
+        + (['--force-local'] if incus_instance_force_local | bool else [])
+        + (['--project', incus_instance_project] if incus_instance_project | length > 0 else [])
+      }}
+
+- name: Build Incus image candidates
+  ansible.builtin.set_fact:
+    incus_instance_image_candidates: >-
+      {{
+        ([incus_instance_item.image] if (incus_instance_item.image | default('', true) | trim | length > 0) else [])
+        + (incus_instance_item.image_candidates | default([], true))
+      }}
+
+- name: Check current Incus instance
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['info', incus_instance_name] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_info
+  changed_when: false
+  failed_when: false
+
+- name: Delete Incus instance when absent
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['delete', incus_instance_name, '--force'] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_delete
+  changed_when: true
+  when:
+    - incus_instance_state == 'absent'
+    - incus_instance_info.rc == 0
+
+- name: Select first available Incus image candidate
+  ansible.builtin.include_tasks: select_image.yml
+  when: incus_instance_state != 'absent'
+
+- name: Create Incus instance
+  ansible.builtin.command:
+    argv: >-
+      {{
+        incus_instance_base_argv
+        + ['init', incus_instance_selected_image, incus_instance_name]
+        + (['--vm'] if incus_instance_type == 'vm' else [])
+        + (incus_instance_profiles | map('regex_replace', '^(.*)$', '--profile=\1') | list)
+      }}
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_create
+  changed_when: true
+  when:
+    - incus_instance_state != 'absent'
+    - incus_instance_info.rc != 0
+
+- name: Configure newly created Incus instance
+  ansible.builtin.include_tasks: configure_instance.yml
+  when:
+    - incus_instance_state != 'absent'
+    - incus_instance_create is changed
+
+- name: Refresh Incus instance state
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['list', incus_instance_name, '--format', 'json'] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_list
+  changed_when: false
+  when: incus_instance_state != 'absent'
+
+- name: Resolve current Incus instance status
+  ansible.builtin.set_fact:
+    incus_instance_current_status: >-
+      {{
+        (
+          incus_instance_list.stdout
+          | from_json
+          | first
+        ).status | default('')
+      }}
+  when: incus_instance_state != 'absent'
+
+- name: Start Incus instance
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['start', incus_instance_name] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  changed_when: true
+  when:
+    - incus_instance_state == 'running'
+    - incus_instance_current_status != 'Running'
+
+- name: Stop Incus instance
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['stop', incus_instance_name, '--force'] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  changed_when: true
+  when:
+    - incus_instance_state == 'stopped'
+    - incus_instance_current_status == 'Running'
+
+- name: Wait for Incus instance IPv4 address
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      "{{ incus_instance_binary }}" {{ '--force-local' if incus_instance_force_local | bool else '' }} \
+      {% if incus_instance_project | length > 0 %}--project "{{ incus_instance_project }}" {% endif %}\
+      list "{{ incus_instance_name }}" --format json | python3 -c '
+      import json
+      import sys
+
+      instances = json.load(sys.stdin)
+      for instance in instances:
+          for iface in instance.get("state", {}).get("network", {}).values():
+              for address in iface.get("addresses", []):
+                  if address.get("family") == "inet" and address.get("address") != "127.0.0.1":
+                      print(address["address"])
+                      raise SystemExit(0)
+      raise SystemExit(1)
+      '
+    executable: /bin/bash
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_ip_lookup
+  changed_when: false
+  retries: "{{ ((incus_instance_wait_timeout | int) / (incus_instance_wait_delay | int)) | int }}"
+  delay: "{{ incus_instance_wait_delay }}"
+  until: incus_instance_ip_lookup.stdout | trim | length > 0
+  when:
+    - incus_instance_state == 'running'
+    - incus_instance_wait_for_ip | bool
+
+- name: Resolve Incus instance IPv4 address
+  ansible.builtin.set_fact:
+    incus_instance_ip: "{{ incus_instance_ip_lookup.stdout | default('', true) | trim }}"
+  when: incus_instance_state == 'running'
+
+- name: Wait for SSH on Incus instance
+  ansible.builtin.wait_for:
+    host: "{{ incus_instance_ip }}"
+    port: 22
+    timeout: "{{ incus_instance_wait_timeout }}"
+    delay: 0
+  when:
+    - incus_instance_state == 'running'
+    - incus_instance_wait_for_ssh | bool
+    - incus_instance_ip | default('', true) | trim | length > 0
+
+- name: Record Incus instance result
+  ansible.builtin.set_fact:
+    incus_instance_results: >-
+      {{
+        incus_instance_results
+        + [
+          {
+            'name': incus_instance_name,
+            'state': incus_instance_state,
+            'type': incus_instance_type,
+            'image': incus_instance_selected_image | default(''),
+            'ip': incus_instance_ip | default(''),
+            'ssh_user': incus_instance_ssh_user
+          }
+        ]
+      }}

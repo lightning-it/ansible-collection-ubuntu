@@ -1,0 +1,54 @@
+---
+incus_instance_enabled: true
+
+incus_instance_binary: incus
+incus_instance_force_local: true
+incus_instance_command_user: ""
+incus_instance_default_project: ""
+
+incus_instance_default_type: vm
+incus_instance_default_state: running
+incus_instance_default_profiles: []
+incus_instance_default_config: {}
+incus_instance_default_devices: {}
+incus_instance_default_limits: {}
+incus_instance_default_wait_for_ip: true
+incus_instance_default_wait_for_ssh: true
+incus_instance_default_wait_timeout: 300
+incus_instance_default_wait_delay: 5
+incus_instance_default_ssh_user: cloud-user
+incus_instance_default_ssh_public_keys: []
+incus_instance_default_cloud_init_enabled: true
+incus_instance_default_cloud_init_manage_etc_hosts: true
+incus_instance_default_cloud_init_disable_root: true
+incus_instance_default_cloud_init_ssh_pwauth: false
+incus_instance_default_cloud_init_groups:
+  - wheel
+incus_instance_default_cloud_init_sudo: "ALL=(ALL) NOPASSWD:ALL"
+incus_instance_default_network_config: |
+  version: 2
+  ethernets:
+    incus0:
+      dhcp4: true
+      dhcp6: true
+      accept-ra: true
+
+# Optional inventory file written on the Ansible controller.
+incus_instance_inventory_path: ""
+incus_instance_inventory_group: incus_instances
+incus_instance_inventory_mode: "0644"
+
+# List of Incus instances to manage.
+# Required per item:
+# - name
+# - image or image_candidates
+# Optional per item:
+# - state: running|present|stopped|absent
+# - type: vm|container
+# - project, profiles, config, devices, limits
+# - hostname, fqdn
+# - ssh_user, ssh_public_keys
+# - cloud_init_enabled, cloud_init_user_data, cloud_init_network_config
+# - wait_for_ip, wait_for_ssh, wait_timeout, wait_delay
+incus_instance_items: []
+incus_instance_results: []

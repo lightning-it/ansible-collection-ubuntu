@@ -1,0 +1,39 @@
+---
+- name: Initialize Incus instance device arguments
+  ansible.builtin.set_fact:
+    incus_instance_device_option_args: []
+
+- name: Build Incus instance device option arguments
+  ansible.builtin.set_fact:
+    incus_instance_device_option_args: >-
+      {{
+        incus_instance_device_option_args
+        + [incus_instance_device_option.key ~ '=' ~ (incus_instance_device_option.value | string)]
+      }}
+  loop: "{{ incus_instance_device_item.value | dict2items | rejectattr('key', 'equalto', 'type') }}"
+  loop_control:
+    loop_var: incus_instance_device_option
+    label: "{{ incus_instance_device_option.key }}"
+
+- name: Add Incus instance device
+  ansible.builtin.command:
+    argv: >-
+      {{
+        incus_instance_base_argv
+        + [
+          'config',
+          'device',
+          'add',
+          incus_instance_name,
+          incus_instance_device_item.key,
+          incus_instance_device_item.value.type
+        ]
+        + incus_instance_device_option_args
+      }}
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_device_add
+  changed_when: incus_instance_device_add.rc == 0
+  failed_when:
+    - incus_instance_device_add.rc != 0
+    - "'already exists' not in (incus_instance_device_add.stderr | default(''))"
