@@ -34,7 +34,7 @@ If generic guidance conflicts with repository behavior, you MUST prefer reposito
    2. `SECURITY.md`
    3. `scripts/wunder-devtools-ee.sh`
 4. Managed collection baseline files from `shared-assets/ansible-collection/base`:
-   1. `AGENT.md`
+   1. `AGENT.md` or downstream `AGENTS.md` when the repository uses the plural name
    2. `CONTRIBUTING.md`
    3. `.ansible-lint`
    4. `ansible.cfg`
@@ -43,6 +43,13 @@ If generic guidance conflicts with repository behavior, you MUST prefer reposito
    7. `.yamllint`
    8. `.gitignore`
    9. shared block in `.pre-commit-config.yaml`
+   10. `scripts/bump_galaxy_version.py`
+   11. `scripts/devtools-ansible-lint.sh`
+   12. `scripts/devtools-collection-prepare.sh`
+   13. `scripts/devtools-collection-smoke.sh`
+   14. `scripts/devtools-galaxy-verify.sh`
+   15. `scripts/devtools-galaxy.sh`
+   16. `scripts/devtools-molecule.sh`
 5. Repo-local exceptions MUST be explicit in the sync workflow and documented in the repository.
 
 ## 2. Repository Baseline (This Repo)
@@ -91,8 +98,8 @@ If generic guidance conflicts with repository behavior, you MUST prefer reposito
 1. Variables defined and owned by a role MUST use that role prefix in snake_case.
 2. Format: `<role>_<name>`.
 3. Examples:
-   1. `baseline_timezone`, `baseline_locale`
-   2. `developer_tools_packages_present`, `developer_tools_pip_packages_present`
+   1. `selinux_state`, `selinux_policy`
+   2. `keycloak_config_skip_apply`, `keycloak_config_tg_dir`
 4. You MUST NOT bypass variable naming rules with lint suppressions (for example `# noqa var-naming`).
 
 ### 3.2 Secrets Variable Naming (Mandatory)
@@ -164,6 +171,28 @@ myrole_api_url_effective: "{{ myrole_api_url | default(minio_deploy_api_url_effe
    (example: `create_authentication_token.yml`, `delete_authentication_token.yml`).
 
 ## 4. Role Structure and Prechecks
+
+### 4.0 Role Responsibility Boundaries
+
+1. Keep operating-system preparation in the operating-system collection:
+   1. users and groups
+   2. sudoers policy
+   3. packages and repositories
+   4. RHSM registration
+   5. Podman installation and rootless storage
+   6. generic Ansible remote temporary directories
+2. Application roles MUST consume prepared OS state and validate it, not create
+   or repair it. For example, AAP roles may validate the `aap` install user and
+   required commands, but user creation belongs to `lit.rhel.users`.
+3. Artifact discovery, download, checksum verification, and staging belong in a
+   dedicated prepare/artifacts role. Deploy roles SHOULD consume final prepared
+   paths and avoid parallel fallback discovery logic.
+4. Avoid repeated near-identical task branches for source variants such as
+   `url`, `local`, and `remote`. Resolve source-specific values once, build one
+   normalized item, and pass that normalized item to the generic implementation.
+5. Compatibility wrappers for misspelled role names or legacy aliases are
+   temporary. Remove them once no maintained playbook, runbook, Molecule
+   scenario, or documentation references them.
 
 ### 4.1 Required Role Layout
 
@@ -381,13 +410,15 @@ Molecule scenarios MUST live at repository root under `molecule/`.
 ### 8.3 Execution Behavior
 
 1. `scripts/devtools-molecule.sh` runs all root scenarios except names ending in `_heavy`.
-2. A single scenario is run with:
+2. Scenarios with `.molecule-mode` set to `protected-incus` are skipped unless
+   `MOLECULE_RUN_PROTECTED=true` is set and the devtools container has the `incus` CLI.
+3. A single scenario is run with:
 
 ```bash
 scripts/devtools-molecule.sh minio-config-basic
 ```
 
-3. Keep light scenarios runnable in devtools and pre-commit without external infrastructure.
+4. Keep light scenarios runnable in devtools and pre-commit without external infrastructure.
 
 ### 8.4 Required Basic Scenario Coverage Per Role (Mandatory)
 
