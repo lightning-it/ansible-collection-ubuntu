@@ -17,9 +17,6 @@
 node_modules/
 npm-debug.log
 
-# Galaxy build artifacts
-*.tar.gz
-
 # Local collection installs from tests/hooks
 collections/**
 !collections/requirements.yml

@@ -97,7 +97,7 @@ This security policy covers:
 
 It does **not** cover:
 
-- upstream products and dependencies (e.g. Ubuntu, OpenShift, Kubernetes,
+- upstream products and dependencies (e.g. RHEL, OpenShift, Kubernetes,
   Keycloak, Vault, GitLab, etc.), which follow their own vendor security
   processes.
 
