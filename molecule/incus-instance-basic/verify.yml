@@ -33,6 +33,8 @@
       ansible.builtin.slurp:
         src: "{{ incus_instance_molecule_inventory }}"
       register: incus_instance_molecule_inventory_file
+      delegate_to: localhost
+      become: false
 
     - name: Assert fake Incus instance lifecycle worked
       ansible.builtin.assert:
