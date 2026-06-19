@@ -29,6 +29,15 @@ Ubuntu-native package and repository management.
 - `lit.ubuntu.incus_instance`
   Manage Incus instance lifecycle, cloud-init injection, readiness waits, and
   optional generated inventory output.
+- `lit.ubuntu.netplan`
+  Render and apply Ubuntu netplan interface configuration.
+- `lit.ubuntu.postgres_deploy`
+  Deploy PostgreSQL as a Podman-managed pod on Ubuntu.
+- `lit.ubuntu.semaphore_deploy`
+  Deploy Semaphore UI as a Podman-managed container, with optional managed
+  PostgreSQL.
+- `lit.ubuntu.semaphore_cac`
+  Provide the Semaphore UI configuration-as-code taskset entrypoint.
 - `lit.ubuntu.podman`, `lit.ubuntu.gui`, `lit.ubuntu.xrdp`,
   `lit.ubuntu.firefox`, and `lit.ubuntu.vscode`
   Provide optional workstation and remote desktop building blocks.
