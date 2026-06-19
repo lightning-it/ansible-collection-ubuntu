@@ -18,6 +18,7 @@ developer_tools_enabled: true
 developer_tools_packages_present: []
 developer_tools_pip_executable: pip3
 developer_tools_pip_packages_present: []
+developer_tools_pip_extra_args: ""
 
 developer_tools_github_cli_enabled: false
 developer_tools_github_cli_package_name: gh
