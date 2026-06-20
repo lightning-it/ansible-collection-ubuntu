@@ -1,3 +1,16 @@
+## 1.0.0 (2026-06-18)
+
+### Features
+
+* **incus_image:** add role for managing Incus images and aliases ([#2](https://github.com/lightning-it/ansible-collection-ubuntu/issues/2)) ([2993c05](https://github.com/lightning-it/ansible-collection-ubuntu/commit/2993c05679d55d0e544729a419ebc6de7bb06afd))
+* **incus_instance:** add role for managing Incus instances and lifec… ([#4](https://github.com/lightning-it/ansible-collection-ubuntu/issues/4)) ([1da4a38](https://github.com/lightning-it/ansible-collection-ubuntu/commit/1da4a383647bed220ee5dcdf85c8fbb45cdd37ea))
+* sync shared assets from lightning-it/shared-assets ([#5](https://github.com/lightning-it/ansible-collection-ubuntu/issues/5)) ([1032825](https://github.com/lightning-it/ansible-collection-ubuntu/commit/10328255630d58dd9b4c625fe5f1ce4a6ebbde96))
+
+### Bug Fixes
+
+* **molecule:** run automatic updates scenario on ubuntu ([4b95855](https://github.com/lightning-it/ansible-collection-ubuntu/commit/4b95855bb26aeb912fcc325a6e0cddb3398a9370))
+* Update license from GPL-3.0-only to MIT across all relevant files ([#3](https://github.com/lightning-it/ansible-collection-ubuntu/issues/3)) ([de5e7b5](https://github.com/lightning-it/ansible-collection-ubuntu/commit/de5e7b5bae8504c83689cc89356031f6b21befab))
+
 ## [1.13.1](https://github.com/lightning-it/ansible-collection-ubuntu/compare/v1.13.0...v1.13.1) (2026-03-21)
 
 ### Bug Fixes

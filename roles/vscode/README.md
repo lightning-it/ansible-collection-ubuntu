@@ -1,3 +1,5 @@
+# lit.ubuntu.vscode
+
 ---
 # lit.ubuntu.vscode
 
@@ -20,7 +22,40 @@ This role centralizes:
 This role is intentionally the shared helper role, not the main lifecycle role
 for normal playbooks.
 
-## Design note
+## Requirements
+
+None.
+
+## Variables
+
+See `defaults/main.yml`.
+
+## Dependencies
+
+None.
+
+## Example Playbook
+
+```yaml
+---
+- name: Use lit.ubuntu.vscode
+  hosts: all
+  become: true
+  roles:
+    - role: lit.ubuntu.vscode
+```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT
+
+## Additional Notes
+
+### Design note
 
 The split keeps shared logic centralized, keeps lifecycle roles focused on one
 responsibility, and minimizes duplication across deployment, configuration, and
@@ -30,7 +65,7 @@ The curated default extension set is optimized for Ansible, Helm, Kubernetes,
 YAML-heavy infrastructure work, container workflows, Terraform, Git-centric
 platform engineering, and general developer workstation productivity on Ubuntu.
 
-## Common variables
+### Common variables
 
 ```yaml
 vscode_users: []
@@ -63,7 +98,7 @@ vscode_remove_package: false
 vscode_remove_repo: false
 ```
 
-## Extension merge behavior
+### Extension merge behavior
 
 The shared role builds the effective extension list in this order:
 
@@ -80,7 +115,7 @@ File-based extension lists are read on the controller and should contain one
 extension ID per line. Empty lines and comment lines starting with `#` are
 ignored.
 
-## VSIX model
+### VSIX model
 
 `vscode_vsix_files` is a list of mappings:
 
@@ -100,7 +135,7 @@ the baseline include:
 - `golang.go`
 - `redhat.java`
 
-## Scope notes
+### Scope notes
 
 - Repository and package state are handled by `lit.ubuntu.vscode_deploy`.
 - User extension management and optional settings are handled by `lit.ubuntu.vscode_config`.

@@ -1,0 +1,16 @@
+---
+- name: Converge firefox destroy syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    firefox_destroy_molecule_execute_role: false
+  tasks:
+    - name: Import lit.ubuntu.firefox_destroy for syntax coverage
+      ansible.builtin.import_role:
+        name: lit.ubuntu.firefox_destroy
+      when: firefox_destroy_molecule_execute_role | bool
+
+    - name: Record lit.ubuntu.firefox_destroy Molecule coverage mode
+      ansible.builtin.set_fact:
+        firefox_destroy_molecule_coverage_mode: syntax_stub

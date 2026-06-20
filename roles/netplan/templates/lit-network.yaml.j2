@@ -1,0 +1,6 @@
+# Ansible managed
+network:
+  version: 2
+  renderer: {{ netplan_renderer }}
+  ethernets:
+{{ netplan_ethernet_config | to_nice_yaml(indent=2, sort_keys=True) | indent(4, true) }}

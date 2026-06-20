@@ -3,11 +3,12 @@
   ansible.builtin.assert:
     that:
       - developer_tools_pip_executable | trim | length > 0
+      - developer_tools_pip_extra_args is string
       - developer_tools_github_cli_package_name | trim | length > 0
-      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo_name | trim | length > 0
-      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo_description | trim | length > 0
-      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo_baseurl | trim | length > 0
-      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo_gpgkey | trim | length > 0
+      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_key_url | trim | length > 0
+      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_key_dest | trim | length > 0
+      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo | trim | length > 0
+      - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_deb_arch | trim | length > 0
       - developer_tools_argocd_cli_dest | trim | length > 0
       - not developer_tools_terragrunt_enabled | bool or developer_tools_terragrunt_version | trim | length > 0
       - not developer_tools_terragrunt_enabled | bool or developer_tools_terragrunt_url | trim | length > 0

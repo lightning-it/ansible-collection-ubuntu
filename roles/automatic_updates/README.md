@@ -4,6 +4,10 @@ Configure weekly automatic OS updates on Ubuntu systems via cron. By default it
 runs `apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade` every
 Sunday at 06:00 and writes output to `/var/log/apt-auto-weekly.log`.
 
+## Requirements
+
+None.
+
 ## Variables
 
 - `automatic_updates_enabled` (bool, default: `true`): Enable or disable the cron job.
@@ -18,3 +22,26 @@ Sunday at 06:00 and writes output to `/var/log/apt-auto-weekly.log`.
 - `automatic_updates_manage_cron_package` (bool, default: `true`): Install the cron package when enabled.
 - `automatic_updates_cron_package` (string, default: `"cron"`): Package that provides `crontab` on Ubuntu.
 - `automatic_updates_crontab_paths` (list): Paths used to detect whether `crontab` is available.
+
+## Dependencies
+
+None.
+
+## Example Playbook
+
+```yaml
+---
+- name: Use lit.ubuntu.automatic_updates
+  hosts: all
+  become: true
+  roles:
+    - role: lit.ubuntu.automatic_updates
+```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT

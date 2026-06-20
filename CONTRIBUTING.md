@@ -90,8 +90,8 @@ For collections using semantic-release:
 
 Each pull request should include:
 
-- A concise title following conventional commits
-  (e.g. `fix: address apt repository idempotency`, `feat: add tf_runner role`).
+- A concise title following conventional commits  
+  (e.g. `fix: address selinux idempotency`, `feat: add tf_runner role`).
 - A description covering:
   - the problem,
   - the solution,
@@ -141,6 +141,6 @@ your local behaviour matches CI.
 ---
 
 _This file is managed centrally for Lightning IT Ansible collections. Downstream
-repositories should not edit their copy directly — propose changes via the
-shared assets repository or the designated “collection-meta” repo so every
+repositories should not edit their copy directly  - propose changes via the
+shared assets repository or the designated `collection-meta` repo so every
 collection stays aligned._
