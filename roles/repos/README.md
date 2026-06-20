@@ -5,7 +5,26 @@ Configure apt repository sources and apt proxy policy for Ubuntu hosts.
 This role is repository policy only. Service roles should own package
 installation.
 
-## Example
+## Requirements
+
+None.
+
+## Variables
+
+- `repos_enabled`: enable or skip the role.
+- `repos_proxy_enabled`: manage apt proxy config.
+- `repos_proxy_url`: proxy URL such as `http://proxy.example.com:3128`.
+- `repos_proxy_file`: apt proxy config path.
+- `repos_custom`: list of apt repositories to manage.
+- `repos_keyring_dir`: keyring directory to create.
+- `repos_update_cache`: refresh apt cache after repository changes.
+- `repos_no_log`: hide repository item details.
+
+## Dependencies
+
+None.
+
+## Example Playbook
 
 ```yaml
 - hosts: ubuntu
@@ -20,13 +39,10 @@ installation.
             key_dest: /etc/apt/keyrings/example.asc
 ```
 
-## Variables
+## License
 
-- `repos_enabled`: enable or skip the role.
-- `repos_proxy_enabled`: manage apt proxy config.
-- `repos_proxy_url`: proxy URL such as `http://proxy.example.com:3128`.
-- `repos_proxy_file`: apt proxy config path.
-- `repos_custom`: list of apt repositories to manage.
-- `repos_keyring_dir`: keyring directory to create.
-- `repos_update_cache`: refresh apt cache after repository changes.
-- `repos_no_log`: hide repository item details.
+MIT
+
+## Author
+
+Lightning IT

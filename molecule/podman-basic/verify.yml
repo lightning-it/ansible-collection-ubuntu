@@ -1,0 +1,11 @@
+---
+- name: Verify podman syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Assert lit.ubuntu.podman coverage stub ran
+      ansible.builtin.assert:
+        that:
+          - podman_molecule_coverage_mode | default('') == 'syntax_stub'
+        quiet: true

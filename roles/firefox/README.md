@@ -1,3 +1,5 @@
+# lit.ubuntu.firefox
+
 ---
 # lit.ubuntu.firefox
 
@@ -19,13 +21,46 @@ This role centralizes:
 
 This role is intentionally not the main lifecycle execution role.
 
-## Design note
+## Requirements
+
+None.
+
+## Variables
+
+See `defaults/main.yml`.
+
+## Dependencies
+
+None.
+
+## Example Playbook
+
+```yaml
+---
+- name: Use lit.ubuntu.firefox
+  hosts: all
+  become: true
+  roles:
+    - role: lit.ubuntu.firefox
+```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT
+
+## Additional Notes
+
+### Design note
 
 This split keeps shared logic centralized, keeps lifecycle roles small, avoids
 duplicating defaults and helper tasks, and aligns with the collection pattern
 used for enterprise workstation roles.
 
-## Configuration model
+### Configuration model
 
 The role set supports two practical models:
 
@@ -51,7 +86,7 @@ user bookmarks in profile SQLite databases, which is not a clean declarative
 target for Ansible. For reproducible corporate defaults, this role uses Firefox
 enterprise bookmark policy.
 
-## Common variables
+### Common variables
 
 ```yaml
 firefox_enabled: true
@@ -96,7 +131,7 @@ firefox_remove_policies: false
 firefox_remove_bookmarks: false
 ```
 
-## Example configuration
+### Example configuration
 
 ```yaml
 firefox_user: developer
@@ -132,7 +167,7 @@ firefox_bookmarks:
     folder: Security
 ```
 
-## Scope notes
+### Scope notes
 
 - Linux policy files are written to `/etc/firefox/policies`, which Firefox
   supports as a system-wide policy location.

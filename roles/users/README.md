@@ -2,6 +2,10 @@
 
 Manage local users, their groups, and authorized SSH keys on Ubuntu hosts.
 
+## Requirements
+
+None.
+
 ## Variables
 
 ### `users_accounts`
@@ -37,7 +41,11 @@ Additional user definitions appended to `users_accounts`. This is useful for
 environment-specific service accounts, for example a shared deploy user, without
 replacing the global baseline users.
 
-## Example
+## Dependencies
+
+None.
+
+## Example Playbook
 
 ```yaml
 - hosts: all
@@ -58,3 +66,11 @@ replacing the global baseline users.
             state: absent
             remove: true
 ```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT
