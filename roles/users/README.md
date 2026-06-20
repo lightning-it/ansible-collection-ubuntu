@@ -26,7 +26,7 @@ users_accounts:
     password_lock: false
     remove: false             # remove home on absent if true
     passwordless_sudo: false  # write /etc/sudoers.d/<name> with NOPASSWD
-    sudoers_name: ops-admin   # optional sudoers file name
+    sudoers_name: ops-admin   # optional sudoers file name; removed when passwordless_sudo is false
     ssh_keys:
       - "ssh-ed25519 AAAA... comment"
 ```

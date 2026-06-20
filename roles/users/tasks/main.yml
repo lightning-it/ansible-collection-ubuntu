@@ -149,3 +149,26 @@
     - ubuntu_users_with_passwordless_sudo | length > 0
   loop_control:
     label: "{{ item.name }}"
+
+- name: Build list of users with passwordless sudo explicitly disabled
+  ansible.builtin.set_fact:
+    ubuntu_users_without_passwordless_sudo: >-
+      {{
+        users_accounts_effective
+        | select('mapping')
+        | selectattr('sudoers_name', 'defined')
+        | selectattr('passwordless_sudo', 'defined')
+        | selectattr('passwordless_sudo', 'equalto', false)
+        | list
+      }}
+
+- name: Remove explicitly disabled passwordless sudo files
+  ansible.builtin.file:
+    path: "/etc/sudoers.d/{{ item.sudoers_name }}"
+    state: absent
+  loop: "{{ ubuntu_users_without_passwordless_sudo | default([]) }}"
+  when:
+    - ubuntu_users_without_passwordless_sudo is defined
+    - ubuntu_users_without_passwordless_sudo | length > 0
+  loop_control:
+    label: "{{ item.name }}"
