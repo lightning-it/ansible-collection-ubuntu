@@ -6,5 +6,10 @@
 #   ssh_keys (list of authorized keys for ~/.ssh/authorized_keys).
 users_accounts: []
 
+# Extra user definitions appended to `users_accounts`. Use this from
+# environment, group, or host inventory when a role consumer needs to add a
+# service account without replacing the shared baseline user list.
+users_accounts_extra: []
+
 # Whether to ensure groups referenced in users exist before assignment.
 users_manage_groups: true

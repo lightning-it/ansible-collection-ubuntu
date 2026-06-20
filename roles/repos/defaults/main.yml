@@ -19,6 +19,9 @@ repos_proxy_file: /etc/apt/apt.conf.d/90proxy
 #     key_dest: /etc/apt/keyrings/example.gpg
 repos_custom: []
 
+# Obsolete apt source files to remove before refreshing the cache.
+repos_cleanup_files: []
+
 repos_keyring_dir: /etc/apt/keyrings
 repos_update_cache: true
 repos_no_log: false

@@ -1,0 +1,21 @@
+---
+- name: Converge netplan
+  hosts: netplan
+  gather_facts: false
+  become: false
+  vars:
+    netplan_config_path: /tmp/lit-netplan/99-lit-network.yaml
+    netplan_validate: false
+    netplan_apply: false
+    net_ifaces:
+      - iface: ens33
+        role: uplink
+        ipv4: 10.34.71.99/24
+        gw4: 10.34.71.1
+      - iface: ens34
+        role: mgmt
+        ipv4: 10.10.30.99/24
+    dns_servers:
+      - 1.1.1.1
+  roles:
+    - role: lit.ubuntu.netplan

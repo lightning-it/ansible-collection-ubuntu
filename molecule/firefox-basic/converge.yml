@@ -1,0 +1,16 @@
+---
+- name: Converge firefox syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    firefox_molecule_execute_role: false
+  tasks:
+    - name: Import lit.ubuntu.firefox for syntax coverage
+      ansible.builtin.import_role:
+        name: lit.ubuntu.firefox
+      when: firefox_molecule_execute_role | bool
+
+    - name: Record lit.ubuntu.firefox Molecule coverage mode
+      ansible.builtin.set_fact:
+        firefox_molecule_coverage_mode: syntax_stub

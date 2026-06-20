@@ -1,9 +1,42 @@
+# lit.ubuntu.vscode_deploy
+
 ---
 # lit.ubuntu.vscode_deploy
 
 Install Visual Studio Code on Ubuntu using the shared `lit.ubuntu.vscode` role.
 
-## Scope
+## Requirements
+
+None.
+
+## Variables
+
+See `defaults/main.yml`.
+
+## Dependencies
+
+None.
+
+## Example Playbook
+
+```yaml
+- hosts: workstations
+  become: true
+  roles:
+    - role: lit.ubuntu.vscode_deploy
+```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT
+
+## Additional Notes
+
+### Scope
 
 This role:
 
@@ -14,12 +47,3 @@ This role:
 
 This role does not manage user extensions or user settings. Use
 `lit.ubuntu.vscode_config` for that.
-
-## Example
-
-```yaml
-- hosts: workstations
-  become: true
-  roles:
-    - role: lit.ubuntu.vscode_deploy
-```

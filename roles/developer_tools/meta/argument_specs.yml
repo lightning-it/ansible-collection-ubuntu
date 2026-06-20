@@ -15,6 +15,9 @@ argument_specs:
       developer_tools_pip_packages_present:
         type: list
         elements: str
+      developer_tools_pip_extra_args:
+        type: str
+        default: ""
       developer_tools_github_cli_enabled:
         type: bool
         default: false

@@ -1,0 +1,16 @@
+---
+- name: Converge vscode destroy syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    vscode_destroy_molecule_execute_role: false
+  tasks:
+    - name: Import lit.ubuntu.vscode_destroy for syntax coverage
+      ansible.builtin.import_role:
+        name: lit.ubuntu.vscode_destroy
+      when: vscode_destroy_molecule_execute_role | bool
+
+    - name: Record lit.ubuntu.vscode_destroy Molecule coverage mode
+      ansible.builtin.set_fact:
+        vscode_destroy_molecule_coverage_mode: syntax_stub

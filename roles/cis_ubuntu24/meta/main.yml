@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: cis_ubuntu24
+  namespace: lit
+  author: Lightning IT
+  description: Thin wrapper for the ansible-lockdown Ubuntu 24 CIS role.
+  company: Lightning IT
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions: ["noble"]
+  galaxy_tags:
+    - ubuntu
+    - cis
+    - compliance
+    - hardening
+dependencies: []

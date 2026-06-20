@@ -11,6 +11,10 @@ argument_specs:
         type: list
         elements: dict
         default: []
+      repos_cleanup_files:
+        type: list
+        elements: str
+        default: []
       repos_keyring_dir: {type: str, default: /etc/apt/keyrings}
       repos_update_cache: {type: bool, default: true}
       repos_no_log: {type: bool, default: false}

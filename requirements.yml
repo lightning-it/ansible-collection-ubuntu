@@ -1,0 +1,4 @@
+---
+roles:
+  - name: ansible-lockdown.ubuntu24_cis
+    version: 1.6.0
