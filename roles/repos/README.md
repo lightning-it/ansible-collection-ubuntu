@@ -16,6 +16,7 @@ None.
 - `repos_proxy_url`: proxy URL such as `http://proxy.example.com:3128`.
 - `repos_proxy_file`: apt proxy config path.
 - `repos_custom`: list of apt repositories to manage.
+- `repos_cleanup_files`: obsolete apt source files to remove before apt cache refresh.
 - `repos_keyring_dir`: keyring directory to create.
 - `repos_update_cache`: refresh apt cache after repository changes.
 - `repos_no_log`: hide repository item details.

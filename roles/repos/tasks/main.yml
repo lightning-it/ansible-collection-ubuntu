@@ -30,6 +30,13 @@
     state: absent
   when: not (repos_proxy_enabled | bool)
 
+- name: Remove obsolete apt source files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ repos_cleanup_files }}"
+  when: repos_cleanup_files | length > 0
+
 - name: Install repository signing keys
   ansible.builtin.get_url:
     url: "{{ item.key_url }}"
@@ -44,6 +51,27 @@
   when:
     - item.key_url is defined
     - item.key_url | length > 0
+    - not (item.key_dearmor | default(false) | bool)
+
+- name: Install dearmored repository signing keys
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      tmp_key="$(mktemp)"
+      curl -fsSL {{ item.key_url | quote }} > "${tmp_key}"
+      gpg --batch --yes --dearmor --output {{ (item.key_dest | default(repos_keyring_dir ~ '/' ~ item.filename ~ '.gpg')) | quote }} "${tmp_key}"
+      rm -f "${tmp_key}"
+      chmod 0644 {{ (item.key_dest | default(repos_keyring_dir ~ '/' ~ item.filename ~ '.gpg')) | quote }}
+    executable: /bin/bash
+    creates: "{{ item.key_dest | default(repos_keyring_dir ~ '/' ~ item.filename ~ '.gpg') }}"
+  loop: "{{ repos_custom }}"
+  loop_control:
+    label: "{{ item.filename | default(item.repo | default('repo')) }}"
+  no_log: "{{ repos_no_log }}"
+  when:
+    - item.key_url is defined
+    - item.key_url | length > 0
+    - item.key_dearmor | default(false) | bool
 
 - name: Configure custom apt repositories
   ansible.builtin.apt_repository:
