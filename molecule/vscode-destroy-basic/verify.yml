@@ -4,8 +4,13 @@
   connection: local
   gather_facts: false
   tasks:
+    - name: Check lit.ubuntu.vscode_destroy coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vscode_destroy-syntax-coverage"
+      register: vscode_destroy_molecule_coverage_marker
+
     - name: Assert lit.ubuntu.vscode_destroy coverage stub ran
       ansible.builtin.assert:
         that:
-          - vscode_destroy_molecule_coverage_mode | default('') == 'syntax_stub'
+          - vscode_destroy_molecule_coverage_marker.stat.exists
         quiet: true

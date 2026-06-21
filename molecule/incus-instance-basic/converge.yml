@@ -80,6 +80,10 @@
               if [ "${args[1]:-}" = "device" ] && [ "${args[2]:-}" = "add" ]; then
                 instance="${args[3]:-}"
                 device="${args[4]:-}"
+                if [ -f "${state_dir}/${instance}.device.${device}" ]; then
+                  echo "Error: Device ${device} already exists" >&2
+                  exit 1
+                fi
                 touch "${state_dir}/${instance}.device.${device}"
                 exit 0
               fi

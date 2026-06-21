@@ -4,8 +4,13 @@
   connection: local
   gather_facts: false
   tasks:
+    - name: Check lit.ubuntu.podman coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/podman-syntax-coverage"
+      register: podman_molecule_coverage_marker
+
     - name: Assert lit.ubuntu.podman coverage stub ran
       ansible.builtin.assert:
         that:
-          - podman_molecule_coverage_mode | default('') == 'syntax_stub'
+          - podman_molecule_coverage_marker.stat.exists
         quiet: true

@@ -9,10 +9,47 @@
       - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_key_dest | trim | length > 0
       - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_repo | trim | length > 0
       - not developer_tools_github_cli_enabled | bool or developer_tools_github_cli_deb_arch | trim | length > 0
+      - developer_tools_git_config_users is sequence
+      - developer_tools_git_config_users is not string
+      - not developer_tools_git_config_enabled | bool or developer_tools_git_config_credential_helper is string
+      - not developer_tools_git_config_enabled | bool or developer_tools_git_config_credential_url | trim | length > 0
+      - developer_tools_git_config_credential_use_http_path is boolean
+      - developer_tools_terminal_config_users is sequence
+      - developer_tools_terminal_config_users is not string
+      - developer_tools_terminal_config_manage_tmux is boolean
+      - developer_tools_terminal_config_manage_screen is boolean
+      - not developer_tools_terminal_config_enabled | bool or developer_tools_terminal_config_users | length > 0
+      - >-
+        not developer_tools_terminal_config_enabled | bool
+        or developer_tools_terminal_config_tmux_path | trim | length > 0
+      - >-
+        not developer_tools_terminal_config_enabled | bool
+        or developer_tools_terminal_config_screen_path | trim | length > 0
+      - not developer_tools_terminal_config_enabled | bool or developer_tools_terminal_config_tmux_content is string
+      - not developer_tools_terminal_config_enabled | bool or developer_tools_terminal_config_screen_content is string
+      - >-
+        not developer_tools_terminal_config_enabled | bool
+        or (
+          developer_tools_terminal_config_users
+          | map('trim')
+          | reject('equalto', '')
+          | list
+          | length
+        ) == (developer_tools_terminal_config_users | length)
+      - >-
+        not developer_tools_terminal_config_enabled | bool
+        or developer_tools_terminal_config_manage_tmux | bool
+        or developer_tools_terminal_config_manage_screen | bool
       - developer_tools_argocd_cli_dest | trim | length > 0
       - not developer_tools_terragrunt_enabled | bool or developer_tools_terragrunt_version | trim | length > 0
       - not developer_tools_terragrunt_enabled | bool or developer_tools_terragrunt_url | trim | length > 0
       - developer_tools_terragrunt_dest | trim | length > 0
+      - not developer_tools_packer_enabled | bool or developer_tools_packer_version | trim | length > 0
+      - not developer_tools_packer_enabled | bool or developer_tools_packer_archive_url | trim | length > 0
+      - developer_tools_packer_archive_path | trim | length > 0
+      - developer_tools_packer_extract_dir | trim | length > 0
+      - developer_tools_packer_dest | trim | length > 0
+      - not developer_tools_packer_enabled | bool or developer_tools_packer_unzip_package_name | trim | length > 0
       - developer_tools_oc_cli_archive_path | trim | length > 0
       - developer_tools_oc_cli_extract_dir | trim | length > 0
       - developer_tools_oc_cli_dest | trim | length > 0
