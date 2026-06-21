@@ -80,7 +80,7 @@ repos:
         entry: bash scripts/devtools-galaxy-verify.sh
         pass_filenames: false
         files: ^(roles/|galaxy\.yml)
-      # <<< END shared-assets pre-commit
+  # <<< END shared-assets pre-commit
 
       # >>> BEGIN repo-specific pre-commit
       # You own everything below this line. The sync job will not touch it.
