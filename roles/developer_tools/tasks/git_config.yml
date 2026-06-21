@@ -4,4 +4,5 @@
   loop: "{{ developer_tools_git_config_users }}"
   loop_control:
     loop_var: developer_tools_git_config_user
-    label: "{{ developer_tools_git_config_user.user | default(developer_tools_git_config_user.name | default('unknown')) }}"
+    label: >-
+      {{ developer_tools_git_config_user.user | default(developer_tools_git_config_user.name | default('unknown')) }}
