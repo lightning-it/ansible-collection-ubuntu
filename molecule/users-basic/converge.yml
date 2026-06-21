@@ -11,6 +11,8 @@
         name: lit.ubuntu.users
       when: users_molecule_execute_role | bool
 
-    - name: Record lit.ubuntu.users Molecule coverage mode
-      ansible.builtin.set_fact:
-        users_molecule_coverage_mode: syntax_stub
+    - name: Record lit.ubuntu.users Molecule coverage marker
+      ansible.builtin.copy:
+        dest: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/users-syntax-coverage"
+        content: "syntax_stub\n"
+        mode: "0644"

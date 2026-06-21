@@ -4,8 +4,13 @@
   connection: local
   gather_facts: false
   tasks:
+    - name: Check lit.ubuntu.developer_tools coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/developer_tools-syntax-coverage"
+      register: developer_tools_molecule_coverage_marker
+
     - name: Assert lit.ubuntu.developer_tools coverage stub ran
       ansible.builtin.assert:
         that:
-          - developer_tools_molecule_coverage_mode | default('') == 'syntax_stub'
+          - developer_tools_molecule_coverage_marker.stat.exists
         quiet: true

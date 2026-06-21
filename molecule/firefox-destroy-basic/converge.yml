@@ -11,6 +11,8 @@
         name: lit.ubuntu.firefox_destroy
       when: firefox_destroy_molecule_execute_role | bool
 
-    - name: Record lit.ubuntu.firefox_destroy Molecule coverage mode
-      ansible.builtin.set_fact:
-        firefox_destroy_molecule_coverage_mode: syntax_stub
+    - name: Record lit.ubuntu.firefox_destroy Molecule coverage marker
+      ansible.builtin.copy:
+        dest: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/firefox_destroy-syntax-coverage"
+        content: "syntax_stub\n"
+        mode: "0644"

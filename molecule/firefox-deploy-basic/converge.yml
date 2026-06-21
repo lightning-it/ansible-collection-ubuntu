@@ -11,6 +11,8 @@
         name: lit.ubuntu.firefox_deploy
       when: firefox_deploy_molecule_execute_role | bool
 
-    - name: Record lit.ubuntu.firefox_deploy Molecule coverage mode
-      ansible.builtin.set_fact:
-        firefox_deploy_molecule_coverage_mode: syntax_stub
+    - name: Record lit.ubuntu.firefox_deploy Molecule coverage marker
+      ansible.builtin.copy:
+        dest: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/firefox_deploy-syntax-coverage"
+        content: "syntax_stub\n"
+        mode: "0644"
