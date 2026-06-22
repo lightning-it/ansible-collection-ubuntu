@@ -1,0 +1,11 @@
+ancestor: null
+releases:
+  1.1.0:
+    changes:
+      bugfixes:
+      - ubuntu - Restore collection roles, Molecule scenarios, and collection dependency
+        metadata on the develop branch after the shared-assets-lit release workflow
+        migration.
+    fragments:
+    - repair-develop.yml
+    release_date: '2026-06-22'
