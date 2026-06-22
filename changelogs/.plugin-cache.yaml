@@ -1,57 +1,56 @@
+---
 objects:
   role:
     developer_tools:
-      description: Install developer packages, pip packages, and optional CLI tools
-        on Ubuntu.
+      description: Install developer packages, pip packages, and optional CLI tools on Ubuntu.
       name: developer_tools
-      version_added: null
+      version_added:
     firefox:
-      description: Shared Firefox defaults, discovery, policy helpers, and teardown
-        helpers for Ubuntu.
+      description: Shared Firefox defaults, discovery, policy helpers, and teardown helpers
+        for Ubuntu.
       name: firefox
-      version_added: null
+      version_added:
     firefox_config:
-      description: Configure Firefox on Ubuntu using the shared lit.ubuntu.firefox
-        role.
+      description: Configure Firefox on Ubuntu using the shared lit.ubuntu.firefox role.
       name: firefox_config
-      version_added: null
+      version_added:
     firefox_deploy:
       description: Install Firefox on Ubuntu using the shared lit.ubuntu.firefox role.
       name: firefox_deploy
-      version_added: null
+      version_added:
     firefox_destroy:
       description: Remove Firefox-managed state on Ubuntu using the shared lit.ubuntu.firefox
         role.
       name: firefox_destroy
-      version_added: null
+      version_added:
     gui:
       description: Install a GUI stack (GNOME or XFCE) on Ubuntu.
       name: gui
-      version_added: null
+      version_added:
     repos:
       description: Configure apt repositories and apt proxy policy for Ubuntu.
       name: repos
-      version_added: null
+      version_added:
     vscode:
       description: Shared VS Code defaults, discovery, and helper tasks for Ubuntu.
       name: vscode
-      version_added: null
+      version_added:
     vscode_config:
       description: Configure Visual Studio Code extensions and user settings on Ubuntu.
       name: vscode_config
-      version_added: null
+      version_added:
     vscode_deploy:
       description: Deploy Visual Studio Code package and repository state on Ubuntu.
       name: vscode_deploy
-      version_added: null
+      version_added:
     vscode_destroy:
       description: Remove Visual Studio Code managed state on Ubuntu.
       name: vscode_destroy
-      version_added: null
+      version_added:
     xrdp:
       description: Install and configure XRDP server on Ubuntu (without enabling repos).
       name: xrdp
-      version_added: null
+      version_added:
 plugins:
   become: {}
   cache: {}
