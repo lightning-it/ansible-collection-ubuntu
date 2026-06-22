@@ -1,24 +1,24 @@
 ---
 namespace: lit
 name: ubuntu
-version: 1.0.0
+version: 1.1.0
 readme: README.md
 description: Ubuntu-focused collection for OS baseline, hardening, user/package management,
   and day-2 operational tasks.
 repository: https://github.com/lightning-it/ansible-collection-ubuntu
 authors:
-  - Lightning IT
+- Lightning IT
 license:
-  - MIT
+- MIT
 tags:
-  - modulix
-  - ubuntu
-  - linux
-  - hardening
-  - baseline
-  - security
-  - compliance
-  - automation
+- modulix
+- ubuntu
+- linux
+- hardening
+- baseline
+- security
+- compliance
+- automation
 dependencies:
   ansible.posix: '*'
   community.general: '>=11.4.5,<12.0.0'
@@ -26,22 +26,22 @@ dependencies:
   community.crypto: '>=3.2.2,<4.0.0'
   community.hashi_vault: '*'
 build_ignore:
-  - .ansible
-  - .cache
-  - .pytest_cache
-  - .tox
-  - .venv
-  - node_modules
-  - collections
-  - vagrant
-  - .git
-  - .github
-  - .gitignore
-  - .molecule
-  - ansible_collections
-  - build
-  - dist
-  - infra
-  - molecule
-  - '*.terraform*'
-  - '*.tar.gz'
+- .ansible
+- .cache
+- .pytest_cache
+- .tox
+- .venv
+- node_modules
+- collections
+- vagrant
+- .git
+- .github
+- .gitignore
+- .molecule
+- ansible_collections
+- build
+- dist
+- infra
+- molecule
+- '*.terraform*'
+- '*.tar.gz'
