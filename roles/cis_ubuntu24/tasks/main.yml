@@ -1,0 +1,4 @@
+---
+- name: Apply ansible-lockdown Ubuntu 24 CIS role
+  ansible.builtin.import_role:
+    name: ansible-lockdown.ubuntu24_cis

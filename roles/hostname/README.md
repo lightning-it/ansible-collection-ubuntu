@@ -3,6 +3,10 @@
 Set the system hostname and optionally manage a matching `/etc/hosts` entry.
 The short hostname is derived from the first label of the FQDN.
 
+## Requirements
+
+None.
+
 ## Variables
 
 - `hostname_fqdn` (string, default: `{{ inventory_hostname }}`): Desired FQDN.
@@ -16,7 +20,11 @@ The short hostname is derived from the first label of the FQDN.
 - `hostname_etc_hostname_unsafe_writes` (bool, default: `false`): Allow
   non-atomic writes to `/etc/hostname` (needed for some container runtimes).
 
-## Example
+## Dependencies
+
+None.
+
+## Example Playbook
 
 ```yaml
 - name: Configure hostname on Ubuntu hosts
@@ -45,3 +53,11 @@ For containerized testing where `/etc/hosts` is a bind mount:
         hostname_etc_hosts_unsafe_writes: true
         hostname_etc_hostname_unsafe_writes: true
 ```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT

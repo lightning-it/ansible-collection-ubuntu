@@ -8,6 +8,8 @@ incus_instance_default_project: ""
 
 incus_instance_default_type: vm
 incus_instance_default_state: running
+incus_instance_default_empty: false
+incus_instance_default_reconfigure: false
 incus_instance_default_profiles: []
 incus_instance_default_config: {}
 incus_instance_default_devices: {}
@@ -41,10 +43,11 @@ incus_instance_inventory_mode: "0644"
 # List of Incus instances to manage.
 # Required per item:
 # - name
-# - image or image_candidates
+# - image or image_candidates, unless empty is true
 # Optional per item:
 # - state: running|present|stopped|absent
 # - type: vm|container
+# - empty, reconfigure
 # - project, profiles, config, devices, limits
 # - hostname, fqdn
 # - ssh_user, ssh_public_keys

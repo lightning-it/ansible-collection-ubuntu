@@ -1,0 +1,26 @@
+---
+- name: Verify netplan
+  hosts: netplan
+  gather_facts: false
+  vars:
+    netplan_config_path: /tmp/lit-netplan/99-lit-network.yaml
+  tasks:
+    - name: Read rendered netplan configuration
+      ansible.builtin.slurp:
+        src: "{{ netplan_config_path }}"
+      register: netplan_rendered
+
+    - name: Decode rendered netplan YAML
+      ansible.builtin.set_fact:
+        netplan_rendered_yaml: "{{ netplan_rendered.content | b64decode | from_yaml }}"
+
+    - name: Verify rendered netplan data
+      ansible.builtin.assert:
+        that:
+          - netplan_rendered_yaml.network.version == 2
+          - netplan_rendered_yaml.network.renderer == 'networkd'
+          - netplan_rendered_yaml.network.ethernets.ens33.addresses == ['10.34.71.99/24']
+          - netplan_rendered_yaml.network.ethernets.ens33.routes[0].to == 'default'
+          - netplan_rendered_yaml.network.ethernets.ens33.routes[0].via == '10.34.71.1'
+          - netplan_rendered_yaml.network.ethernets.ens33.nameservers.addresses == ['1.1.1.1']
+          - netplan_rendered_yaml.network.ethernets.ens34.addresses == ['10.10.30.99/24']

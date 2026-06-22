@@ -1,0 +1,16 @@
+---
+- name: Verify gui syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check lit.ubuntu.gui coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/gui-syntax-coverage"
+      register: gui_molecule_coverage_marker
+
+    - name: Assert lit.ubuntu.gui coverage stub ran
+      ansible.builtin.assert:
+        that:
+          - gui_molecule_coverage_marker.stat.exists
+        quiet: true

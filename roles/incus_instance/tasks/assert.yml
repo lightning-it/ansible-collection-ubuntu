@@ -9,6 +9,8 @@
       - incus_instance_default_project is string
       - incus_instance_default_type in ['vm', 'container']
       - incus_instance_default_state in ['running', 'present', 'stopped', 'absent']
+      - incus_instance_default_empty is boolean
+      - incus_instance_default_reconfigure is boolean
       - incus_instance_default_profiles is sequence
       - incus_instance_default_profiles is not string
       - incus_instance_default_config is mapping
@@ -48,12 +50,15 @@
       - incus_instance_item.name | default('', true) | trim | length > 0
       - incus_instance_item.state | default(incus_instance_default_state) in ['running', 'present', 'stopped', 'absent']
       - incus_instance_item.type | default(incus_instance_default_type) in ['vm', 'container']
+      - incus_instance_item.empty | default(incus_instance_default_empty) is boolean
+      - incus_instance_item.reconfigure | default(incus_instance_default_reconfigure) is boolean
       - incus_instance_item.image | default('', true) is string
       - incus_instance_item.image_candidates | default([], true) is sequence
       - incus_instance_item.image_candidates | default([], true) is not string
       - >-
         (incus_instance_item.image | default('', true) | trim | length > 0)
         or (incus_instance_item.image_candidates | default([], true) | length > 0)
+        or (incus_instance_item.empty | default(incus_instance_default_empty) | bool)
         or (incus_instance_item.state | default(incus_instance_default_state)) == 'absent'
       - incus_instance_item.project | default(incus_instance_default_project) is string
       - incus_instance_item.profiles | default(incus_instance_default_profiles) is sequence
@@ -69,7 +74,7 @@
       - incus_instance_item.wait_for_ssh | default(incus_instance_default_wait_for_ssh) is boolean
     fail_msg: >-
       Invalid Incus instance item. Each non-absent item needs a name and either
-      image or image_candidates.
+      image, image_candidates, or empty: true.
     quiet: true
   changed_when: false
   loop: "{{ incus_instance_items }}"

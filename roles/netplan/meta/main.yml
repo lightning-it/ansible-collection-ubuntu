@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  role_name: netplan
+  namespace: lit
+  author: Lightning IT
+  company: Lightning IT
+  description: Render and apply netplan configuration on Ubuntu.
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - modulix
+    - netplan
+    - networking
+    - ubuntu
+
+dependencies: []

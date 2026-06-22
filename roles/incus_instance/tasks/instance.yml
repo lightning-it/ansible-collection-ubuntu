@@ -4,6 +4,9 @@
     incus_instance_name: "{{ incus_instance_item.name | trim }}"
     incus_instance_state: "{{ incus_instance_item.state | default(incus_instance_default_state) }}"
     incus_instance_type: "{{ incus_instance_item.type | default(incus_instance_default_type) }}"
+    incus_instance_empty: "{{ incus_instance_item.empty | default(incus_instance_default_empty) | bool }}"
+    incus_instance_reconfigure: >-
+      {{ incus_instance_item.reconfigure | default(incus_instance_default_reconfigure) | bool }}
     incus_instance_project: "{{ incus_instance_item.project | default(incus_instance_default_project) | trim }}"
     incus_instance_profiles: "{{ incus_instance_item.profiles | default(incus_instance_default_profiles) }}"
     incus_instance_config: "{{ incus_instance_default_config | combine(incus_instance_item.config | default({})) }}"
@@ -69,14 +72,20 @@
 
 - name: Select first available Incus image candidate
   ansible.builtin.include_tasks: select_image.yml
-  when: incus_instance_state != 'absent'
+  when:
+    - incus_instance_state != 'absent'
+    - not incus_instance_empty | bool
 
 - name: Create Incus instance
   ansible.builtin.command:
     argv: >-
       {{
         incus_instance_base_argv
-        + ['init', incus_instance_selected_image, incus_instance_name]
+        + (
+          ['init', incus_instance_name, '--empty']
+          if incus_instance_empty | bool
+          else ['init', incus_instance_selected_image, incus_instance_name]
+        )
         + (['--vm'] if incus_instance_type == 'vm' else [])
         + (incus_instance_profiles | map('regex_replace', '^(.*)$', '--profile=\1') | list)
       }}
@@ -92,7 +101,7 @@
   ansible.builtin.include_tasks: configure_instance.yml
   when:
     - incus_instance_state != 'absent'
-    - incus_instance_create is changed
+    - incus_instance_create is changed or incus_instance_reconfigure | bool
 
 - name: Refresh Incus instance state
   ansible.builtin.command:
@@ -192,9 +201,15 @@
             'name': incus_instance_name,
             'state': incus_instance_state,
             'type': incus_instance_type,
+            'empty': incus_instance_empty,
             'image': incus_instance_selected_image | default(''),
+            'hostname': incus_instance_hostname,
+            'fqdn': incus_instance_fqdn,
             'ip': incus_instance_ip | default(''),
-            'ssh_user': incus_instance_ssh_user
+            'ssh_user': incus_instance_ssh_user,
+            'config': incus_instance_config,
+            'devices': incus_instance_devices,
+            'limits': incus_instance_limits
           }
         ]
       }}

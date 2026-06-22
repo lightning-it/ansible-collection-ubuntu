@@ -1,3 +1,5 @@
+# lit.ubuntu.developer_tools
+
 ---
 # lit.ubuntu.developer_tools
 
@@ -18,6 +20,7 @@ developer_tools_enabled: true
 developer_tools_packages_present: []
 developer_tools_pip_executable: pip3
 developer_tools_pip_packages_present: []
+developer_tools_pip_extra_args: ""
 
 developer_tools_github_cli_enabled: false
 developer_tools_github_cli_package_name: gh
@@ -26,6 +29,24 @@ developer_tools_github_cli_repo_description: packages for the GitHub CLI
 developer_tools_github_cli_repo_baseurl: https://cli.github.com/packages/rpm
 developer_tools_github_cli_repo_gpgcheck: true
 developer_tools_github_cli_repo_gpgkey: https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x23F3D4EA75716059
+
+developer_tools_git_config_enabled: false
+developer_tools_git_config_credential_helper: "!gh auth git-credential"
+developer_tools_git_config_credential_url: https://github.com
+developer_tools_git_config_credential_use_http_path: true
+developer_tools_git_config_users:
+  - user: ops-admin
+    name: Ops Admin
+    email: ops-admin@example.com
+    username: ops-admin
+
+developer_tools_terminal_config_enabled: false
+developer_tools_terminal_config_users:
+  - ops-admin
+developer_tools_terminal_config_manage_tmux: true
+developer_tools_terminal_config_manage_screen: true
+developer_tools_terminal_config_tmux_path: .tmux.conf
+developer_tools_terminal_config_screen_path: .screenrc
 
 developer_tools_argocd_cli_enabled: false
 developer_tools_argocd_cli_version: v3.3.3
@@ -37,6 +58,14 @@ developer_tools_terragrunt_version: v0.93.8
 developer_tools_terragrunt_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
 developer_tools_terragrunt_url: "https://github.com/gruntwork-io/terragrunt/releases/download/{{ developer_tools_terragrunt_version }}/terragrunt_linux_{{ developer_tools_terragrunt_arch }}"
 developer_tools_terragrunt_dest: /usr/local/bin/terragrunt
+
+developer_tools_packer_enabled: false
+developer_tools_packer_version: 1.15.4
+developer_tools_packer_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+developer_tools_packer_archive_url: "https://releases.hashicorp.com/packer/{{ developer_tools_packer_version }}/packer_{{ developer_tools_packer_version }}_linux_{{ developer_tools_packer_arch }}.zip"
+developer_tools_packer_archive_path: "/var/tmp/packer_{{ developer_tools_packer_version }}_linux_{{ developer_tools_packer_arch }}.zip"
+developer_tools_packer_extract_dir: "/var/tmp/packer-{{ developer_tools_packer_version }}"
+developer_tools_packer_dest: /usr/local/bin/packer
 
 developer_tools_oc_cli_enabled: false
 developer_tools_oc_cli_version: 4.18.24
@@ -80,7 +109,14 @@ developer_tools_ssh_private_keys_vault_secret_id: ""
 ```
 
 - When `developer_tools_github_cli_enabled` is true, the role configures the official GitHub CLI RPM repository and installs `gh`.
+- When `developer_tools_git_config_enabled` is true, the role configures per-user Git identity and credential helper
+  settings. Passwords and tokens are not written by this role; with the default `!gh auth git-credential` helper,
+  users authenticate with `gh auth login`, and `gh` manages the credential secret store.
+- When `developer_tools_terminal_config_enabled` is true, the role writes base `~/.tmux.conf` and `~/.screenrc`
+  files for the configured users. Install `tmux` and `screen` through `developer_tools_packages_present` when needed.
 - When `developer_tools_terragrunt_enabled` is true, the role downloads the Terragrunt standalone binary from the official GitHub release assets.
+- When `developer_tools_packer_enabled` is true, the role downloads and installs the pinned HashiCorp Packer binary
+  from the official HashiCorp release assets.
 - When `developer_tools_ssh_agent_enabled` is true, the role configures a persistent `systemd --user` `ssh-agent`
   service, exports `SSH_AUTH_SOCK` in the selected shell init files, and adds an `~/.ssh/config` block that can
   auto-add the configured identity files to the agent on first SSH use.
@@ -103,6 +139,11 @@ None.
         developer_tools_packages_present:
           - git
           - podman
+          - screen
+          - tmux
+        developer_tools_terminal_config_enabled: true
+        developer_tools_terminal_config_users:
+          - ops-admin
         developer_tools_ssh_agent_enabled: true
         developer_tools_ssh_agent_users:
           - ops-admin

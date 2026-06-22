@@ -1,10 +1,45 @@
+# lit.ubuntu.vscode_config
+
 ---
 # lit.ubuntu.vscode_config
 
 Configure Visual Studio Code on Ubuntu using the shared `lit.ubuntu.vscode`
 role.
 
-## Scope
+## Requirements
+
+None.
+
+## Variables
+
+See `defaults/main.yml`.
+
+## Dependencies
+
+None.
+
+## Example Playbook
+
+```yaml
+---
+- name: Use lit.ubuntu.vscode_config
+  hosts: all
+  become: true
+  roles:
+    - role: lit.ubuntu.vscode_config
+```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT
+
+## Additional Notes
+
+### Scope
 
 This role:
 
@@ -18,7 +53,7 @@ This role:
 This role does not install the VS Code package or repository. Use
 `lit.ubuntu.vscode_deploy` for package state.
 
-## Extension merge behavior
+### Extension merge behavior
 
 The effective extension list is built from:
 
@@ -28,7 +63,7 @@ The effective extension list is built from:
 4. removal of duplicates
 5. subtraction of `vscode_extensions_remove`
 
-## File-based extension list
+### File-based extension list
 
 Example:
 
@@ -46,7 +81,7 @@ ms-kubernetes-tools.vscode-kubernetes-tools
 tim-koehler.helm-intellisense
 ```
 
-## VSIX handling
+### VSIX handling
 
 Example:
 
@@ -56,12 +91,12 @@ vscode_vsix_files:
     path: files/vscode/vendor.custom-extension.vsix
 ```
 
-## User settings
+### User settings
 
 When `vscode_manage_user_settings: true`, the role writes
 `~/.config/Code/User/settings.json` for the target user.
 
-## Examples
+### Examples
 
 ```yaml
 - hosts: workstations

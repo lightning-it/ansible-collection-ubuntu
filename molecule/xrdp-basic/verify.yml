@@ -1,0 +1,16 @@
+---
+- name: Verify xrdp syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check lit.ubuntu.xrdp coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/xrdp-syntax-coverage"
+      register: xrdp_molecule_coverage_marker
+
+    - name: Assert lit.ubuntu.xrdp coverage stub ran
+      ansible.builtin.assert:
+        that:
+          - xrdp_molecule_coverage_marker.stat.exists
+        quiet: true
