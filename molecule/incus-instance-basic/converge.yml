@@ -60,9 +60,13 @@
               test -f "${state_dir}/${instance}.exists"
               ;;
             init)
-              image="${args[1]:-}"
-              instance="${args[2]:-}"
-              test "${image}" = "local:rhel10-ci"
+              if [ "${args[2]:-}" = "--empty" ]; then
+                instance="${args[1]:-}"
+              else
+                image="${args[1]:-}"
+                instance="${args[2]:-}"
+                test "${image}" = "local:rhel10-ci"
+              fi
               touch "${state_dir}/${instance}.exists"
               printf 'Stopped\n' > "${state_dir}/${instance}.status"
               ;;
@@ -76,6 +80,10 @@
               if [ "${args[1]:-}" = "device" ] && [ "${args[2]:-}" = "add" ]; then
                 instance="${args[3]:-}"
                 device="${args[4]:-}"
+                if [ -f "${state_dir}/${instance}.device.${device}" ]; then
+                  echo "Error: Device ${device} already exists" >&2
+                  exit 1
+                fi
                 touch "${state_dir}/${instance}.device.${device}"
                 exit 0
               fi
@@ -129,3 +137,16 @@
             limits:
               cpu: "2"
               memory: 4GiB
+          - name: molecule-empty-agent
+            empty: true
+            type: vm
+            state: stopped
+            cloud_init_enabled: false
+            wait_for_ip: false
+            wait_for_ssh: false
+            reconfigure: true
+            devices:
+              agent-iso:
+                type: disk
+                source: /tmp/agent.x86_64.iso
+                boot.priority: "10"

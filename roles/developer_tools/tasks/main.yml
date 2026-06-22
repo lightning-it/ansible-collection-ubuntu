@@ -18,6 +18,7 @@
     name: "{{ developer_tools_pip_packages_present }}"
     state: present
     executable: "{{ developer_tools_pip_executable }}"
+    extra_args: "{{ developer_tools_pip_extra_args | default(omit, true) }}"
   when: (developer_tools_pip_packages_present | default([], true) | length) > 0
 
 - name: Ensure apt keyring directory exists for GitHub CLI
@@ -52,6 +53,14 @@
     state: present
   when: developer_tools_github_cli_enabled | bool
 
+- name: Configure Git for developer users
+  ansible.builtin.include_tasks: git_config.yml
+  when: developer_tools_git_config_enabled | bool
+
+- name: Configure tmux and screen for developer users
+  ansible.builtin.include_tasks: terminal_config.yml
+  when: developer_tools_terminal_config_enabled | bool
+
 - name: Ensure Argo CD CLI is installed when enabled
   ansible.builtin.get_url:
     url: "{{ developer_tools_argocd_cli_url }}"
@@ -65,6 +74,42 @@
     dest: "{{ developer_tools_terragrunt_dest }}"
     mode: "0755"
   when: developer_tools_terragrunt_enabled | bool
+
+- name: Ensure Packer archive dependencies are installed when enabled
+  ansible.builtin.package:
+    name: "{{ developer_tools_packer_unzip_package_name }}"
+    state: present
+  when: developer_tools_packer_enabled | bool
+
+- name: Ensure Packer archive is downloaded when enabled
+  ansible.builtin.get_url:
+    url: "{{ developer_tools_packer_archive_url }}"
+    dest: "{{ developer_tools_packer_archive_path }}"
+    mode: "0644"
+  when: developer_tools_packer_enabled | bool
+
+- name: Ensure Packer extract directory exists when enabled
+  ansible.builtin.file:
+    path: "{{ developer_tools_packer_extract_dir }}"
+    state: directory
+    mode: "0755"
+  when: developer_tools_packer_enabled | bool
+
+- name: Ensure Packer archive is unpacked when enabled
+  ansible.builtin.unarchive:
+    src: "{{ developer_tools_packer_archive_path }}"
+    dest: "{{ developer_tools_packer_extract_dir }}"
+    remote_src: true
+    creates: "{{ developer_tools_packer_extract_dir }}/packer"
+  when: developer_tools_packer_enabled | bool
+
+- name: Ensure Packer CLI is installed when enabled
+  ansible.builtin.copy:
+    src: "{{ developer_tools_packer_extract_dir }}/packer"
+    dest: "{{ developer_tools_packer_dest }}"
+    remote_src: true
+    mode: "0755"
+  when: developer_tools_packer_enabled | bool
 
 - name: Ensure OpenShift CLI archive is downloaded when enabled
   ansible.builtin.get_url:

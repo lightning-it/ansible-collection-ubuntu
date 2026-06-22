@@ -1,0 +1,16 @@
+---
+- name: Verify vscode deploy syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check lit.ubuntu.vscode_deploy coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vscode_deploy-syntax-coverage"
+      register: vscode_deploy_molecule_coverage_marker
+
+    - name: Assert lit.ubuntu.vscode_deploy coverage stub ran
+      ansible.builtin.assert:
+        that:
+          - vscode_deploy_molecule_coverage_marker.stat.exists
+        quiet: true

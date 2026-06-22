@@ -1,0 +1,44 @@
+---
+- name: Gather passwd database for terminal config users
+  ansible.builtin.getent:
+    database: passwd
+    split: ':'
+  changed_when: false
+
+- name: Ensure configured terminal config users exist
+  ansible.builtin.assert:
+    that:
+      - item | default('', true) | string | trim | length > 0
+      - (item | string) in ansible_facts.getent_passwd
+    fail_msg: >-
+      Configured terminal config user '{{ item | default('') }}' does not
+      exist in the passwd database.
+    quiet: true
+  loop: "{{ developer_tools_terminal_config_users }}"
+  loop_control:
+    label: "{{ item | default('missing-user') }}"
+  changed_when: false
+
+- name: Install tmux base config for developer users
+  ansible.builtin.copy:
+    dest: "{{ ansible_facts.getent_passwd[item][4] }}/{{ developer_tools_terminal_config_tmux_path }}"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0644"
+    content: "{{ developer_tools_terminal_config_tmux_content }}"
+  loop: "{{ developer_tools_terminal_config_users }}"
+  loop_control:
+    label: "{{ item }}:{{ developer_tools_terminal_config_tmux_path }}"
+  when: developer_tools_terminal_config_manage_tmux | bool
+
+- name: Install screen base config for developer users
+  ansible.builtin.copy:
+    dest: "{{ ansible_facts.getent_passwd[item][4] }}/{{ developer_tools_terminal_config_screen_path }}"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0644"
+    content: "{{ developer_tools_terminal_config_screen_content }}"
+  loop: "{{ developer_tools_terminal_config_users }}"
+  loop_control:
+    label: "{{ item }}:{{ developer_tools_terminal_config_screen_path }}"
+  when: developer_tools_terminal_config_manage_screen | bool

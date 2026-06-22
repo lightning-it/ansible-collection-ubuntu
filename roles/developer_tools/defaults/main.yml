@@ -4,6 +4,7 @@ developer_tools_enabled: true
 developer_tools_packages_present: []
 developer_tools_pip_executable: pip3
 developer_tools_pip_packages_present: []
+developer_tools_pip_extra_args: ""
 
 developer_tools_github_cli_enabled: false
 developer_tools_github_cli_package_name: gh
@@ -17,6 +18,38 @@ developer_tools_github_cli_deb_arch: >-
   {{ 'arm64'
      if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
      else 'amd64' }}
+
+developer_tools_git_config_enabled: false
+developer_tools_git_config_users: []
+developer_tools_git_config_credential_helper: "!gh auth git-credential"
+developer_tools_git_config_credential_url: https://github.com
+developer_tools_git_config_credential_use_http_path: true
+
+developer_tools_terminal_config_enabled: false
+developer_tools_terminal_config_users: []
+developer_tools_terminal_config_manage_tmux: true
+developer_tools_terminal_config_manage_screen: true
+developer_tools_terminal_config_tmux_path: .tmux.conf
+developer_tools_terminal_config_screen_path: .screenrc
+developer_tools_terminal_config_tmux_content: |
+  set -g mouse on
+  set -g history-limit 100000
+  setw -g mode-keys vi
+  set -g status-keys vi
+  set -g base-index 1
+  setw -g pane-base-index 1
+  set -g renumber-windows on
+  set -g escape-time 10
+  bind r source-file ~/.tmux.conf \; display-message "tmux config reloaded"
+developer_tools_terminal_config_screen_content: |
+  startup_message off
+  defscrollback 100000
+  defutf8 on
+  vbell off
+  altscreen on
+  term screen-256color
+  caption always "%{= kw}%-w%{= wk}%n %t%{-}%+w"
+  hardstatus alwayslastline "%H %l %Y-%m-%d %c"
 
 developer_tools_argocd_cli_enabled: false
 developer_tools_argocd_cli_version: v3.3.3
@@ -36,6 +69,23 @@ developer_tools_terragrunt_url: >-
   developer_tools_terragrunt_version }}/terragrunt_linux_{{
   developer_tools_terragrunt_arch }}
 developer_tools_terragrunt_dest: /usr/local/bin/terragrunt
+
+developer_tools_packer_enabled: false
+developer_tools_packer_version: 1.15.4
+developer_tools_packer_arch: >-
+  {{ 'arm64'
+     if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
+     else 'amd64' }}
+developer_tools_packer_archive_url: >-
+  https://releases.hashicorp.com/packer/{{ developer_tools_packer_version
+  }}/packer_{{ developer_tools_packer_version }}_linux_{{
+  developer_tools_packer_arch }}.zip
+developer_tools_packer_archive_path: >-
+  /var/tmp/packer_{{ developer_tools_packer_version }}_linux_{{
+  developer_tools_packer_arch }}.zip
+developer_tools_packer_extract_dir: "/var/tmp/packer-{{ developer_tools_packer_version }}"
+developer_tools_packer_dest: /usr/local/bin/packer
+developer_tools_packer_unzip_package_name: unzip
 
 developer_tools_oc_cli_enabled: false
 developer_tools_oc_cli_version: 4.18.24

@@ -36,7 +36,11 @@ Each `incus_image_items` entry supports:
 - `project`: Override default Incus project.
 - `properties`: Image properties passed to `incus image import` as `key=value`.
 
-## Example
+## Dependencies
+
+None.
+
+## Example Playbook
 
 ```yaml
 ---
@@ -59,3 +63,7 @@ Each `incus_image_items` entry supports:
 ## License
 
 MIT
+
+## Author
+
+Lightning IT

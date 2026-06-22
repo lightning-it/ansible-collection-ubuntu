@@ -1,0 +1,16 @@
+---
+- name: Verify repos syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check lit.ubuntu.repos coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/repos-syntax-coverage"
+      register: repos_molecule_coverage_marker
+
+    - name: Assert lit.ubuntu.repos coverage stub ran
+      ansible.builtin.assert:
+        that:
+          - repos_molecule_coverage_marker.stat.exists
+        quiet: true

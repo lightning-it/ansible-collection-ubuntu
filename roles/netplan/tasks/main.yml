@@ -1,0 +1,122 @@
+---
+- name: End netplan role when disabled
+  ansible.builtin.meta: end_role
+  when: not netplan_enabled | bool
+
+- name: Validate netplan inputs
+  ansible.builtin.import_tasks: assert.yml
+
+- name: Initialize netplan ethernet configuration from explicit mapping
+  ansible.builtin.set_fact:
+    netplan_ethernet_config: "{{ netplan_ethernets }}"
+
+- name: Build netplan ethernet configuration from net_ifaces
+  ansible.builtin.set_fact:
+    netplan_ethernet_config: >-
+      {{
+        netplan_ethernet_config
+        | combine(
+            {
+              item.iface: (
+                {}
+                | combine({'dhcp4': item.dhcp4 | default(false) | bool})
+                | combine({'optional': item.optional | default(true) | bool})
+                | combine(
+                    (item.ipv4 | default('', true) | trim | length > 0)
+                    | ternary({'addresses': [item.ipv4]}, {}),
+                    recursive=True
+                  )
+                | combine(
+                    (item.gw4 | default('', true) | trim | length > 0)
+                    | ternary({'routes': [{'to': 'default', 'via': item.gw4}]}, {}),
+                    recursive=True
+                  )
+                | combine(
+                    (
+                      (
+                        item.nameservers | default([], true) | length > 0
+                      )
+                      or (
+                        netplan_dns_servers | length > 0
+                        and item.role | default('', true) == 'uplink'
+                      )
+                    )
+                    | ternary(
+                        {
+                          'nameservers': {
+                            'addresses': (
+                              item.nameservers
+                              | default(netplan_dns_servers, true)
+                            )
+                          }
+                        },
+                        {}
+                      ),
+                    recursive=True
+                  )
+              )
+            },
+            recursive=True
+          )
+      }}
+  loop: "{{ netplan_net_ifaces }}"
+  when: netplan_ethernets | length == 0
+
+- name: Ensure netplan configuration directory exists
+  ansible.builtin.file:
+    path: "{{ netplan_config_path | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Remove stale netplan configuration files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ netplan_config_files_absent }}"
+  register: netplan_config_files_result
+  when:
+    - not ansible_check_mode
+    - netplan_config_files_absent | length > 0
+
+- name: Render netplan configuration
+  ansible.builtin.template:
+    src: lit-network.yaml.j2
+    dest: "{{ netplan_config_path }}"
+    mode: "{{ netplan_config_mode }}"
+  register: netplan_render_result
+
+- name: Remove runtime systemd-networkd files that override netplan
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ netplan_runtime_networkd_files_absent }}"
+  register: netplan_runtime_files_result
+  when:
+    - not ansible_check_mode
+    - netplan_runtime_networkd_files_absent | length > 0
+
+- name: Validate netplan configuration
+  ansible.builtin.command:
+    argv: "{{ netplan_generate_command }}"
+  changed_when: false
+  when:
+    - netplan_validate | bool
+    - not ansible_check_mode
+    - >-
+      netplan_render_result.changed
+      or netplan_config_files_result.changed | default(false)
+      or netplan_runtime_files_result.changed | default(false)
+      or netplan_apply_always | bool
+
+- name: Apply netplan configuration
+  ansible.builtin.command:
+    argv: "{{ netplan_apply_command }}"
+  changed_when: true
+  when:
+    - netplan_apply | bool
+    - not ansible_check_mode
+    - >-
+      netplan_render_result.changed
+      or netplan_config_files_result.changed | default(false)
+      or netplan_runtime_files_result.changed | default(false)
+      or netplan_apply_always | bool

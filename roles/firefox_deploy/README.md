@@ -1,9 +1,41 @@
+# lit.ubuntu.firefox_deploy
+
 ---
 # lit.ubuntu.firefox_deploy
 
 Install Firefox on Ubuntu using the shared `lit.ubuntu.firefox` helper role.
 
-## Scope
+## Requirements
+
+None.
+
+## Variables
+
+See `defaults/main.yml`.
+
+## Dependencies
+
+None.
+
+## Example Playbook
+
+```yaml
+- hosts: workstations
+  roles:
+    - role: lit.ubuntu.firefox_deploy
+```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT
+
+## Additional Notes
+
+### Scope
 
 This role:
 
@@ -14,11 +46,3 @@ This role:
 
 This role does not manage ongoing browser settings, bookmarks, or user profile
 preferences. Use `lit.ubuntu.firefox_config` for that.
-
-## Example
-
-```yaml
-- hosts: workstations
-  roles:
-    - role: lit.ubuntu.firefox_deploy
-```

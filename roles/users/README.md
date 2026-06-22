@@ -2,6 +2,10 @@
 
 Manage local users, their groups, and authorized SSH keys on Ubuntu hosts.
 
+## Requirements
+
+None.
+
 ## Variables
 
 ### `users_accounts`
@@ -21,6 +25,8 @@ users_accounts:
     update_password: on_create
     password_lock: false
     remove: false             # remove home on absent if true
+    passwordless_sudo: false  # write /etc/sudoers.d/<name> with NOPASSWD
+    sudoers_name: ops-admin   # optional sudoers file name; removed when passwordless_sudo is false
     ssh_keys:
       - "ssh-ed25519 AAAA... comment"
 ```
@@ -29,7 +35,17 @@ users_accounts:
 
 Whether to create any groups referenced in `users_accounts` before assignment. Default: `true`.
 
-## Example
+### `users_accounts_extra`
+
+Additional user definitions appended to `users_accounts`. This is useful for
+environment-specific service accounts, for example a shared deploy user, without
+replacing the global baseline users.
+
+## Dependencies
+
+None.
+
+## Example Playbook
 
 ```yaml
 - hosts: all
@@ -50,3 +66,11 @@ Whether to create any groups referenced in `users_accounts` before assignment. D
             state: absent
             remove: true
 ```
+
+## License
+
+MIT
+
+## Author
+
+Lightning IT

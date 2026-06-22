@@ -1,0 +1,36 @@
+---
+- name: Validate netplan variables
+  ansible.builtin.assert:
+    that:
+      - netplan_config_path | trim | length > 0
+      - netplan_config_mode | trim | length > 0
+      - netplan_renderer | trim | length > 0
+      - netplan_enabled is boolean
+      - netplan_validate is boolean
+      - netplan_apply is boolean
+      - netplan_apply_always is boolean
+      - netplan_net_ifaces is sequence
+      - netplan_net_ifaces is not string
+      - netplan_dns_servers is sequence
+      - netplan_dns_servers is not string
+      - netplan_ethernets is mapping
+      - netplan_config_files_absent is sequence
+      - netplan_config_files_absent is not string
+      - netplan_runtime_networkd_files_absent is sequence
+      - netplan_runtime_networkd_files_absent is not string
+      - netplan_generate_command is sequence
+      - netplan_generate_command is not string
+      - netplan_apply_command is sequence
+      - netplan_apply_command is not string
+  when: netplan_enabled | bool
+
+- name: Validate net_ifaces item shape
+  ansible.builtin.assert:
+    that:
+      - item.iface | default('', true) | trim | length > 0
+      - item.ipv4 is defined or item.dhcp4 | default(false) | bool
+    fail_msg: "Each netplan_net_ifaces item needs iface plus either ipv4 or dhcp4=true."
+  loop: "{{ netplan_net_ifaces }}"
+  when:
+    - netplan_enabled | bool
+    - netplan_ethernets | length == 0

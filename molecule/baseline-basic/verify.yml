@@ -1,0 +1,16 @@
+---
+- name: Verify baseline syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check lit.ubuntu.baseline coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/baseline-syntax-coverage"
+      register: baseline_molecule_coverage_marker
+
+    - name: Assert lit.ubuntu.baseline coverage stub ran
+      ansible.builtin.assert:
+        that:
+          - baseline_molecule_coverage_marker.stat.exists
+        quiet: true

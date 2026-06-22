@@ -19,6 +19,16 @@
         path: "{{ incus_instance_molecule_root }}/state/molecule-rhel10.exists"
       register: incus_instance_molecule_exists
 
+    - name: Check fake empty Incus VM state
+      ansible.builtin.stat:
+        path: "{{ incus_instance_molecule_root }}/state/molecule-empty-agent.exists"
+      register: incus_instance_molecule_empty_exists
+
+    - name: Check fake empty Incus VM ISO device
+      ansible.builtin.stat:
+        path: "{{ incus_instance_molecule_root }}/state/molecule-empty-agent.device.agent-iso"
+      register: incus_instance_molecule_empty_iso
+
     - name: Read fake Incus instance status
       ansible.builtin.slurp:
         src: "{{ incus_instance_molecule_root }}/state/molecule-rhel10.status"
@@ -40,6 +50,8 @@
       ansible.builtin.assert:
         that:
           - incus_instance_molecule_exists.stat.exists
+          - incus_instance_molecule_empty_exists.stat.exists
+          - incus_instance_molecule_empty_iso.stat.exists
           - (incus_instance_molecule_status.content | b64decode | trim) == 'Running'
           - "'molecule-rhel10.example.com' in (incus_instance_molecule_user_data.content | b64decode)"
           - >-

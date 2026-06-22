@@ -9,6 +9,7 @@
   ansible.builtin.include_role:
     name: lit.ubuntu.firefox
     tasks_from: main.yml
+    public: true
 
 - name: Build shared Firefox proxy data
   ansible.builtin.include_role:

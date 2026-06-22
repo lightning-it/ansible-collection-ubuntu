@@ -1,0 +1,113 @@
+---
+- name: Validate Git config user item
+  ansible.builtin.assert:
+    that:
+      - developer_tools_git_config_user is mapping
+      - developer_tools_git_config_user.user | default('') | trim | length > 0
+      - developer_tools_git_config_user.name | default('') | trim | length > 0
+      - developer_tools_git_config_user.email | default('') | trim | length > 0
+    fail_msg: "Each Git config item requires user, name, and email."
+
+- name: Query Git config user account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ developer_tools_git_config_user.user }}"
+
+- name: Resolve Git config user home
+  ansible.builtin.set_fact:
+    developer_tools_git_config_user_home: >-
+      {{ ansible_facts.getent_passwd[developer_tools_git_config_user.user][4] }}
+
+- name: Ensure Git config user home exists
+  ansible.builtin.file:
+    path: "{{ developer_tools_git_config_user_home }}"
+    state: directory
+    owner: "{{ developer_tools_git_config_user.user }}"
+    group: "{{ developer_tools_git_config_user.user }}"
+    mode: "0755"
+
+- name: Configure Git user name
+  community.general.git_config:
+    name: user.name
+    scope: global
+    value: "{{ developer_tools_git_config_user.name }}"
+  become: true
+  become_user: "{{ developer_tools_git_config_user.user }}"
+  environment:
+    HOME: "{{ developer_tools_git_config_user_home }}"
+
+- name: Configure Git user email
+  community.general.git_config:
+    name: user.email
+    scope: global
+    value: "{{ developer_tools_git_config_user.email }}"
+  become: true
+  become_user: "{{ developer_tools_git_config_user.user }}"
+  environment:
+    HOME: "{{ developer_tools_git_config_user_home }}"
+
+- name: Configure Git credential helper
+  community.general.git_config:
+    name: credential.helper
+    scope: global
+    value: >-
+      {{
+        developer_tools_git_config_user.credential_helper
+        | default(developer_tools_git_config_credential_helper, true)
+      }}
+  become: true
+  become_user: "{{ developer_tools_git_config_user.user }}"
+  environment:
+    HOME: "{{ developer_tools_git_config_user_home }}"
+  when: >-
+    (
+      developer_tools_git_config_user.credential_helper
+      | default(developer_tools_git_config_credential_helper, true)
+      | string
+      | trim
+      | length
+    ) > 0
+
+- name: Configure Git credential username
+  community.general.git_config:
+    name: >-
+      credential.{{
+        developer_tools_git_config_user.credential_url
+        | default(developer_tools_git_config_credential_url, true)
+      }}.username
+    scope: global
+    value: >-
+      {{
+        developer_tools_git_config_user.credential_username
+        | default(developer_tools_git_config_user.username | default(developer_tools_git_config_user.user, true), true)
+      }}
+  become: true
+  become_user: "{{ developer_tools_git_config_user.user }}"
+  environment:
+    HOME: "{{ developer_tools_git_config_user_home }}"
+  when: >-
+    (
+      developer_tools_git_config_user.credential_username
+      | default(developer_tools_git_config_user.username | default(developer_tools_git_config_user.user, true), true)
+      | string
+      | trim
+      | length
+    ) > 0
+
+- name: Configure Git credential HTTP path behavior
+  community.general.git_config:
+    name: credential.useHttpPath
+    scope: global
+    value: >-
+      {{
+        (
+          developer_tools_git_config_user.credential_use_http_path
+          | default(developer_tools_git_config_credential_use_http_path, true)
+          | bool
+        )
+        | ternary('true', 'false')
+      }}
+  become: true
+  become_user: "{{ developer_tools_git_config_user.user }}"
+  environment:
+    HOME: "{{ developer_tools_git_config_user_home }}"

@@ -15,6 +15,9 @@ argument_specs:
       developer_tools_pip_packages_present:
         type: list
         elements: str
+      developer_tools_pip_extra_args:
+        type: str
+        default: ""
       developer_tools_github_cli_enabled:
         type: bool
         default: false
@@ -38,6 +41,43 @@ argument_specs:
           {{ 'arm64'
              if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
              else 'amd64' }}
+      developer_tools_git_config_enabled:
+        type: bool
+        default: false
+      developer_tools_git_config_users:
+        type: list
+        elements: dict
+      developer_tools_git_config_credential_helper:
+        type: str
+        default: "!gh auth git-credential"
+      developer_tools_git_config_credential_url:
+        type: str
+        default: https://github.com
+      developer_tools_git_config_credential_use_http_path:
+        type: bool
+        default: true
+      developer_tools_terminal_config_enabled:
+        type: bool
+        default: false
+      developer_tools_terminal_config_users:
+        type: list
+        elements: str
+      developer_tools_terminal_config_manage_tmux:
+        type: bool
+        default: true
+      developer_tools_terminal_config_manage_screen:
+        type: bool
+        default: true
+      developer_tools_terminal_config_tmux_path:
+        type: str
+        default: .tmux.conf
+      developer_tools_terminal_config_screen_path:
+        type: str
+        default: .screenrc
+      developer_tools_terminal_config_tmux_content:
+        type: str
+      developer_tools_terminal_config_screen_content:
+        type: str
       developer_tools_argocd_cli_enabled:
         type: bool
         default: false

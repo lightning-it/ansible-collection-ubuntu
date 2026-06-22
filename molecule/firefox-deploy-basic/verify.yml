@@ -1,0 +1,16 @@
+---
+- name: Verify firefox deploy syntax coverage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check lit.ubuntu.firefox_deploy coverage marker
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/firefox_deploy-syntax-coverage"
+      register: firefox_deploy_molecule_coverage_marker
+
+    - name: Assert lit.ubuntu.firefox_deploy coverage stub ran
+      ansible.builtin.assert:
+        that:
+          - firefox_deploy_molecule_coverage_marker.stat.exists
+        quiet: true
