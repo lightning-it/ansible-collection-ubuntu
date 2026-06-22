@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - >-
+    ubuntu - Restore collection roles, Molecule scenarios, and collection dependency metadata on the develop
+    branch after the shared-assets-lit release workflow migration.
