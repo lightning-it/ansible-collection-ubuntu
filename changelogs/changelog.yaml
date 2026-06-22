@@ -19,3 +19,10 @@ releases:
     fragments:
       - repair-develop.yml
     release_date: '2026-06-22'
+  1.3.0:
+    changes:
+      minor_changes:
+        - lit.ubuntu - Verify automated collection release workflow cycle 1.
+    fragments:
+      - release-verification-1.yml
+    release_date: '2026-06-22'
