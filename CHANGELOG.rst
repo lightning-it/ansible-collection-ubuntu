@@ -4,6 +4,15 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.5.0
+======
+
+Minor Changes
+-------------
+
+- molecule - Run Docker-driver light scenarios with host networking so they clean up reliably through the rootless Podman API socket.
+- podman - Add optional system and rootless user Podman API socket management for workbench container flows without Docker.
+
 v1.4.0
 ======
 

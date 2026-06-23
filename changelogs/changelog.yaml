@@ -33,3 +33,13 @@ releases:
     fragments:
       - release-verification-2.yml
     release_date: '2026-06-22'
+  1.5.0:
+    changes:
+      minor_changes:
+        - molecule - Run Docker-driver light scenarios with host networking so they
+          clean up reliably through the rootless Podman API socket.
+        - podman - Add optional system and rootless user Podman API socket management
+          for workbench container flows without Docker.
+    fragments:
+      - podman-workbench-socket.yml
+    release_date: '2026-06-23'
