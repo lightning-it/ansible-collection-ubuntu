@@ -9,6 +9,10 @@
     - name: Import lit.ubuntu.podman for syntax coverage
       ansible.builtin.import_role:
         name: lit.ubuntu.podman
+      vars:
+        podman_user_socket_enabled: true
+        podman_user_socket_users:
+          - root
       when: podman_molecule_execute_role | bool
 
     - name: Record lit.ubuntu.podman Molecule coverage marker

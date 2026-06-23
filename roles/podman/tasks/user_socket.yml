@@ -1,0 +1,109 @@
+---
+- name: Gather passwd database for Podman socket users
+  ansible.builtin.getent:
+    database: passwd
+    split: ':'
+  changed_when: false
+
+- name: Ensure configured Podman socket users exist
+  ansible.builtin.assert:
+    that:
+      - item | default('', true) | string | trim | length > 0
+      - (item | string) in ansible_facts.getent_passwd
+    fail_msg: >-
+      Configured Podman socket user '{{ item | default('') }}' does not exist
+      in the passwd database.
+    quiet: true
+  loop: "{{ podman_user_socket_users }}"
+  loop_control:
+    label: "{{ item | default('missing-user') }}"
+  changed_when: false
+
+- name: Initialize Podman socket user info list
+  ansible.builtin.set_fact:
+    podman_user_socket_user_infos: []
+  changed_when: false
+
+- name: Build Podman socket user info list
+  ansible.builtin.set_fact:
+    podman_user_socket_user_infos: >-
+      {{
+        podman_user_socket_user_infos
+        + [
+            {
+              'name': item,
+              'uid': (ansible_facts.getent_passwd[item][1] | int),
+              'gid': (ansible_facts.getent_passwd[item][2] | int),
+              'home': ansible_facts.getent_passwd[item][4]
+            }
+          ]
+      }}
+  loop: "{{ podman_user_socket_users }}"
+  changed_when: false
+
+- name: Check linger state for Podman socket users
+  ansible.builtin.stat:
+    path: "/var/lib/systemd/linger/{{ item.name }}"
+  loop: "{{ podman_user_socket_user_infos }}"
+  register: podman_user_socket_linger_stats
+  when: podman_user_socket_manage_linger | bool
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Enable lingering for Podman socket users
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ item.item.name }}"
+  loop: "{{ podman_user_socket_linger_stats.results | default([]) }}"
+  when:
+    - podman_user_socket_manage_linger | bool
+    - not (item.stat.exists | default(false))
+  changed_when: true
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Ensure user managers are started for Podman socket users
+  ansible.builtin.systemd_service:
+    name: "user@{{ item.uid }}.service"
+    state: started
+  loop: "{{ podman_user_socket_user_infos }}"
+  when: podman_user_socket_start_user_manager | bool
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Enable and start rootless Podman API sockets
+  ansible.builtin.systemd_service:
+    name: "{{ podman_user_socket_service_name }}"
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: started
+  become: true
+  become_user: "{{ item.name }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ item.uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ item.uid }}/bus"
+  loop: "{{ podman_user_socket_user_infos }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Export Podman API socket variables in shell init files
+  ansible.builtin.blockinfile:
+    path: "{{ item.0.home }}/{{ item.1 }}"
+    create: true
+    owner: "{{ item.0.name }}"
+    group: "{{ item.0.name }}"
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK podman api socket"
+    block: |
+      PODMAN_API_SOCKET="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/podman/podman.sock"
+      export DOCKER_HOST="${DOCKER_HOST:-unix://${PODMAN_API_SOCKET}}"
+      export CONTAINER_HOST="${CONTAINER_HOST:-${DOCKER_HOST}}"
+  loop: >-
+    {{
+      podman_user_socket_user_infos
+      | product(podman_user_socket_shell_init_files)
+      | list
+    }}
+  when: podman_user_socket_manage_shell_init | bool
+  loop_control:
+    label: "{{ item.0.name }}:{{ item.1 }}"

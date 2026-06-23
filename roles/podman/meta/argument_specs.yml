@@ -1,0 +1,44 @@
+---
+argument_specs:
+  main:
+    short_description: Install Podman tooling and optionally manage API sockets.
+    options:
+      podman_packages:
+        type: list
+        elements: str
+        default:
+          - podman
+          - buildah
+      podman_registries_conf_dir:
+        type: str
+        default: /etc/containers
+      podman_system_socket_enabled:
+        type: bool
+        default: false
+      podman_system_socket_service_name:
+        type: str
+        default: podman.socket
+      podman_user_socket_enabled:
+        type: bool
+        default: false
+      podman_user_socket_users:
+        type: list
+        elements: str
+      podman_user_socket_service_name:
+        type: str
+        default: podman.socket
+      podman_user_socket_manage_linger:
+        type: bool
+        default: true
+      podman_user_socket_start_user_manager:
+        type: bool
+        default: true
+      podman_user_socket_manage_shell_init:
+        type: bool
+        default: true
+      podman_user_socket_shell_init_files:
+        type: list
+        elements: str
+        default:
+          - .bash_profile
+          - .bashrc
