@@ -29,6 +29,10 @@ objects:
       description: Install a GUI stack (GNOME or XFCE) on Ubuntu.
       name: gui
       version_added: null
+    podman:
+      description: Install Podman tooling and optionally manage API sockets.
+      name: podman
+      version_added: null
     repos:
       description: Configure apt repositories and apt proxy policy for Ubuntu.
       name: repos
@@ -69,4 +73,4 @@ plugins:
   strategy: {}
   test: {}
   vars: {}
-version: 1.4.0
+version: 1.5.0
