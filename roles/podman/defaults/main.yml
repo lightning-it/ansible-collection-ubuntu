@@ -4,3 +4,16 @@ podman_packages:
   - buildah
 
 podman_registries_conf_dir: /etc/containers
+
+podman_system_socket_enabled: false
+podman_system_socket_service_name: podman.socket
+
+podman_user_socket_enabled: false
+podman_user_socket_users: []
+podman_user_socket_service_name: podman.socket
+podman_user_socket_manage_linger: true
+podman_user_socket_start_user_manager: true
+podman_user_socket_manage_shell_init: true
+podman_user_socket_shell_init_files:
+  - .bash_profile
+  - .bashrc

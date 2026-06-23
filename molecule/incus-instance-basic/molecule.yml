@@ -12,6 +12,7 @@ platforms:
     image: ubuntu:24.04
     pre_build_image: true
     command: sleep infinity
+    network_mode: host
 
 provisioner:
   name: ansible

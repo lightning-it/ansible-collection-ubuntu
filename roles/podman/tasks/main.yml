@@ -9,3 +9,14 @@
     path: "{{ podman_registries_conf_dir }}"
     state: directory
     mode: "0755"
+
+- name: Ensure system Podman API socket is enabled
+  ansible.builtin.systemd_service:
+    name: "{{ podman_system_socket_service_name }}"
+    enabled: true
+    state: started
+  when: podman_system_socket_enabled | bool
+
+- name: Configure rootless Podman API sockets
+  ansible.builtin.include_tasks: user_socket.yml
+  when: podman_user_socket_enabled | bool

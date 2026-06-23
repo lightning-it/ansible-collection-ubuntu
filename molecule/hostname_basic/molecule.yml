@@ -12,6 +12,7 @@ platforms:
     image: quay.io/rockylinux/rockylinux:9
     pre_build_image: true
     privileged: true
+    network_mode: host
 
 provisioner:
   name: ansible
