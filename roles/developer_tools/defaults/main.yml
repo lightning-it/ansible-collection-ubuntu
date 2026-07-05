@@ -70,6 +70,27 @@ developer_tools_terragrunt_url: >-
   developer_tools_terragrunt_arch }}
 developer_tools_terragrunt_dest: /usr/local/bin/terragrunt
 
+developer_tools_actionlint_enabled: false
+developer_tools_actionlint_version: 1.7.12
+developer_tools_actionlint_arch: >-
+  {{ 'arm64'
+     if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
+     else 'amd64' }}
+developer_tools_actionlint_archive_url: >-
+  https://github.com/rhysd/actionlint/releases/download/v{{
+  developer_tools_actionlint_version }}/actionlint_{{
+  developer_tools_actionlint_version }}_linux_{{
+  developer_tools_actionlint_arch }}.tar.gz
+developer_tools_actionlint_checksum_url: >-
+  https://github.com/rhysd/actionlint/releases/download/v{{
+  developer_tools_actionlint_version }}/actionlint_{{
+  developer_tools_actionlint_version }}_checksums.txt
+developer_tools_actionlint_archive_path: >-
+  /var/tmp/actionlint_{{ developer_tools_actionlint_version }}_linux_{{
+  developer_tools_actionlint_arch }}.tar.gz
+developer_tools_actionlint_extract_dir: "/var/tmp/actionlint-{{ developer_tools_actionlint_version }}"
+developer_tools_actionlint_dest: /usr/local/bin/actionlint
+
 developer_tools_packer_enabled: false
 developer_tools_packer_version: 1.15.4
 developer_tools_packer_arch: >-

@@ -1,0 +1,3 @@
+---
+trivial:
+  - Add matrix-based CI documentation and protected Incus test coverage gates.

@@ -1,5 +1,7 @@
 # ansible-collection-ubuntu
 
+[![Collection CI](https://github.com/lightning-it/ansible-collection-ubuntu/actions/workflows/collection-ci.yml/badge.svg?branch=develop)](https://github.com/lightning-it/ansible-collection-ubuntu/actions/workflows/collection-ci.yml)
+
 Ubuntu-focused Ansible collection covering OS baseline, apt repositories,
 automatic updates, users, developer tooling, desktop helpers, and day-2
 operational tasks.
