@@ -1,3 +1,0 @@
----
-minor_changes:
-  - developer_tools - Add optional actionlint installation from the upstream release archive with checksum verification.
