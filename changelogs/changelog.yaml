@@ -43,3 +43,12 @@ releases:
     fragments:
       - podman-workbench-socket.yml
     release_date: '2026-06-23'
+  1.6.0:
+    changes:
+      minor_changes:
+        - developer_tools - Add optional actionlint installation from the upstream
+          release archive with checksum verification.
+    fragments:
+      - 84-ci-test-matrix.yml
+      - 84-developer-tools-actionlint.yml
+    release_date: '2026-07-05'
