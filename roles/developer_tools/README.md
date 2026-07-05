@@ -59,6 +59,15 @@ developer_tools_terragrunt_arch: "{{ 'arm64' if ansible_architecture in ['aarch6
 developer_tools_terragrunt_url: "https://github.com/gruntwork-io/terragrunt/releases/download/{{ developer_tools_terragrunt_version }}/terragrunt_linux_{{ developer_tools_terragrunt_arch }}"
 developer_tools_terragrunt_dest: /usr/local/bin/terragrunt
 
+developer_tools_actionlint_enabled: false
+developer_tools_actionlint_version: 1.7.12
+developer_tools_actionlint_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+developer_tools_actionlint_archive_url: "https://github.com/rhysd/actionlint/releases/download/v{{ developer_tools_actionlint_version }}/actionlint_{{ developer_tools_actionlint_version }}_linux_{{ developer_tools_actionlint_arch }}.tar.gz"
+developer_tools_actionlint_checksum_url: "https://github.com/rhysd/actionlint/releases/download/v{{ developer_tools_actionlint_version }}/actionlint_{{ developer_tools_actionlint_version }}_checksums.txt"
+developer_tools_actionlint_archive_path: "/var/tmp/actionlint_{{ developer_tools_actionlint_version }}_linux_{{ developer_tools_actionlint_arch }}.tar.gz"
+developer_tools_actionlint_extract_dir: "/var/tmp/actionlint-{{ developer_tools_actionlint_version }}"
+developer_tools_actionlint_dest: /usr/local/bin/actionlint
+
 developer_tools_packer_enabled: false
 developer_tools_packer_version: 1.15.4
 developer_tools_packer_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
@@ -115,6 +124,8 @@ developer_tools_ssh_private_keys_vault_secret_id: ""
 - When `developer_tools_terminal_config_enabled` is true, the role writes base `~/.tmux.conf` and `~/.screenrc`
   files for the configured users. Install `tmux` and `screen` through `developer_tools_packages_present` when needed.
 - When `developer_tools_terragrunt_enabled` is true, the role downloads the Terragrunt standalone binary from the official GitHub release assets.
+- When `developer_tools_actionlint_enabled` is true, the role downloads and installs the pinned `actionlint`
+  standalone binary after verifying the upstream release checksum file.
 - When `developer_tools_packer_enabled` is true, the role downloads and installs the pinned HashiCorp Packer binary
   from the official HashiCorp release assets.
 - When `developer_tools_ssh_agent_enabled` is true, the role configures a persistent `systemd --user` `ssh-agent`

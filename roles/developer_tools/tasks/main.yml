@@ -75,6 +75,74 @@
     mode: "0755"
   when: developer_tools_terragrunt_enabled | bool
 
+- name: Read actionlint checksum file when enabled
+  ansible.builtin.uri:
+    url: "{{ developer_tools_actionlint_checksum_url }}"
+    return_content: true
+  register: developer_tools_actionlint_checksum_response
+  when: developer_tools_actionlint_enabled | bool
+
+- name: Resolve actionlint archive checksum when enabled
+  ansible.builtin.set_fact:
+    developer_tools_actionlint_checksum: >-
+      {{
+        'sha256:'
+        ~ (
+          developer_tools_actionlint_checksum_response.content
+          | regex_search(
+              '([A-Fa-f0-9]{64})\\s+actionlint_'
+              ~ (developer_tools_actionlint_version | regex_escape)
+              ~ '_linux_'
+              ~ (developer_tools_actionlint_arch | regex_escape)
+              ~ '\\.tar\\.gz',
+              '\\1'
+            )
+          | default([], true)
+          | first
+          | default('', true)
+        )
+      }}
+  when: developer_tools_actionlint_enabled | bool
+
+- name: Ensure actionlint checksum was found when enabled
+  ansible.builtin.assert:
+    that:
+      - developer_tools_actionlint_checksum is defined
+      - developer_tools_actionlint_checksum | regex_search('^sha256:[A-Fa-f0-9]{64}$')
+    fail_msg: "Unable to find actionlint checksum for {{ developer_tools_actionlint_archive_url }}."
+  when: developer_tools_actionlint_enabled | bool
+
+- name: Ensure actionlint archive is downloaded when enabled
+  ansible.builtin.get_url:
+    url: "{{ developer_tools_actionlint_archive_url }}"
+    dest: "{{ developer_tools_actionlint_archive_path }}"
+    checksum: "{{ developer_tools_actionlint_checksum }}"
+    mode: "0644"
+  when: developer_tools_actionlint_enabled | bool
+
+- name: Ensure actionlint extract directory exists when enabled
+  ansible.builtin.file:
+    path: "{{ developer_tools_actionlint_extract_dir }}"
+    state: directory
+    mode: "0755"
+  when: developer_tools_actionlint_enabled | bool
+
+- name: Ensure actionlint archive is unpacked when enabled
+  ansible.builtin.unarchive:
+    src: "{{ developer_tools_actionlint_archive_path }}"
+    dest: "{{ developer_tools_actionlint_extract_dir }}"
+    remote_src: true
+    creates: "{{ developer_tools_actionlint_extract_dir }}/actionlint"
+  when: developer_tools_actionlint_enabled | bool
+
+- name: Ensure actionlint CLI is installed when enabled
+  ansible.builtin.copy:
+    src: "{{ developer_tools_actionlint_extract_dir }}/actionlint"
+    dest: "{{ developer_tools_actionlint_dest }}"
+    remote_src: true
+    mode: "0755"
+  when: developer_tools_actionlint_enabled | bool
+
 - name: Ensure Packer archive dependencies are installed when enabled
   ansible.builtin.package:
     name: "{{ developer_tools_packer_unzip_package_name }}"
