@@ -18,6 +18,54 @@ argument_specs:
       developer_tools_pip_extra_args:
         type: str
         default: ""
+      developer_tools_nodejs_enabled:
+        type: bool
+        default: false
+      developer_tools_nodejs_package_source:
+        type: str
+        choices:
+          - os
+        default: os
+      developer_tools_nodejs_packages_present:
+        type: list
+        elements: str
+        default:
+          - nodejs
+          - npm
+      developer_tools_node_executable:
+        type: str
+        default: node
+      developer_tools_npm_executable:
+        type: str
+        default: npm
+      developer_tools_npx_executable:
+        type: str
+        default: npx
+      developer_tools_nodejs_validate:
+        type: bool
+        default: true
+      developer_tools_nodejs_expected_users:
+        type: list
+        elements: str
+        default: []
+      developer_tools_markdownlint_cli2_enabled:
+        type: bool
+        default: false
+      developer_tools_markdownlint_cli2_install_mode:
+        type: str
+        choices:
+          - global
+          - npx
+        default: global
+      developer_tools_markdownlint_cli2_package_name:
+        type: str
+        default: markdownlint-cli2
+      developer_tools_markdownlint_cli2_version:
+        type: str
+        default: ""
+      developer_tools_markdownlint_cli2_validate:
+        type: bool
+        default: true
       developer_tools_github_cli_enabled:
         type: bool
         default: false

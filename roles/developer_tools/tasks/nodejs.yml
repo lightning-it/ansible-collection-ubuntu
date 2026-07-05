@@ -1,0 +1,100 @@
+---
+- name: Ensure Node.js package source is supported
+  ansible.builtin.assert:
+    that:
+      - developer_tools_nodejs_package_source == "os"
+    fail_msg: >-
+      developer_tools_nodejs_package_source currently supports only "os".
+      Configure external repositories separately before overriding package names.
+  changed_when: false
+
+- name: Ensure Node.js, npm, and npx packages are installed
+  ansible.builtin.package:
+    name: "{{ developer_tools_nodejs_packages_present }}"
+    state: present
+  when: (developer_tools_nodejs_packages_present | default([], true) | length) > 0
+
+- name: Resolve markdownlint-cli2 npx package spec
+  ansible.builtin.set_fact:
+    developer_tools_markdownlint_cli2_npx_package_spec: >-
+      {{ developer_tools_markdownlint_cli2_package_name }}{{
+        '@' ~ developer_tools_markdownlint_cli2_version
+        if (developer_tools_markdownlint_cli2_version | string | trim | length > 0)
+        else ''
+      }}
+  when: developer_tools_markdownlint_cli2_enabled | bool
+
+- name: Ensure markdownlint-cli2 is installed globally when enabled
+  community.general.npm:
+    name: "{{ developer_tools_markdownlint_cli2_package_name }}"
+    version: >-
+      {{
+        (developer_tools_markdownlint_cli2_version | string | trim | length > 0)
+        | ternary(developer_tools_markdownlint_cli2_version, omit)
+      }}
+    global: true
+    executable: "{{ developer_tools_npm_executable }}"
+    state: present
+  when:
+    - developer_tools_markdownlint_cli2_enabled | bool
+    - developer_tools_markdownlint_cli2_install_mode == "global"
+
+- name: Validate node is executable
+  ansible.builtin.command:
+    argv:
+      - "{{ developer_tools_node_executable }}"
+      - --version
+  changed_when: false
+  when: developer_tools_nodejs_validate | bool
+
+- name: Validate npm is executable
+  ansible.builtin.command:
+    argv:
+      - "{{ developer_tools_npm_executable }}"
+      - --version
+  changed_when: false
+  when: developer_tools_nodejs_validate | bool
+
+- name: Validate npx is executable
+  ansible.builtin.command:
+    argv:
+      - "{{ developer_tools_npx_executable }}"
+      - --version
+  changed_when: false
+  when: developer_tools_nodejs_validate | bool
+
+- name: Validate npx is executable for expected users
+  ansible.builtin.command:
+    argv:
+      - "{{ developer_tools_npx_executable }}"
+      - --version
+  become: true
+  become_user: "{{ item }}"
+  changed_when: false
+  loop: "{{ developer_tools_nodejs_expected_users }}"
+  when: developer_tools_nodejs_validate | bool
+
+- name: Validate markdownlint-cli2 can run through npx
+  ansible.builtin.command:
+    argv:
+      - "{{ developer_tools_npx_executable }}"
+      - markdownlint-cli2
+      - --version
+  changed_when: false
+  when:
+    - developer_tools_markdownlint_cli2_enabled | bool
+    - developer_tools_markdownlint_cli2_validate | bool
+    - developer_tools_markdownlint_cli2_install_mode == "global"
+
+- name: Validate markdownlint-cli2 can run through npx package execution
+  ansible.builtin.command:
+    argv:
+      - "{{ developer_tools_npx_executable }}"
+      - --yes
+      - "{{ developer_tools_markdownlint_cli2_npx_package_spec }}"
+      - --version
+  changed_when: false
+  when:
+    - developer_tools_markdownlint_cli2_enabled | bool
+    - developer_tools_markdownlint_cli2_validate | bool
+    - developer_tools_markdownlint_cli2_install_mode == "npx"

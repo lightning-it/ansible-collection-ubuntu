@@ -5,6 +5,10 @@
   gather_facts: false
   vars:
     developer_tools_molecule_execute_role: false
+    developer_tools_nodejs_enabled: true
+    developer_tools_markdownlint_cli2_enabled: true
+    developer_tools_nodejs_expected_users:
+      - molecule-user
   tasks:
     - name: Import lit.ubuntu.developer_tools for syntax coverage
       ansible.builtin.import_role:
