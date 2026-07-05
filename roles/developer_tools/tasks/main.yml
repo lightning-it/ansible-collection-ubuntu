@@ -89,15 +89,13 @@
         'sha256:'
         ~ (
           developer_tools_actionlint_checksum_response.content
-          | regex_search(
+          | regex_findall(
               '([A-Fa-f0-9]{64})\\s+actionlint_'
               ~ (developer_tools_actionlint_version | regex_escape)
               ~ '_linux_'
               ~ (developer_tools_actionlint_arch | regex_escape)
-              ~ '\\.tar\\.gz',
-              '\\1'
+              ~ '\\.tar\\.gz'
             )
-          | default([], true)
           | first
           | default('', true)
         )
