@@ -14,6 +14,17 @@
     state: present
   when: (developer_tools_nodejs_packages_present | default([], true) | length) > 0
 
+- name: Check npm availability during check mode
+  ansible.builtin.command:
+    argv:
+      - "{{ developer_tools_npm_executable }}"
+      - --version
+  check_mode: false
+  changed_when: false
+  failed_when: false
+  register: developer_tools_nodejs_check_mode_npm
+  when: ansible_check_mode
+
 - name: Resolve markdownlint-cli2 npx package spec
   ansible.builtin.set_fact:
     developer_tools_markdownlint_cli2_npx_package_spec: >-
@@ -38,6 +49,9 @@
   when:
     - developer_tools_markdownlint_cli2_enabled | bool
     - developer_tools_markdownlint_cli2_install_mode == "global"
+    - >-
+      not ansible_check_mode
+      or (developer_tools_nodejs_check_mode_npm.rc | default(0)) == 0
 
 - name: Validate node is executable
   ansible.builtin.command:
@@ -45,7 +59,11 @@
       - "{{ developer_tools_node_executable }}"
       - --version
   changed_when: false
-  when: developer_tools_nodejs_validate | bool
+  when:
+    - developer_tools_nodejs_validate | bool
+    - >-
+      not ansible_check_mode
+      or (developer_tools_nodejs_check_mode_npm.rc | default(0)) == 0
 
 - name: Validate npm is executable
   ansible.builtin.command:
@@ -53,7 +71,11 @@
       - "{{ developer_tools_npm_executable }}"
       - --version
   changed_when: false
-  when: developer_tools_nodejs_validate | bool
+  when:
+    - developer_tools_nodejs_validate | bool
+    - >-
+      not ansible_check_mode
+      or (developer_tools_nodejs_check_mode_npm.rc | default(0)) == 0
 
 - name: Validate npx is executable
   ansible.builtin.command:
@@ -61,7 +83,11 @@
       - "{{ developer_tools_npx_executable }}"
       - --version
   changed_when: false
-  when: developer_tools_nodejs_validate | bool
+  when:
+    - developer_tools_nodejs_validate | bool
+    - >-
+      not ansible_check_mode
+      or (developer_tools_nodejs_check_mode_npm.rc | default(0)) == 0
 
 - name: Validate npx is executable for expected users
   ansible.builtin.command:
@@ -72,7 +98,11 @@
   become_user: "{{ item }}"
   changed_when: false
   loop: "{{ developer_tools_nodejs_expected_users }}"
-  when: developer_tools_nodejs_validate | bool
+  when:
+    - developer_tools_nodejs_validate | bool
+    - >-
+      not ansible_check_mode
+      or (developer_tools_nodejs_check_mode_npm.rc | default(0)) == 0
 
 - name: Validate markdownlint-cli2 can run through npx
   ansible.builtin.command:
@@ -85,6 +115,9 @@
     - developer_tools_markdownlint_cli2_enabled | bool
     - developer_tools_markdownlint_cli2_validate | bool
     - developer_tools_markdownlint_cli2_install_mode == "global"
+    - >-
+      not ansible_check_mode
+      or (developer_tools_nodejs_check_mode_npm.rc | default(0)) == 0
 
 - name: Validate markdownlint-cli2 can run through npx package execution
   ansible.builtin.command:
@@ -98,3 +131,6 @@
     - developer_tools_markdownlint_cli2_enabled | bool
     - developer_tools_markdownlint_cli2_validate | bool
     - developer_tools_markdownlint_cli2_install_mode == "npx"
+    - >-
+      not ansible_check_mode
+      or (developer_tools_nodejs_check_mode_npm.rc | default(0)) == 0
