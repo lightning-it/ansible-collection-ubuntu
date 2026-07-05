@@ -90,11 +90,11 @@
         ~ (
           developer_tools_actionlint_checksum_response.content
           | regex_findall(
-              '([A-Fa-f0-9]{64})\\s+actionlint_'
+              '([A-Fa-f0-9]{64})\s+actionlint_'
               ~ (developer_tools_actionlint_version | regex_escape)
               ~ '_linux_'
               ~ (developer_tools_actionlint_arch | regex_escape)
-              ~ '\\.tar\\.gz'
+              ~ '\.tar\.gz'
             )
           | first
           | default('', true)
@@ -106,7 +106,7 @@
   ansible.builtin.assert:
     that:
       - developer_tools_actionlint_checksum is defined
-      - developer_tools_actionlint_checksum | regex_search('^sha256:[A-Fa-f0-9]{64}$')
+      - developer_tools_actionlint_checksum is match('^sha256:[A-Fa-f0-9]{64}$')
     fail_msg: "Unable to find actionlint checksum for {{ developer_tools_actionlint_archive_url }}."
   when: developer_tools_actionlint_enabled | bool
 
