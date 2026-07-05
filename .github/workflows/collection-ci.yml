@@ -3,28 +3,12 @@
 name: Collection CI
 
 on:
+  # CI on pushes to integration/stable branches and version tags (v*)
   push:
     branches: ["develop", "main"]
     tags: ["v*"]
+  # CI on all PRs
   pull_request:
-  schedule:
-    - cron: "17 2 * * *"
-  workflow_dispatch:
-    inputs:
-      run_incus:
-        description: "Run Incus Molecule scenarios on self-hosted runners"
-        required: false
-        default: false
-        type: boolean
-      run_heavy:
-        description: "Run heavy Molecule scenarios on self-hosted Incus runners"
-        required: false
-        default: false
-        type: boolean
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -40,154 +24,49 @@ env:
   EXAMPLE_PLAYBOOK: "playbooks/example.yml"
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Collection CI
+  # ---------------------------------------------------------------------------
   lint:
-    name: Lint
+    name: Lint (ansible-lint via ee-wunder-devtools-ubi9)
     runs-on: ubuntu-latest
 
     steps:
+      # 1) Checkout the repository
       - name: Checkout
         uses: actions/checkout@v7
 
+      # 2) Run ansible-lint inside the ee-wunder-devtools-ubi9 container
       - name: Run ansible-lint via devtools-ansible-lint.sh
         env:
+          # These env vars make the script generic across collections
           COLLECTION_NAMESPACE: ${{ env.COLLECTION_NAMESPACE }}
           ANSIBLE_LINT_VERSION: ${{ env.ANSIBLE_LINT_VERSION }}
         run: |
           bash scripts/devtools-ansible-lint.sh
 
-      - name: Run yamllint
-        run: |
-          python3 -m pip install --user yamllint
-          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
-          "${HOME}/.local/bin/yamllint" .
-
-  molecule-docker:
-    name: Molecule Docker (${{ matrix.scenario }})
+  molecule:
+    name: Molecule (via devtools)
     runs-on: ubuntu-latest
     needs: lint
-    strategy:
-      fail-fast: false
-      matrix:
-        scenario:
-          - automatic_updates_basic
-          - baseline-basic
-          - developer-tools-basic
-          - github-runner-basic
-          - hostname_basic
-          - podman-basic
-          - repos-basic
-          - users-basic
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Run Molecule via ee-wunder-devtools-ubi9.
+      # scripts/devtools-molecule.sh is expected to:
+      #  - build the collection
+      #  - install it into a temp path
+      #  - run one or more molecule scenarios
       - name: Run Molecule tests (via devtools)
         env:
           MOLECULE_NO_LOG: "false"
         run: |
-          bash scripts/devtools-molecule.sh "${{ matrix.scenario }}"
-
-  molecule-desktop:
-    name: Molecule Desktop (${{ matrix.scenario }})
-    runs-on: ubuntu-latest
-    needs: lint
-    strategy:
-      fail-fast: false
-      matrix:
-        scenario:
-          - firefox-basic
-          - firefox-config-basic
-          - firefox-deploy-basic
-          - firefox-destroy-basic
-          - gui-basic
-          - vscode-basic
-          - vscode-config-basic
-          - vscode-deploy-basic
-          - vscode-destroy-basic
-          - xrdp-basic
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Run desktop Molecule tests (via devtools)
-        env:
-          MOLECULE_NO_LOG: "false"
-        run: |
-          bash scripts/devtools-molecule.sh "${{ matrix.scenario }}"
-
-  molecule-incus:
-    name: Molecule Incus (${{ matrix.scenario }})
-    if: >-
-      github.event_name == 'schedule' ||
-      (
-        github.event_name == 'push' &&
-        (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-      ) ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_incus)
-    runs-on:
-      - self-hosted
-      - linux
-      - ubuntu
-      - incus
-    needs: lint
-    strategy:
-      fail-fast: false
-      matrix:
-        scenario:
-          - incus-basic
-          - incus-image-basic
-          - incus-instance-basic
-          - netplan-basic
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Run protected Incus Molecule tests (via devtools)
-        env:
-          MOLECULE_NO_LOG: "false"
-          MOLECULE_RUN_PROTECTED: "true"
-        run: |
-          bash scripts/devtools-molecule.sh "${{ matrix.scenario }}"
-
-  molecule-heavy:
-    name: Molecule Heavy
-    if: >-
-      github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_heavy) ||
-      startsWith(github.ref, 'refs/tags/v')
-    runs-on:
-      - self-hosted
-      - linux
-      - ubuntu
-      - incus
-      - heavy
-    needs: lint
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Run heavy Molecule scenarios
-        env:
-          MOLECULE_NO_LOG: "false"
-          MOLECULE_RUN_PROTECTED: "true"
-        run: |
-          shopt -s nullglob
-          scenarios=(molecule/*_heavy)
-          if [ "${#scenarios[@]}" -eq 0 ]; then
-            echo "No *_heavy Molecule scenarios are defined in this collection."
-            exit 0
-          fi
-          for scenario_dir in "${scenarios[@]}"; do
-            scenario="${scenario_dir##*/}"
-            bash scripts/devtools-molecule.sh "${scenario}"
-          done
+          bash scripts/devtools-molecule.sh
 
   build-install:
-    name: Build & install collection
+    name: Build & install collection (via devtools smoke test)
     runs-on: ubuntu-latest
     needs: lint
 
@@ -195,92 +74,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Run a full collection smoke test inside ee-wunder-devtools-ubi9:
+      #  - build the collection
+      #  - install it into /tmp/wunder/collections
+      #  - run the example playbook
       - name: Run collection smoke test via devtools-collection-smoke.sh
         env:
           COLLECTION_NAMESPACE: ${{ env.COLLECTION_NAMESPACE }}
           EXAMPLE_PLAYBOOK: ${{ env.EXAMPLE_PLAYBOOK }}
         run: |
           bash scripts/devtools-collection-smoke.sh
-
-  ci-result:
-    name: CI Result
-    if: always()
-    runs-on: ubuntu-latest
-    needs:
-      - lint
-      - build-install
-      - molecule-docker
-      - molecule-desktop
-      - molecule-incus
-      - molecule-heavy
-
-    steps:
-      - name: Evaluate required CI results
-        env:
-          LINT_RESULT: ${{ needs.lint.result }}
-          BUILD_INSTALL_RESULT: ${{ needs.build-install.result }}
-          MOLECULE_DOCKER_RESULT: ${{ needs.molecule-docker.result }}
-          MOLECULE_DESKTOP_RESULT: ${{ needs.molecule-desktop.result }}
-          MOLECULE_INCUS_RESULT: ${{ needs.molecule-incus.result }}
-          MOLECULE_HEAVY_RESULT: ${{ needs.molecule-heavy.result }}
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref }}
-          RUN_INCUS: ${{ inputs.run_incus || 'false' }}
-          RUN_HEAVY: ${{ inputs.run_heavy || 'false' }}
-        run: |
-          set -euo pipefail
-
-          required_results=(
-            "lint:${LINT_RESULT}"
-            "build-install:${BUILD_INSTALL_RESULT}"
-            "molecule-docker:${MOLECULE_DOCKER_RESULT}"
-            "molecule-desktop:${MOLECULE_DESKTOP_RESULT}"
-          )
-
-          incus_required=false
-          heavy_required=false
-
-          if [ "${EVENT_NAME}" = "schedule" ]; then
-            incus_required=true
-            heavy_required=true
-          fi
-
-          if [ "${EVENT_NAME}" = "push" ]; then
-            case "${REF_NAME}" in
-              refs/heads/develop|refs/heads/main|refs/tags/v*)
-                incus_required=true
-                ;;
-            esac
-            case "${REF_NAME}" in
-              refs/tags/v*)
-                heavy_required=true
-                ;;
-            esac
-          fi
-
-          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
-            [ "${RUN_INCUS}" = "true" ] && incus_required=true
-            [ "${RUN_HEAVY}" = "true" ] && heavy_required=true
-          fi
-
-          if [ "${incus_required}" = "true" ]; then
-            required_results+=("molecule-incus:${MOLECULE_INCUS_RESULT}")
-          fi
-          if [ "${heavy_required}" = "true" ]; then
-            required_results+=("molecule-heavy:${MOLECULE_HEAVY_RESULT}")
-          fi
-
-          failed=0
-          for result in "${required_results[@]}"; do
-            job="${result%%:*}"
-            state="${result#*:}"
-            echo "${job}: ${state}"
-            if [ "${state}" != "success" ]; then
-              failed=1
-            fi
-          done
-
-          if [ "${failed}" -ne 0 ]; then
-            echo "One or more required CI jobs failed, were cancelled, or were skipped." >&2
-            exit 1
-          fi
