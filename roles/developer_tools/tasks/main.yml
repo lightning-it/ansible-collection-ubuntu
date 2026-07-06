@@ -21,6 +21,10 @@
     extra_args: "{{ developer_tools_pip_extra_args | default(omit, true) }}"
   when: (developer_tools_pip_packages_present | default([], true) | length) > 0
 
+- name: Configure Node.js developer tooling
+  ansible.builtin.include_tasks: nodejs.yml
+  when: developer_tools_nodejs_enabled | bool
+
 - name: Ensure apt keyring directory exists for GitHub CLI
   ansible.builtin.file:
     path: "{{ developer_tools_github_cli_key_dest | dirname }}"
