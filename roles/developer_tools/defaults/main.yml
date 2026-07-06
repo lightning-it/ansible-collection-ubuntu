@@ -6,6 +6,23 @@ developer_tools_pip_executable: pip3
 developer_tools_pip_packages_present: []
 developer_tools_pip_extra_args: ""
 
+developer_tools_nodejs_enabled: false
+developer_tools_nodejs_package_source: os
+developer_tools_nodejs_packages_present:
+  - nodejs
+  - npm
+developer_tools_node_executable: node
+developer_tools_npm_executable: npm
+developer_tools_npx_executable: npx
+developer_tools_nodejs_validate: true
+developer_tools_nodejs_expected_users: []
+
+developer_tools_markdownlint_cli2_enabled: false
+developer_tools_markdownlint_cli2_install_mode: global
+developer_tools_markdownlint_cli2_package_name: markdownlint-cli2
+developer_tools_markdownlint_cli2_version: ""
+developer_tools_markdownlint_cli2_validate: true
+
 developer_tools_github_cli_enabled: false
 developer_tools_github_cli_package_name: gh
 developer_tools_github_cli_key_url: >-

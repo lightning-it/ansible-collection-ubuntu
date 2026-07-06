@@ -22,6 +22,24 @@ developer_tools_pip_executable: pip3
 developer_tools_pip_packages_present: []
 developer_tools_pip_extra_args: ""
 
+developer_tools_nodejs_enabled: false
+developer_tools_nodejs_package_source: os
+developer_tools_nodejs_packages_present:
+  - nodejs
+  - npm
+developer_tools_node_executable: node
+developer_tools_npm_executable: npm
+developer_tools_npx_executable: npx
+developer_tools_nodejs_validate: true
+developer_tools_nodejs_expected_users:
+  - ops-admin
+
+developer_tools_markdownlint_cli2_enabled: false
+developer_tools_markdownlint_cli2_install_mode: global
+developer_tools_markdownlint_cli2_package_name: markdownlint-cli2
+developer_tools_markdownlint_cli2_version: ""
+developer_tools_markdownlint_cli2_validate: true
+
 developer_tools_github_cli_enabled: false
 developer_tools_github_cli_package_name: gh
 developer_tools_github_cli_repo_name: gh-cli
@@ -123,6 +141,12 @@ developer_tools_ssh_private_keys_vault_secret_id: ""
   users authenticate with `gh auth login`, and `gh` manages the credential secret store.
 - When `developer_tools_terminal_config_enabled` is true, the role writes base `~/.tmux.conf` and `~/.screenrc`
   files for the configured users. Install `tmux` and `screen` through `developer_tools_packages_present` when needed.
+- When `developer_tools_nodejs_enabled` is true, the role installs Node.js/npm/npx from the configured OS package
+  source and validates `node --version`, `npm --version`, and `npx --version`. The default package source is `os`;
+  external repositories such as NodeSource must be configured separately and explicitly before overriding package names.
+- When `developer_tools_markdownlint_cli2_enabled` is true, the role installs `markdownlint-cli2` globally with npm
+  by default and validates `npx markdownlint-cli2 --version`. Set `developer_tools_markdownlint_cli2_install_mode`
+  to `npx` to avoid a global npm package and validate package execution through `npx --yes` instead.
 - When `developer_tools_terragrunt_enabled` is true, the role downloads the Terragrunt standalone binary from the official GitHub release assets.
 - When `developer_tools_actionlint_enabled` is true, the role downloads and installs the pinned `actionlint`
   standalone binary after verifying the upstream release checksum file.
@@ -149,9 +173,15 @@ None.
       vars:
         developer_tools_packages_present:
           - git
+          - npm
+          - nodejs
           - podman
           - screen
           - tmux
+        developer_tools_nodejs_enabled: true
+        developer_tools_markdownlint_cli2_enabled: true
+        developer_tools_nodejs_expected_users:
+          - ops-admin
         developer_tools_terminal_config_enabled: true
         developer_tools_terminal_config_users:
           - ops-admin
