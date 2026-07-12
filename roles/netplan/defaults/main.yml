@@ -8,6 +8,7 @@ netplan_renderer: networkd
 netplan_net_ifaces: "{{ net_ifaces | default([]) }}"
 netplan_dns_servers: "{{ dns_servers | default([]) }}"
 netplan_ethernets: {}
+netplan_vlans: {}
 netplan_config_files_absent: []
 netplan_runtime_networkd_files_absent: []
 

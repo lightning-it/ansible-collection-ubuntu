@@ -1,0 +1,36 @@
+---
+- name: Ensure GRUB drop-in directory exists
+  ansible.builtin.file:
+    path: "{{ luks_unlock_grub_dropin_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Render initramfs network kernel argument
+  ansible.builtin.template:
+    src: grub-initramfs-network.cfg.j2
+    dest: "{{ luks_unlock_grub_dropin_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: LUKS unlock | Update GRUB configuration
+
+- name: Ensure initramfs-tools configuration directory exists
+  ansible.builtin.file:
+    path: "{{ luks_unlock_initramfs_modules_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Include early-boot network drivers in initramfs
+  ansible.builtin.lineinfile:
+    path: "{{ luks_unlock_initramfs_modules_path }}"
+    line: "{{ item }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ luks_unlock_network_modules }}"
+  notify: LUKS unlock | Rebuild initramfs

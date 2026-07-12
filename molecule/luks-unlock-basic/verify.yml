@@ -1,0 +1,68 @@
+---
+- name: Verify LUKS unlock
+  hosts: luks_unlock
+  become: false
+  gather_facts: false
+  vars:
+    luks_unlock_test_dir: /tmp/lit-luks-unlock-molecule
+    luks_unlock_test_public_key: >-
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoleculeDocumentationKeyOnly000000000 molecule@example.invalid
+
+  tasks:
+    - name: Inspect staged installimage hook
+      ansible.builtin.stat:
+        path: "{{ luks_unlock_test_dir }}/post-install.sh"
+      register: luks_unlock_stage_stat
+      changed_when: false
+
+    - name: Read staged installimage hook
+      ansible.builtin.slurp:
+        src: "{{ luks_unlock_test_dir }}/post-install.sh"
+      register: luks_unlock_stage_file
+      changed_when: false
+
+    - name: Read rendered GRUB network drop-in
+      ansible.builtin.slurp:
+        src: "{{ luks_unlock_test_dir }}/grub.d/80-lit-initramfs-network.cfg"
+      register: luks_unlock_grub_file
+      changed_when: false
+
+    - name: Read rendered Dropbear authorized keys
+      ansible.builtin.slurp:
+        src: "{{ luks_unlock_test_dir }}/dropbear/authorized_keys"
+      register: luks_unlock_authorized_keys_file
+      changed_when: false
+
+    - name: Read rendered initramfs modules
+      ansible.builtin.slurp:
+        src: "{{ luks_unlock_test_dir }}/initramfs-tools/modules"
+      register: luks_unlock_modules_file
+      changed_when: false
+
+    - name: Check staged installimage hook shell syntax
+      ansible.builtin.command:
+        argv:
+          - bash
+          - -n
+          - "{{ luks_unlock_test_dir }}/post-install.sh"
+      changed_when: false
+
+    - name: Validate secret-free bootstrap and installed configuration
+      ansible.builtin.assert:
+        that:
+          - luks_unlock_stage_stat.stat.mode == '0700'
+          - "'cryptsetup-initramfs' in (luks_unlock_stage_file.content | b64decode)"
+          - "'dropbear-initramfs' in (luks_unlock_stage_file.content | b64decode)"
+          - "'update-initramfs -u -k all' in (luks_unlock_stage_file.content | b64decode)"
+          - "'LIT_DROPBEAR_HOSTKEY_SHA256=' in (luks_unlock_stage_file.content | b64decode)"
+          - "'LIT_OPENSSH_HOSTKEY_SHA256=' in (luks_unlock_stage_file.content | b64decode)"
+          - "'/boot/lit-first-boot-hostkey-fingerprints' in (luks_unlock_stage_file.content | b64decode)"
+          - "'MoleculeRecoverySecret' not in (luks_unlock_stage_file.content | b64decode)"
+          - >-
+            'ip=192.0.2.10::192.0.2.1:255.255.255.0:molecule-host:enp1s0:none:192.0.2.53:192.0.2.54'
+            in (luks_unlock_grub_file.content | b64decode)
+          - >-
+            'no-port-forwarding,no-agent-forwarding,no-X11-forwarding,command="/bin/cryptroot-unlock"'
+            in (luks_unlock_authorized_keys_file.content | b64decode)
+          - luks_unlock_test_public_key in (luks_unlock_authorized_keys_file.content | b64decode)
+          - "'igb' in (luks_unlock_modules_file.content | b64decode).splitlines()"

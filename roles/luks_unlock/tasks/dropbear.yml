@@ -1,0 +1,33 @@
+---
+- name: Install Dropbear initramfs packages
+  ansible.builtin.apt:
+    name: "{{ luks_unlock_dropbear_packages }}"
+    state: present
+    update_cache: "{{ luks_unlock_update_apt_cache | bool }}"
+  notify: LUKS unlock | Rebuild initramfs
+  when: luks_unlock_manage_packages | bool
+
+- name: Ensure Dropbear initramfs configuration directory exists
+  ansible.builtin.file:
+    path: "{{ luks_unlock_dropbear_config_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Render Dropbear initramfs configuration
+  ansible.builtin.template:
+    src: dropbear.conf.j2
+    dest: "{{ luks_unlock_dropbear_config_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: LUKS unlock | Rebuild initramfs
+- name: Render restricted Dropbear authorized keys
+  ansible.builtin.template:
+    src: authorized_keys.j2
+    dest: "{{ luks_unlock_dropbear_authorized_keys_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: LUKS unlock | Rebuild initramfs

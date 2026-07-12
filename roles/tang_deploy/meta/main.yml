@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  role_name: tang_deploy
+  namespace: lit
+  author: Lightning IT
+  company: Lightning IT
+  description: Install and validate a minimal systemd socket-activated Tang binding service on Ubuntu.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - tang
+    - clevis
+    - luks
+    - security
+
+dependencies: []

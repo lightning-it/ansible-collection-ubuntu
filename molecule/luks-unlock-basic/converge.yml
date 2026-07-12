@@ -1,0 +1,99 @@
+---
+- name: Converge LUKS unlock
+  hosts: luks_unlock
+  become: false
+  gather_facts: false
+  vars:
+    luks_unlock_test_dir: /tmp/lit-luks-unlock-molecule
+    luks_unlock_test_public_key: >-
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoleculeDocumentationKeyOnly000000000 molecule@example.invalid
+    luks_unlock_test_network:
+      method: static
+      interface: enp1s0
+      address: 192.0.2.10
+      gateway: 192.0.2.1
+      netmask: 255.255.255.0
+      hostname: molecule-host
+      dns:
+        - 192.0.2.53
+        - 192.0.2.54
+
+  pre_tasks:
+    - name: Create LUKS unlock test directory
+      ansible.builtin.file:
+        path: "{{ luks_unlock_test_dir }}"
+        state: directory
+        mode: "0700"
+
+  tasks:
+    - name: Stage installimage bootstrap hook
+      ansible.builtin.include_role:
+        name: lit.ubuntu.luks_unlock
+      vars:
+        luks_unlock_enabled: true
+        luks_unlock_execution_mode: rescue_stage
+        luks_unlock_method: dropbear
+        luks_unlock_rescue_stage_path: "{{ luks_unlock_test_dir }}/post-install.sh"
+        luks_unlock_early_network: "{{ luks_unlock_test_network }}"
+        luks_unlock_network_modules:
+          - igb
+        luks_unlock_dropbear_authorized_keys:
+          - "{{ luks_unlock_test_public_key }}"
+
+    - name: Confirm installimage bootstrap fact
+      ansible.builtin.assert:
+        that:
+          - luks_unlock_installimage_post_install_script_path == luks_unlock_test_dir + '/post-install.sh'
+
+    - name: Render installed Dropbear configuration without changing the test host boot artifacts
+      ansible.builtin.include_role:
+        name: lit.ubuntu.luks_unlock
+      vars:
+        luks_unlock_enabled: true
+        luks_unlock_execution_mode: installed
+        luks_unlock_method: dropbear
+        luks_unlock_manage_packages: false
+        luks_unlock_early_network: "{{ luks_unlock_test_network }}"
+        luks_unlock_network_modules:
+          - igb
+        luks_unlock_grub_dropin_path: "{{ luks_unlock_test_dir }}/grub.d/80-lit-initramfs-network.cfg"
+        luks_unlock_initramfs_modules_path: "{{ luks_unlock_test_dir }}/initramfs-tools/modules"
+        luks_unlock_update_grub: false
+        luks_unlock_rebuild_initramfs: false
+        luks_unlock_dropbear_authorized_keys:
+          - "{{ luks_unlock_test_public_key }}"
+        luks_unlock_dropbear_config_path: "{{ luks_unlock_test_dir }}/dropbear/dropbear.conf"
+        luks_unlock_dropbear_authorized_keys_path: "{{ luks_unlock_test_dir }}/dropbear/authorized_keys"
+        luks_unlock_validate_dropbear_host_keys: false
+
+    - name: Create intentionally ambiguous crypttab fixture
+      ansible.builtin.copy:
+        dest: "{{ luks_unlock_test_dir }}/crypttab"
+        content: |
+          luks-first UUID=11111111-1111-1111-1111-111111111111 none luks,initramfs
+          luks-second UUID=22222222-2222-2222-2222-222222222222 none luks,initramfs
+        mode: "0600"
+
+    - name: Verify automatic crypttab selection rejects ambiguity
+      block:
+        - name: Attempt automatic selection with multiple active crypttab entries
+          ansible.builtin.include_role:
+            name: lit.ubuntu.luks_unlock
+            tasks_from: clevis_device
+          vars:
+            luks_unlock_crypttab_path: "{{ luks_unlock_test_dir }}/crypttab"
+            luks_unlock_device:
+              id: root
+              crypttab_name: auto
+              keyslot: 7
+              initramfs: true
+
+        - name: Fail when ambiguous automatic selection was accepted
+          ansible.builtin.fail:
+            msg: "crypttab_name=auto unexpectedly accepted multiple active entries."
+
+      rescue:
+        - name: Confirm ambiguity caused the safe failure
+          ansible.builtin.assert:
+            that:
+              - "'must select exactly one active entry' in ansible_failed_result.msg"

@@ -14,6 +14,7 @@
       - netplan_dns_servers is sequence
       - netplan_dns_servers is not string
       - netplan_ethernets is mapping
+      - netplan_vlans is mapping
       - netplan_config_files_absent is sequence
       - netplan_config_files_absent is not string
       - netplan_runtime_networkd_files_absent is sequence
@@ -34,3 +35,24 @@
   when:
     - netplan_enabled | bool
     - netplan_ethernets | length == 0
+
+- name: Validate netplan VLAN definitions
+  ansible.builtin.assert:
+    that:
+      - item.key | trim | length > 0
+      - item.value is mapping
+      - item.value.id is defined
+      - item.value.id | int >= 1
+      - item.value.id | int <= 4094
+      - item.value.link | default('', true) | trim | length > 0
+      - item.value.addresses is defined
+      - item.value.addresses is sequence
+      - item.value.addresses is not string
+      - item.value.addresses | length > 0
+    fail_msg: >-
+      Each netplan VLAN needs a name, VLAN ID from 1 through 4094,
+      parent link, and at least one address.
+  loop: "{{ netplan_vlans | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: netplan_enabled | bool

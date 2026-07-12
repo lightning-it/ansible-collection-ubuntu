@@ -1,0 +1,62 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Install Tang packages
+  ansible.builtin.apt:
+    name: "{{ tang_deploy_packages }}"
+    state: present
+    update_cache: "{{ tang_deploy_update_apt_cache | bool }}"
+  when:
+    - tang_deploy_enabled | bool
+    - tang_deploy_manage_packages | bool
+
+- name: Ensure Tang socket override directory exists
+  ansible.builtin.file:
+    path: "{{ tang_deploy_socket_override_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - tang_deploy_enabled | bool
+    - tang_deploy_manage_socket_override | bool
+
+- name: Render Tang socket override
+  ansible.builtin.template:
+    src: tangd.socket.conf.j2
+    dest: "{{ tang_deploy_socket_override_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Tang deploy | Reload systemd
+    - Tang deploy | Restart socket
+  when:
+    - tang_deploy_enabled | bool
+    - tang_deploy_manage_socket_override | bool
+
+- name: Enable and start Tang socket
+  ansible.builtin.systemd_service:
+    name: "{{ tang_deploy_socket_unit }}"
+    state: "{{ tang_deploy_socket_state }}"
+    enabled: "{{ tang_deploy_socket_enabled | bool }}"
+    daemon_reload: "{{ tang_deploy_manage_socket_override | bool }}"
+  when:
+    - tang_deploy_enabled | bool
+    - tang_deploy_manage_service | bool
+
+- name: Apply pending Tang socket handlers before validation
+  ansible.builtin.meta: flush_handlers
+  when:
+    - tang_deploy_enabled | bool
+    - tang_deploy_manage_service | bool
+    - not ansible_check_mode
+
+- name: Validate Tang deployment
+  ansible.builtin.include_tasks: validate.yml
+  when:
+    - tang_deploy_enabled | bool
+    - tang_deploy_validate | bool
+    - not ansible_check_mode
