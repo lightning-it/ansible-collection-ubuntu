@@ -248,7 +248,7 @@
   ansible.builtin.assert:
     that:
       - luks_unlock_device_current_pin == 'tang'
-      - luks_unlock_device_current_policy == luks_unlock_clevis_tang_policy_effective
+      - luks_unlock_device_current_policy == luks_unlock_clevis_tang_stored_policy_effective
     fail_msg: >-
       Existing Clevis keyslot {{ luks_unlock_device.keyslot }} does not match the requested pinned Tang policy.
       This role never edits or unbinds an existing keyslot automatically.
@@ -296,51 +296,13 @@
     - not luks_unlock_device_slot_present | bool
 
 - name: Bind the verified free keyslot to the pinned Tang policy
-  ansible.builtin.command:
-    argv:
-      - clevis
-      - luks
-      - bind
-      - -y
-      - -d
-      - "{{ luks_unlock_device_resolved_path }}"
-      - -s
-      - "{{ luks_unlock_device.keyslot | string }}"
-      - -k
-      - '-'
-      - tang
-      - "{{ luks_unlock_clevis_tang_policy_effective | to_json }}"
-    stdin: "{{ luks_unlock_existing_passphrases[luks_unlock_device.id] }}"
-    stdin_add_newline: false
-  changed_when: true
-  no_log: true
-  notify: LUKS unlock | Rebuild initramfs
+  ansible.builtin.include_tasks: clevis_bind.yml
   when:
     - not ansible_check_mode
     - not luks_unlock_device_slot_present | bool
 
-- name: Verify the requested Clevis binding
-  ansible.builtin.command:
-    argv:
-      - clevis
-      - luks
-      - list
-      - -d
-      - "{{ luks_unlock_device_resolved_path }}"
-      - -s
-      - "{{ luks_unlock_device.keyslot | string }}"
-  register: luks_unlock_device_clevis_verify
-  changed_when: false
-  when: not ansible_check_mode
-
-- name: Confirm the pinned Tang binding is present
-  ansible.builtin.assert:
-    that:
-      - luks_unlock_device_clevis_verify.rc == 0
-      - "' tang ' in (' ' ~ luks_unlock_device_clevis_verify.stdout ~ ' ')"
-      - luks_unlock_clevis_tang_url in luks_unlock_device_clevis_verify.stdout
-      - luks_unlock_clevis_tang_thumbprint in luks_unlock_device_clevis_verify.stdout
-    fail_msg: "The requested Clevis Tang binding could not be verified."
+- name: Verify the reconciled Clevis Tang binding
+  ansible.builtin.include_tasks: clevis_binding_verify.yml
   when: not ansible_check_mode
 
 - name: Re-read LUKS2 metadata after reconciliation

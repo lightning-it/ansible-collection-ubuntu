@@ -1,0 +1,189 @@
+---
+- name: Verify live LUKS and Tang integration
+  hosts: luks_unlock_tang_heavy
+  become: false
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    luks_unlock_test_loop_file: /tmp/lit-luks-unlock.loop
+    luks_unlock_test_passphrase: MoleculeRecoverySecret-DoNotUse
+    luks_unlock_test_tang_port: 17500
+    luks_unlock_test_tang_url: "http://127.0.0.1:{{ luks_unlock_test_tang_port }}"
+
+  tasks:
+    - name: Read the fixture loop device
+      ansible.builtin.slurp:
+        src: "{{ luks_unlock_test_loop_file }}"
+      register: luks_unlock_test_loop_file_content
+      changed_when: false
+
+    - name: Record the fixture loop device
+      ansible.builtin.set_fact:
+        luks_unlock_test_loop_device: >-
+          {{ luks_unlock_test_loop_file_content.content | b64decode | trim }}
+      changed_when: false
+
+    - name: Read the persisted Clevis binding
+      ansible.builtin.command:
+        argv:
+          - clevis
+          - luks
+          - list
+          - -d
+          - "{{ luks_unlock_test_loop_device }}"
+          - -s
+          - "7"
+      register: luks_unlock_test_binding
+      changed_when: false
+
+    - name: Split the persisted Clevis binding
+      ansible.builtin.set_fact:
+        luks_unlock_test_binding_parts: "{{ (luks_unlock_test_binding.stdout | trim).split(None, 2) }}"
+      changed_when: false
+
+    - name: Read LUKS2 metadata before the offline test
+      ansible.builtin.command:
+        argv:
+          - cryptsetup
+          - luksDump
+          - --dump-json-metadata
+          - "{{ luks_unlock_test_loop_device }}"
+      register: luks_unlock_test_metadata_before
+      changed_when: false
+
+    - name: Prove the declared Clevis slot unlocks while Tang is online
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/timeout
+          - --kill-after=5s
+          - 10s
+          - /bin/bash
+          - -o
+          - pipefail
+          - -c
+          - >-
+            set -eu;
+            clevis luks pass -d "$1" -s "$2" |
+            cryptsetup open --test-passphrase --key-slot "$2" --key-file=- "$1"
+          - lit-clevis-slot-verification
+          - "{{ luks_unlock_test_loop_device }}"
+          - "7"
+      changed_when: false
+      no_log: true
+
+    - name: Prove the recovery passphrase still unlocks the volume
+      ansible.builtin.command:
+        argv:
+          - cryptsetup
+          - open
+          - --test-passphrase
+          - --key-file=-
+          - "{{ luks_unlock_test_loop_device }}"
+        stdin: "{{ luks_unlock_test_passphrase }}"
+        stdin_add_newline: false
+      changed_when: false
+      no_log: true
+
+    - name: Refuse the Clevis passphrase when constrained to the recovery slot
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/timeout
+          - --kill-after=5s
+          - 10s
+          - /bin/bash
+          - -o
+          - pipefail
+          - -c
+          - >-
+            set -eu;
+            clevis luks pass -d "$1" -s "$2" |
+            cryptsetup open --test-passphrase --key-slot "$3" --key-file=- "$1"
+          - lit-clevis-wrong-slot-verification
+          - "{{ luks_unlock_test_loop_device }}"
+          - "7"
+          - "0"
+      register: luks_unlock_test_wrong_slot_result
+      changed_when: false
+      failed_when: false
+      no_log: true
+
+    - name: Stop the Tang fixture
+      ansible.builtin.command:
+        argv:
+          - pkill
+          - -TERM
+          - -x
+          - tangd
+      register: luks_unlock_test_tang_stop
+      changed_when: luks_unlock_test_tang_stop.rc == 0
+      failed_when: luks_unlock_test_tang_stop.rc not in [0, 1]
+
+    - name: Wait for the Tang fixture to stop
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ luks_unlock_test_tang_port }}"
+        state: stopped
+        timeout: 5
+
+    - name: Test the declared Clevis slot while Tang is offline
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/timeout
+          - --kill-after=2s
+          - 3s
+          - /bin/bash
+          - -o
+          - pipefail
+          - -c
+          - >-
+            set -eu;
+            clevis luks pass -d "$1" -s "$2" |
+            cryptsetup open --test-passphrase --key-slot "$2" --key-file=- "$1"
+          - lit-clevis-slot-verification
+          - "{{ luks_unlock_test_loop_device }}"
+          - "7"
+      register: luks_unlock_test_offline_result
+      changed_when: false
+      failed_when: false
+      no_log: true
+
+    - name: Read LUKS2 metadata after the offline test
+      ansible.builtin.command:
+        argv:
+          - cryptsetup
+          - luksDump
+          - --dump-json-metadata
+          - "{{ luks_unlock_test_loop_device }}"
+      register: luks_unlock_test_metadata_after
+      changed_when: false
+
+    - name: Prove the recovery passphrase still works while Tang is offline
+      ansible.builtin.command:
+        argv:
+          - cryptsetup
+          - open
+          - --test-passphrase
+          - --key-file=-
+          - "{{ luks_unlock_test_loop_device }}"
+        stdin: "{{ luks_unlock_test_passphrase }}"
+        stdin_add_newline: false
+      changed_when: false
+      no_log: true
+
+    - name: Validate binding policy, keyslots, and safe offline behavior
+      ansible.builtin.assert:
+        that:
+          - luks_unlock_test_binding_parts | length == 3
+          - luks_unlock_test_binding_parts[0] == '7:'
+          - luks_unlock_test_binding_parts[1] == 'tang'
+          - >-
+            (luks_unlock_test_binding_parts[2][1:-1] | from_json)
+            == {'url': luks_unlock_test_tang_url}
+          - "'0' in (luks_unlock_test_metadata_before.stdout | from_json).keyslots"
+          - "'7' in (luks_unlock_test_metadata_before.stdout | from_json).keyslots"
+          - luks_unlock_test_wrong_slot_result.rc != 0
+          - luks_unlock_test_offline_result.rc != 0
+          - >-
+            (luks_unlock_test_metadata_before.stdout | from_json)
+            == (luks_unlock_test_metadata_after.stdout | from_json)

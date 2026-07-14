@@ -39,12 +39,24 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
   one active non-comment entry in `/etc/crypttab`; UUID and PARTUUID sources are resolved with `findfs` and then
   canonicalized before inspection. This role manages early-root unlock, so `initramfs` must be `true`.
 - `luks_unlock_clevis_tang_url` and `luks_unlock_clevis_tang_thumbprint`: pinned Tang policy.
+- `luks_unlock_clevis_network_timeout_seconds`: socket timeout for the advertisement fetch and runtime before a
+  Tang-dependent read-only Clevis subprocess is terminated. It defaults to 30 seconds, accepts values from 1 through
+  600, and gives Clevis a five-second grace period before forced termination.
 - `luks_unlock_existing_passphrases`: passphrases keyed by device id. Supply from a secret manager; tasks using these
   values use `no_log` and stdin.
 - `luks_unlock_allow_luks_metadata_change` and `luks_unlock_header_backup_confirmed`: both must be `true` before a
   missing Clevis binding can be added.
+- `luks_unlock_force_rebuild_initramfs`: exceptional recovery opt-in that queues a boot-image rebuild after an
+  already-existing binding passes every verifier. It requires `luks_unlock_rebuild_initramfs: true` and does not
+  authorize LUKS metadata changes. This force option intentionally reports a change and rebuilds on every enabled
+  run, so enable it for one recovery run and then return it to `false`.
 
-An existing mismatched or occupied keyslot fails safely. The role does not edit or replace it automatically.
+An existing mismatched or occupied keyslot fails safely. The role does not edit or replace it automatically. Clevis
+uses the thumbprint to authenticate the Tang advertisement during enrollment, while `clevis luks list` reports only
+the persisted URL. The role therefore fetches and verifies the pinned advertisement before mutation, uses that cached
+advertisement for offline enrollment, verifies the reported pin and URL, and pipes `clevis luks pass` directly into a
+read-only `cryptsetup --test-passphrase --key-slot` check. No decrypted key is placed in an Ansible or shell variable,
+and the role never passes Clevis's trust-bypass (`-y`) option.
 
 ## Dependencies
 
@@ -76,6 +88,22 @@ None.
           - igb
         luks_unlock_dropbear_authorized_keys:
           - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleOnly operator@example.invalid"
+```
+
+## Testing
+
+The default Molecule scenario uses deterministic command doubles and runs in the normal collection gate:
+
+```bash
+bash scripts/devtools-molecule.sh luks-unlock-basic
+```
+
+The optional live scenario provisions Tang and a real LUKS2 loop device inside a disposable Ubuntu 24.04 container.
+It requires a rootful Docker daemon and a privileged container, is intentionally excluded from ordinary PR checks,
+and should run only on an isolated runner:
+
+```bash
+bash scripts/devtools-molecule.sh luks-unlock-tang_heavy
 ```
 
 ## License
