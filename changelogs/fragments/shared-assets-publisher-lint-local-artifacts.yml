@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    shared_tooling - Dispatch collection publishing from protected main with the managed release environment and
+    Galaxy credential, make lint compatibility detection rely on the execution environment, and ignore generated
+    local collection-install and Python cache artifacts.
