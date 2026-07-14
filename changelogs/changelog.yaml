@@ -84,3 +84,16 @@ releases:
       - shared-assets-lit-governance.yml
       - shared-assets-publisher-lint-local-artifacts.yml
     release_date: '2026-07-14'
+  1.8.0:
+    changes:
+      bugfixes:
+        - luks_unlock - Enforce the declared Tang signing thumbprint during preflight
+          and cached-advertisement enrollment, verify persisted bindings using Clevis's
+          URL-only representation, and bound an exact-keyslot online unlock test without
+          exposing key material.
+      minor_changes:
+        - luks_unlock - Add an explicitly non-idempotent, one-run recovery option
+          to rebuild initramfs after an existing Clevis binding passes every verifier.
+    fragments:
+      - luks-unlock-tang-verification.yml
+    release_date: '2026-07-14'

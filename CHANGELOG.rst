@@ -4,6 +4,19 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.8.0
+======
+
+Minor Changes
+-------------
+
+- luks_unlock - Add an explicitly non-idempotent, one-run recovery option to rebuild initramfs after an existing Clevis binding passes every verifier.
+
+Bugfixes
+--------
+
+- luks_unlock - Enforce the declared Tang signing thumbprint during preflight and cached-advertisement enrollment, verify persisted bindings using Clevis's URL-only representation, and bound an exact-keyslot online unlock test without exposing key material.
+
 v1.7.0
 ======
 
