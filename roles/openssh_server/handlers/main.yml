@@ -1,0 +1,23 @@
+---
+- name: OpenSSH server | Reload and restart active socket
+  ansible.builtin.systemd_service:
+    name: "{{ openssh_server_socket_name }}"
+    daemon_reload: true
+    state: restarted
+  listen: OpenSSH server | Restart service
+  when:
+    - openssh_server_manage_service | bool
+    - openssh_server_manage_socket_activation | bool
+    - _openssh_server_socket_active | default(false) | bool
+    - openssh_server_service_state == 'started'
+    - not ansible_check_mode
+
+- name: OpenSSH server | Restart daemon
+  ansible.builtin.systemd_service:
+    name: "{{ openssh_server_service_name }}"
+    state: restarted
+  listen: OpenSSH server | Restart service
+  when:
+    - openssh_server_manage_service | bool
+    - openssh_server_service_state == 'started'
+    - not ansible_check_mode

@@ -74,6 +74,9 @@ Ubuntu-native package and repository management.
   optional generated inventory output.
 - `lit.ubuntu.netplan`
   Render and apply Ubuntu netplan interface configuration.
+- `lit.ubuntu.openssh_server`
+  Render and validate hardened OpenSSH server configuration with safe multi-port transitions and Ubuntu socket
+  activation reconciliation.
 - `lit.ubuntu.luks_unlock`
   Stage secret-free Dropbear first-boot unlock hooks and safely add pinned Clevis Tang bindings to existing LUKS2
   devices.

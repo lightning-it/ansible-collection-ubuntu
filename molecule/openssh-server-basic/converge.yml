@@ -1,0 +1,34 @@
+---
+- name: Converge OpenSSH server role
+  hosts: openssh_server
+  become: false
+  gather_facts: false
+  vars:
+    openssh_server_test_dir: /tmp/lit-openssh-server-molecule
+
+  pre_tasks:
+    - name: Create OpenSSH server test directory
+      ansible.builtin.file:
+        path: "{{ openssh_server_test_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Remove the OpenSSH check-mode test target
+      ansible.builtin.file:
+        path: "{{ openssh_server_test_dir }}/check-mode.conf"
+        state: absent
+
+  roles:
+    - role: lit.ubuntu.openssh_server
+      vars:
+        openssh_server_manage_packages: false
+        openssh_server_manage_service: false
+        openssh_server_validate_config: false
+        openssh_server_verify_listeners: false
+        openssh_server_config_path: "{{ openssh_server_test_dir }}/sshd_config.d/60-lit-hardening.conf"
+        openssh_server_ports:
+          - 22
+          - 1905
+        openssh_server_allow_users:
+          - svc_ansible
+          - breakglass
