@@ -1,0 +1,74 @@
+---
+- name: Converge live LUKS and Tang integration
+  hosts: luks_unlock_tang_heavy
+  become: false
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    luks_unlock_test_loop_file: /tmp/lit-luks-unlock.loop
+    luks_unlock_test_passphrase: MoleculeRecoverySecret-DoNotUse
+    luks_unlock_test_tang_port: 17500
+    luks_unlock_test_tang_url: "http://127.0.0.1:{{ luks_unlock_test_tang_port }}"
+
+  pre_tasks:
+    - name: Read the fixture loop device
+      ansible.builtin.slurp:
+        src: "{{ luks_unlock_test_loop_file }}"
+      register: luks_unlock_test_loop_file_content
+      changed_when: false
+
+    - name: Read the Tang signing thumbprint
+      ansible.builtin.command:
+        argv:
+          - tang-show-keys
+          - "{{ luks_unlock_test_tang_port | string }}"
+      register: luks_unlock_test_tang_thumbprint
+      changed_when: false
+
+    - name: Record live fixture facts
+      ansible.builtin.set_fact:
+        luks_unlock_test_loop_device: >-
+          {{ luks_unlock_test_loop_file_content.content | b64decode | trim }}
+        luks_unlock_test_tang_thp: "{{ luks_unlock_test_tang_thumbprint.stdout | trim }}"
+      changed_when: false
+
+  tasks:
+    - name: Reconcile the live Clevis Tang binding
+      ansible.builtin.include_role:
+        name: lit.ubuntu.luks_unlock
+      vars:
+        luks_unlock_enabled: true
+        luks_unlock_execution_mode: installed
+        luks_unlock_method: clevis_tang
+        luks_unlock_manage_packages: false
+        luks_unlock_manage_early_network: false
+        luks_unlock_early_network:
+          method: dhcp
+          interface: eth0
+          dns: []
+        luks_unlock_update_grub: false
+        luks_unlock_rebuild_initramfs: false
+        luks_unlock_clevis_tang_url: "{{ luks_unlock_test_tang_url }}"
+        luks_unlock_clevis_tang_thumbprint: "{{ luks_unlock_test_tang_thp }}"
+        luks_unlock_clevis_network_timeout_seconds: 10
+        luks_unlock_devices:
+          - id: molecule_root
+            device: "{{ luks_unlock_test_loop_device }}"
+            keyslot: 7
+            initramfs: true
+        luks_unlock_allow_luks_metadata_change: true
+        luks_unlock_header_backup_confirmed: true
+        luks_unlock_existing_passphrases:
+          molecule_root: "{{ luks_unlock_test_passphrase }}"
+
+    - name: Confirm the role used a cached pinned Tang advertisement
+      ansible.builtin.assert:
+        that:
+          - luks_unlock_clevis_tang_enrollment_policy is mapping
+          - luks_unlock_clevis_tang_enrollment_policy.url == luks_unlock_test_tang_url
+          - luks_unlock_clevis_tang_enrollment_policy.thp == luks_unlock_test_tang_thp
+          - luks_unlock_clevis_tang_enrollment_policy.adv is mapping
+          - luks_unlock_clevis_tang_enrollment_policy.adv.payload is defined
+          - luks_unlock_clevis_tang_enrollment_policy.adv.signatures is defined
+      no_log: true

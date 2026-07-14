@@ -1,0 +1,73 @@
+---
+- name: Read the reconciled Clevis binding
+  ansible.builtin.command:
+    argv:
+      - clevis
+      - luks
+      - list
+      - -d
+      - "{{ luks_unlock_device_resolved_path }}"
+      - -s
+      - "{{ luks_unlock_device.keyslot | string }}"
+  register: luks_unlock_device_clevis_verify
+  changed_when: false
+  failed_when: false
+
+- name: Split the verified Clevis keyslot description
+  ansible.builtin.set_fact:
+    luks_unlock_device_verified_slot_parts: "{{ (luks_unlock_device_clevis_verify.stdout | trim).split(None, 2) }}"
+  changed_when: false
+
+- name: Validate the verified Clevis keyslot description
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_clevis_verify.rc == 0
+      - luks_unlock_device_verified_slot_parts | length == 3
+      - luks_unlock_device_verified_slot_parts[0] == (luks_unlock_device.keyslot | string) + ':'
+      - luks_unlock_device_verified_slot_parts[2].startswith("'")
+      - luks_unlock_device_verified_slot_parts[2].endswith("'")
+    fail_msg: "The requested Clevis Tang binding could not be verified."
+
+- name: Decode the verified Clevis keyslot policy
+  ansible.builtin.set_fact:
+    luks_unlock_device_verified_pin: "{{ luks_unlock_device_verified_slot_parts[1] }}"
+    luks_unlock_device_verified_policy: >-
+      {{ luks_unlock_device_verified_slot_parts[2][1:-1] | from_json }}
+  changed_when: false
+
+- name: Confirm the expected Tang binding is present
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_verified_pin == 'tang'
+      - luks_unlock_device_verified_policy == luks_unlock_clevis_tang_stored_policy_effective
+    fail_msg: "The requested Clevis Tang binding does not match the declared Tang URL."
+
+- name: Prove the Clevis keyslot can unlock through the live Tang server
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/timeout
+      - --kill-after=5s
+      - "{{ luks_unlock_clevis_network_timeout_seconds | string }}s"
+      - /bin/bash
+      - -o
+      - pipefail
+      - -c
+      - >-
+        set -eu;
+        clevis luks pass -d "$1" -s "$2" |
+        cryptsetup open --test-passphrase --key-slot "$2" --key-file=- "$1"
+      - lit-clevis-slot-verification
+      - "{{ luks_unlock_device_resolved_path }}"
+      - "{{ luks_unlock_device.keyslot | string }}"
+  register: luks_unlock_device_online_unlock_test
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Confirm the Clevis keyslot passed the online unlock test
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_online_unlock_test.rc == 0
+    fail_msg: >-
+      The requested Clevis keyslot could not unlock through the live Tang server;
+      no existing keyslot was edited or removed.

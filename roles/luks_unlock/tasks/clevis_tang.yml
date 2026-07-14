@@ -7,38 +7,41 @@
   notify: LUKS unlock | Rebuild initramfs
   when: luks_unlock_manage_packages | bool
 
-- name: Encrypt fixed preflight data with the pinned Tang policy
-  ansible.builtin.command:
-    argv:
-      - clevis
-      - encrypt
-      - tang
-      - "{{ luks_unlock_clevis_tang_policy_effective | to_json }}"
-      - -y
-    stdin: "{{ luks_unlock_clevis_probe_plaintext }}"
-    stdin_add_newline: false
-  register: luks_unlock_clevis_probe_jwe
+- name: Fetch the declared Tang signing advertisement
+  ansible.builtin.uri:
+    url: >-
+      {{ luks_unlock_clevis_tang_url | regex_replace('/+$', '')
+      }}/adv/{{ luks_unlock_clevis_tang_thumbprint | urlencode }}
+    method: GET
+    follow_redirects: none
+    return_content: true
+    status_code: 200
+    timeout: "{{ luks_unlock_clevis_network_timeout_seconds }}"
+    use_netrc: false
+  register: luks_unlock_clevis_tang_advertisement_response
   changed_when: false
+  failed_when: false
   check_mode: false
   no_log: true
 
-- name: Decrypt fixed Tang preflight data
-  ansible.builtin.command:
-    argv:
-      - clevis
-      - decrypt
-    stdin: "{{ luks_unlock_clevis_probe_jwe.stdout }}"
-    stdin_add_newline: false
-  register: luks_unlock_clevis_probe_result
-  changed_when: false
-  check_mode: false
-  no_log: true
-
-- name: Confirm the pinned Tang policy is usable
+- name: Require the declared Tang signing advertisement
   ansible.builtin.assert:
     that:
-      - luks_unlock_clevis_probe_result.stdout == luks_unlock_clevis_probe_plaintext
-    fail_msg: "Tang preflight failed; no LUKS metadata was changed."
+      - luks_unlock_clevis_tang_advertisement_response.status | default(-1) == 200
+      - luks_unlock_clevis_tang_advertisement_response.content | default('') | trim | length > 0
+    fail_msg: "The pinned Tang advertisement could not be fetched; no LUKS metadata was changed."
+
+- name: Build the offline pinned Tang enrollment policy
+  ansible.builtin.set_fact:
+    luks_unlock_clevis_tang_enrollment_policy:
+      url: "{{ luks_unlock_clevis_tang_policy_effective.url }}"
+      thp: "{{ luks_unlock_clevis_tang_policy_effective.thp }}"
+      adv: "{{ luks_unlock_clevis_tang_advertisement_response.content | from_json }}"
+  changed_when: false
+  no_log: true
+
+- name: Verify the cached pinned Tang advertisement
+  ansible.builtin.include_tasks: clevis_tang_preflight.yml
 
 - name: Reconcile Clevis binding for each declared LUKS2 device
   ansible.builtin.include_tasks: clevis_device.yml
@@ -46,3 +49,10 @@
   loop_control:
     loop_var: luks_unlock_device
     label: "{{ luks_unlock_device.id }}"
+
+- name: Queue an explicit initramfs rebuild after interrupted binding reconciliation
+  ansible.builtin.debug:
+    msg: "Rebuilding initramfs to publish the already-verified existing Clevis binding."
+  changed_when: true
+  notify: LUKS unlock | Rebuild initramfs
+  when: luks_unlock_force_rebuild_initramfs | bool
