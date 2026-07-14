@@ -1,0 +1,41 @@
+---
+openssh_server_enabled: true
+
+openssh_server_manage_packages: true
+openssh_server_packages:
+  - openssh-server
+openssh_server_update_apt_cache: false
+
+openssh_server_config_path: /etc/ssh/sshd_config.d/60-lit-hardening.conf
+openssh_server_config_owner: root
+openssh_server_config_group: root
+openssh_server_config_mode: "0644"
+openssh_server_validate_config: true
+openssh_server_binary: /usr/sbin/sshd
+
+openssh_server_ports:
+  - 22
+openssh_server_listen_addresses: []
+
+openssh_server_permit_root_login: "no"
+openssh_server_password_authentication: "no"
+openssh_server_kbd_interactive_authentication: "no"
+openssh_server_pubkey_authentication: "yes"
+openssh_server_permit_empty_passwords: "no"
+openssh_server_x11_forwarding: "no"
+openssh_server_use_pam: "yes"
+openssh_server_max_auth_tries: 3
+openssh_server_max_sessions: 10
+openssh_server_client_alive_interval: 300
+openssh_server_client_alive_count_max: 2
+openssh_server_allow_users: []
+
+openssh_server_manage_service: true
+openssh_server_service_name: ssh
+openssh_server_service_enabled: true
+openssh_server_service_state: started
+openssh_server_manage_socket_activation: true
+openssh_server_socket_name: ssh.socket
+openssh_server_verify_listeners: true
+openssh_server_listener_verify_host: 127.0.0.1
+openssh_server_listener_verify_timeout: 15

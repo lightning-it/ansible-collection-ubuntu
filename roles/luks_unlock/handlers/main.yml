@@ -1,0 +1,16 @@
+---
+- name: LUKS unlock | Update GRUB configuration
+  ansible.builtin.command:
+    argv: "{{ luks_unlock_update_grub_command }}"
+  changed_when: true
+  when:
+    - luks_unlock_update_grub | bool
+    - not ansible_check_mode
+
+- name: LUKS unlock | Rebuild initramfs
+  ansible.builtin.command:
+    argv: "{{ luks_unlock_update_initramfs_command }}"
+  changed_when: true
+  when:
+    - luks_unlock_rebuild_initramfs | bool
+    - not ansible_check_mode

@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+# Hetzner installimage executes this script inside the installed Ubuntu system.
+# It deliberately contains no LUKS passphrase or other private credential.
+trap 'rm -f -- "$0"' EXIT
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update >/dev/null
+apt-get install -y{% for luks_unlock_package in luks_unlock_dropbear_packages %} {{ luks_unlock_package | quote }}{% endfor %} >/dev/null
+
+install -d -m 0700 /etc/dropbear/initramfs
+install -d -m 0755 /etc/default/grub.d /etc/initramfs-tools
+
+cat >{{ luks_unlock_dropbear_config_path | quote }} <<'LIT_DROPBEAR_CONFIG'
+# Managed by lit.ubuntu.luks_unlock installimage bootstrap
+DROPBEAR_OPTIONS="{{ luks_unlock_dropbear_options_effective }}"
+DROPBEAR_IFDOWN="{{ 'none' if luks_unlock_dropbear_keep_network_up | bool else luks_unlock_early_network.interface }}"
+LIT_DROPBEAR_CONFIG
+chmod 0600 {{ luks_unlock_dropbear_config_path | quote }}
+
+cat >{{ luks_unlock_dropbear_authorized_keys_path | quote }} <<'LIT_DROPBEAR_AUTHORIZED_KEYS'
+{% for luks_unlock_public_key in luks_unlock_dropbear_authorized_keys %}
+no-port-forwarding,no-agent-forwarding,no-X11-forwarding,command="/bin/cryptroot-unlock" {{ luks_unlock_public_key }}
+{% endfor %}
+LIT_DROPBEAR_AUTHORIZED_KEYS
+chmod 0600 {{ luks_unlock_dropbear_authorized_keys_path | quote }}
+
+cat >{{ luks_unlock_grub_dropin_path | quote }} <<'LIT_GRUB_NETWORK'
+# Managed by lit.ubuntu.luks_unlock installimage bootstrap
+GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} {{ luks_unlock_kernel_ip_argument_effective | trim }}"
+LIT_GRUB_NETWORK
+chmod 0644 {{ luks_unlock_grub_dropin_path | quote }}
+
+touch {{ luks_unlock_initramfs_modules_path | quote }}
+chmod 0644 {{ luks_unlock_initramfs_modules_path | quote }}
+{% for luks_unlock_module in luks_unlock_network_modules %}
+grep -qxF {{ luks_unlock_module | quote }} {{ luks_unlock_initramfs_modules_path | quote }} || \
+  printf '%s\n' {{ luks_unlock_module | quote }} >>{{ luks_unlock_initramfs_modules_path | quote }}
+{% endfor %}
+
+if [ ! -s /etc/dropbear/initramfs/dropbear_ed25519_host_key ]; then
+  dropbearkey -t ed25519 -f /etc/dropbear/initramfs/dropbear_ed25519_host_key >/dev/null
+fi
+chmod 0600 /etc/dropbear/initramfs/dropbear_ed25519_host_key
+
+if [ ! -s /etc/ssh/ssh_host_ed25519_key.pub ]; then
+  ssh-keygen -A >/dev/null
+fi
+test -s /etc/ssh/ssh_host_ed25519_key.pub
+
+update-grub >/dev/null
+update-initramfs -u -k all >/dev/null
+
+initrd=""
+for initrd_candidate in /boot/initrd.img-*; do
+  [ -e "$initrd_candidate" ] || continue
+  if [ -z "$initrd" ] || [ "$initrd_candidate" -nt "$initrd" ]; then
+    initrd="$initrd_candidate"
+  fi
+done
+test -n "$initrd"
+initramfs_listing="$(lsinitramfs "$initrd")"
+grep -q 'cryptroot-unlock' <<<"$initramfs_listing"
+grep -q 'authorized_keys' <<<"$initramfs_listing"
+{% for luks_unlock_module in luks_unlock_network_modules %}
+grep -Eq '/{{ luks_unlock_module | regex_escape }}\.ko(\..*)?$' <<<"$initramfs_listing"
+{% endfor %}
+
+dropbear_fingerprint="$(
+  dropbearkey -y -f /etc/dropbear/initramfs/dropbear_ed25519_host_key 2>/dev/null \
+    | awk '$1 == "Fingerprint:" {print $2}'
+)"
+openssh_fingerprint="$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256 | awk '{print $2}')"
+
+case "$dropbear_fingerprint" in
+  SHA256:*) ;;
+  *) echo 'Could not calculate the dedicated Dropbear Ed25519 fingerprint.' >&2; exit 1 ;;
+esac
+case "$openssh_fingerprint" in
+  SHA256:*) ;;
+  *) echo 'Could not calculate the OpenSSH Ed25519 fingerprint.' >&2; exit 1 ;;
+esac
+
+fingerprint_file=/boot/lit-first-boot-hostkey-fingerprints
+printf '%s\n' \
+  "LIT_DROPBEAR_HOSTKEY_SHA256=$dropbear_fingerprint" \
+  "LIT_OPENSSH_HOSTKEY_SHA256=$openssh_fingerprint" >"$fingerprint_file"
+chmod 0644 "$fingerprint_file"
+
+printf '%s\n' \
+  "LIT_DROPBEAR_HOSTKEY_SHA256=$dropbear_fingerprint" \
+  "LIT_OPENSSH_HOSTKEY_SHA256=$openssh_fingerprint"

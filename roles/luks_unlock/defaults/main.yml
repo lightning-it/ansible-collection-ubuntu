@@ -1,0 +1,87 @@
+---
+luks_unlock_enabled: false
+luks_unlock_execution_mode: installed
+luks_unlock_method: ""
+
+luks_unlock_manage_packages: true
+luks_unlock_update_apt_cache: true
+luks_unlock_dropbear_packages:
+  - cryptsetup-initramfs
+  - dropbear-initramfs
+  - openssh-server
+luks_unlock_clevis_packages:
+  - clevis
+  - clevis-initramfs
+  - clevis-luks
+  - cryptsetup-initramfs
+
+luks_unlock_manage_early_network: true
+luks_unlock_early_network:
+  method: static
+  interface: ""
+  address: ""
+  gateway: ""
+  netmask: ""
+  hostname: ""
+  dns: []
+luks_unlock_network_modules: []
+luks_unlock_kernel_ip_argument_effective: >-
+  {{
+    'ip=dhcp'
+    if luks_unlock_early_network.method | default('static') == 'dhcp'
+    else (
+      'ip=' ~ (luks_unlock_early_network.address | default(''))
+      ~ '::' ~ (luks_unlock_early_network.gateway | default(''))
+      ~ ':' ~ (luks_unlock_early_network.netmask | default(''))
+      ~ ':' ~ (luks_unlock_early_network.hostname | default(''))
+      ~ ':' ~ (luks_unlock_early_network.interface | default(''))
+      ~ ':none:' ~ (luks_unlock_early_network.dns[0] | default(''))
+      ~ ':' ~ (luks_unlock_early_network.dns[1] | default(''))
+    )
+  }}
+
+luks_unlock_grub_dropin_path: /etc/default/grub.d/80-lit-initramfs-network.cfg
+luks_unlock_initramfs_modules_path: /etc/initramfs-tools/modules
+luks_unlock_update_grub: true
+luks_unlock_update_grub_command:
+  - update-grub
+luks_unlock_rebuild_initramfs: true
+luks_unlock_update_initramfs_command:
+  - update-initramfs
+  - -u
+  - -k
+  - all
+
+luks_unlock_dropbear_port: 2222
+luks_unlock_dropbear_idle_timeout: 300
+luks_unlock_dropbear_keep_network_up: false
+luks_unlock_dropbear_authorized_keys: []
+luks_unlock_dropbear_config_path: /etc/dropbear/initramfs/dropbear.conf
+luks_unlock_dropbear_authorized_keys_path: /etc/dropbear/initramfs/authorized_keys
+luks_unlock_dropbear_host_key_paths:
+  - /etc/dropbear/initramfs/dropbear_ed25519_host_key
+  - /etc/dropbear/initramfs/dropbear_ecdsa_host_key
+  - /etc/dropbear/initramfs/dropbear_rsa_host_key
+luks_unlock_validate_dropbear_host_keys: true
+luks_unlock_dropbear_options_effective: >-
+  -p {{ luks_unlock_dropbear_port }} -s -j -k -I {{ luks_unlock_dropbear_idle_timeout }}
+
+# Rescue staging renders a secret-free installimage -x hook. Hetzner executes
+# this hook inside the newly installed Ubuntu system.
+luks_unlock_rescue_stage_path: /root/lit-luks-unlock-post-install.sh
+luks_unlock_installimage_post_install_script_path: ""
+
+# Clevis binding is intentionally supported only against an already installed
+# system. Bootstrap every encrypted host with Dropbear first, then add Clevis
+# after the Tang service is online and its signing thumbprint is trusted.
+luks_unlock_devices: []
+luks_unlock_crypttab_path: /etc/crypttab
+luks_unlock_clevis_tang_url: ""
+luks_unlock_clevis_tang_thumbprint: ""
+luks_unlock_clevis_tang_policy_effective:
+  url: "{{ luks_unlock_clevis_tang_url }}"
+  thp: "{{ luks_unlock_clevis_tang_thumbprint }}"
+luks_unlock_existing_passphrases: {}
+luks_unlock_allow_luks_metadata_change: false
+luks_unlock_header_backup_confirmed: false
+luks_unlock_clevis_probe_plaintext: lit-clevis-tang-preflight

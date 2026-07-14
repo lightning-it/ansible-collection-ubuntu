@@ -1,0 +1,27 @@
+---
+- name: Inspect Dropbear initramfs host keys
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ luks_unlock_dropbear_host_key_paths }}"
+  register: luks_unlock_dropbear_host_key_stats
+  changed_when: false
+  when:
+    - luks_unlock_method == 'dropbear'
+    - luks_unlock_validate_dropbear_host_keys | bool
+    - not ansible_check_mode
+- name: Require a dedicated Dropbear initramfs host key
+  ansible.builtin.assert:
+    that:
+      - >-
+        luks_unlock_dropbear_host_key_stats.results
+        | selectattr('stat.size', 'defined')
+        | selectattr('stat.size', 'gt', 0)
+        | list
+        | length > 0
+    fail_msg: >-
+      No Dropbear initramfs host key exists. The initramfs must use a dedicated host key,
+      never a key copied from the normal SSH service.
+  when:
+    - luks_unlock_method == 'dropbear'
+    - luks_unlock_validate_dropbear_host_keys | bool
+    - not ansible_check_mode

@@ -1,0 +1,4 @@
+{% for luks_unlock_public_key in luks_unlock_dropbear_authorized_keys %}
+no-port-forwarding,no-agent-forwarding,no-X11-forwarding,command="/bin/cryptroot-unlock" {{ luks_unlock_public_key }}
+{% endfor %}
+

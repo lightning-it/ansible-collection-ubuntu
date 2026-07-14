@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  role_name: openssh_server
+  namespace: lit
+  author: Lightning IT
+  company: Lightning IT
+  description: Configure and validate a hardened OpenSSH server on Ubuntu.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - openssh
+    - ssh
+    - hardening
+    - security
+
+dependencies: []

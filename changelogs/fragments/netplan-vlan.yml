@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - >-
+    netplan - Add validated rendering support for tagged VLAN interfaces.

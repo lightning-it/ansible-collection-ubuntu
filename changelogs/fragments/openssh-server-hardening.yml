@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - >-
+    Add the inventory-driven ``lit.ubuntu.openssh_server`` role with validated
+    multi-port transition support, Ubuntu systemd socket-activation
+    reconciliation, check-mode coverage, directive-injection protection, and
+    secure public-key-only defaults.

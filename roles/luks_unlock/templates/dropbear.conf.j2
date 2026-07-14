@@ -1,0 +1,4 @@
+# Ansible managed
+DROPBEAR_OPTIONS="{{ luks_unlock_dropbear_options_effective }}"
+DROPBEAR_IFDOWN="{{ 'none' if luks_unlock_dropbear_keep_network_up | bool else luks_unlock_early_network.interface }}"
+

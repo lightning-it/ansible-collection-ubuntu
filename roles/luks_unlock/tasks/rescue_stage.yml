@@ -1,0 +1,26 @@
+---
+- name: Inspect Rescue staging directory
+  ansible.builtin.stat:
+    path: "{{ luks_unlock_rescue_stage_path | dirname }}"
+  register: luks_unlock_rescue_stage_directory
+  changed_when: false
+
+- name: Require an existing Rescue staging directory
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_rescue_stage_directory.stat.exists
+      - luks_unlock_rescue_stage_directory.stat.isdir
+    fail_msg: >-
+      Rescue staging directory {{ luks_unlock_rescue_stage_path | dirname }} must already exist;
+      the role will not create or change permissions on an arbitrary parent directory.
+
+- name: Render secret-free installimage post-install hook
+  ansible.builtin.template:
+    src: installimage-post-install.sh.j2
+    dest: "{{ luks_unlock_rescue_stage_path }}"
+    mode: "0700"
+
+- name: Expose installimage post-install hook path
+  ansible.builtin.set_fact:
+    luks_unlock_installimage_post_install_script_path: "{{ luks_unlock_rescue_stage_path }}"
+  changed_when: false

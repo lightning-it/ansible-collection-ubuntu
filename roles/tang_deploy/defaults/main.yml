@@ -1,0 +1,19 @@
+---
+tang_deploy_enabled: false
+tang_deploy_manage_packages: true
+tang_deploy_update_apt_cache: true
+tang_deploy_packages:
+  - tang
+
+tang_deploy_manage_service: true
+tang_deploy_socket_unit: tangd.socket
+tang_deploy_socket_state: started
+tang_deploy_socket_enabled: true
+
+tang_deploy_manage_socket_override: false
+tang_deploy_listen_port: 80
+tang_deploy_socket_override_path: /etc/systemd/system/tangd.socket.d/80-lit-listen.conf
+
+tang_deploy_validate: true
+tang_deploy_validate_url: "http://127.0.0.1:{{ tang_deploy_listen_port }}/adv"
+tang_deploy_public_thumbprints: []
