@@ -1,5 +1,0 @@
----
-minor_changes:
-  - >-
-    Added guarded Ubuntu LUKS initramfs unlock automation with a secret-free Hetzner installimage Dropbear bootstrap,
-    pinned Clevis Tang bindings, and a minimal Tang socket deployment role.

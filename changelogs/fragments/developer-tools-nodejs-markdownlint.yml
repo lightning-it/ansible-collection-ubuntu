@@ -1,3 +1,0 @@
----
-minor_changes:
-  - developer_tools - Add configurable Node.js/npm/npx installation and markdownlint-cli2 validation support.
