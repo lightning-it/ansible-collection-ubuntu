@@ -1,0 +1,89 @@
+---
+- name: Verify OpenSSH server role
+  hosts: openssh_server
+  become: false
+  gather_facts: false
+  vars:
+    openssh_server_test_config: /tmp/lit-openssh-server-molecule/sshd_config.d/60-lit-hardening.conf
+
+  tasks:
+    - name: Exercise OpenSSH server role in check mode
+      vars:
+        openssh_server_manage_packages: false
+        openssh_server_manage_service: false
+        openssh_server_validate_config: false
+        openssh_server_verify_listeners: false
+        openssh_server_config_path: >-
+          /tmp/lit-openssh-server-molecule/check-mode.conf
+      check_mode: true
+      block:
+        - name: Include OpenSSH server role without applying changes
+          ansible.builtin.include_role:
+            name: lit.ubuntu.openssh_server
+
+    - name: Inspect check-mode OpenSSH configuration target
+      ansible.builtin.stat:
+        path: /tmp/lit-openssh-server-molecule/check-mode.conf
+      register: openssh_server_check_mode_target
+      changed_when: false
+
+    - name: Confirm check mode did not write OpenSSH configuration
+      ansible.builtin.assert:
+        that:
+          - not openssh_server_check_mode_target.stat.exists
+
+    - name: Inspect rendered OpenSSH server configuration
+      ansible.builtin.stat:
+        path: "{{ openssh_server_test_config }}"
+      register: openssh_server_rendered_stat
+      changed_when: false
+
+    - name: Read rendered OpenSSH server configuration
+      ansible.builtin.slurp:
+        src: "{{ openssh_server_test_config }}"
+      register: openssh_server_rendered_config
+      changed_when: false
+
+    - name: Validate rendered OpenSSH hardening and transition ports
+      ansible.builtin.assert:
+        that:
+          - openssh_server_rendered_stat.stat.mode == '0644'
+          - _openssh_server_config.splitlines().count('Port 22') == 1
+          - _openssh_server_config.splitlines().count('Port 1905') == 1
+          - "'PermitRootLogin no' in _openssh_server_config"
+          - "'PasswordAuthentication no' in _openssh_server_config"
+          - "'KbdInteractiveAuthentication no' in _openssh_server_config"
+          - "'PubkeyAuthentication yes' in _openssh_server_config"
+          - "'PermitEmptyPasswords no' in _openssh_server_config"
+          - "'X11Forwarding no' in _openssh_server_config"
+          - "'UsePAM yes' in _openssh_server_config"
+          - "'AllowUsers svc_ansible breakglass' in _openssh_server_config"
+      vars:
+        _openssh_server_config: "{{ openssh_server_rendered_config.content | b64decode }}"
+
+    - name: Confirm OpenSSH input validation rejects directive injection
+      block:
+        - name: Attempt to configure a multiline OpenSSH listen address
+          ansible.builtin.include_role:
+            name: lit.ubuntu.openssh_server
+          vars:
+            openssh_server_manage_packages: false
+            openssh_server_manage_service: false
+            openssh_server_validate_config: false
+            openssh_server_verify_listeners: false
+            openssh_server_config_path: >-
+              /tmp/lit-openssh-server-molecule/rejected/60-lit-hardening.conf
+            openssh_server_listen_addresses:
+              - |-
+                127.0.0.1
+                PermitRootLogin yes
+
+        - name: Fail when multiline OpenSSH input was accepted
+          ansible.builtin.fail:
+            msg: "Multiline OpenSSH listen input was unexpectedly accepted."
+
+      rescue:
+        - name: Validate safe rejection of multiline OpenSSH input
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
