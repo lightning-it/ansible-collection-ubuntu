@@ -5,6 +5,7 @@
   gather_facts: false
   vars:
     luks_unlock_test_dir: /tmp/lit-luks-unlock-molecule
+    luks_unlock_test_clevis_log: /tmp/lit-luks-unlock-molecule/clevis.log
     luks_unlock_test_public_key: >-
       ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoleculeDocumentationKeyOnly000000000 molecule@example.invalid
 
@@ -39,6 +40,12 @@
       register: luks_unlock_modules_file
       changed_when: false
 
+    - name: Read deterministic Clevis command log
+      ansible.builtin.slurp:
+        src: "{{ luks_unlock_test_clevis_log }}"
+      register: luks_unlock_clevis_log_file
+      changed_when: false
+
     - name: Check staged installimage hook shell syntax
       ansible.builtin.command:
         argv:
@@ -66,3 +73,15 @@
             in (luks_unlock_authorized_keys_file.content | b64decode)
           - luks_unlock_test_public_key in (luks_unlock_authorized_keys_file.content | b64decode)
           - "'igb' in (luks_unlock_modules_file.content | b64decode).splitlines()"
+          - "'encrypt tang' in (luks_unlock_clevis_log_file.content | b64decode)"
+          - "'molecule-tang-signing-thumbprint' in (luks_unlock_clevis_log_file.content | b64decode)"
+          - "'molecule-protected-advertisement' in (luks_unlock_clevis_log_file.content | b64decode)"
+          - "'luks bind -d /dev/mapper/mock-luks -s 7 -k - tang' in (luks_unlock_clevis_log_file.content | b64decode)"
+          - "'luks list -d /dev/mapper/mock-luks -s 7' in (luks_unlock_clevis_log_file.content | b64decode)"
+          - "'luks pass -d /dev/mapper/mock-luks -s 7' in (luks_unlock_clevis_log_file.content | b64decode)"
+          - >-
+            'cryptsetup open --test-passphrase --key-slot 7 --key-file=- /dev/mapper/mock-luks'
+            in (luks_unlock_clevis_log_file.content | b64decode)
+          - "' -y ' not in (' ' ~ (luks_unlock_clevis_log_file.content | b64decode) ~ ' ')"
+          - "'MoleculeRecoverySecret' not in (luks_unlock_clevis_log_file.content | b64decode)"
+          - "'MoleculeGeneratedPassphrase' not in (luks_unlock_clevis_log_file.content | b64decode)"

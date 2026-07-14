@@ -46,6 +46,7 @@ luks_unlock_update_grub: true
 luks_unlock_update_grub_command:
   - update-grub
 luks_unlock_rebuild_initramfs: true
+luks_unlock_force_rebuild_initramfs: false
 luks_unlock_update_initramfs_command:
   - update-initramfs
   - -u
@@ -78,9 +79,14 @@ luks_unlock_devices: []
 luks_unlock_crypttab_path: /etc/crypttab
 luks_unlock_clevis_tang_url: ""
 luks_unlock_clevis_tang_thumbprint: ""
+luks_unlock_clevis_network_timeout_seconds: 30
 luks_unlock_clevis_tang_policy_effective:
   url: "{{ luks_unlock_clevis_tang_url }}"
   thp: "{{ luks_unlock_clevis_tang_thumbprint }}"
+# Clevis uses ``thp`` to authenticate the advertisement during enrollment, but
+# ``clevis luks list`` renders the persisted Tang policy as its URL only.
+luks_unlock_clevis_tang_stored_policy_effective:
+  url: "{{ luks_unlock_clevis_tang_url }}"
 luks_unlock_existing_passphrases: {}
 luks_unlock_allow_luks_metadata_change: false
 luks_unlock_header_backup_confirmed: false

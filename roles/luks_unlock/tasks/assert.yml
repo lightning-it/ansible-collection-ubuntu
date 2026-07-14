@@ -9,6 +9,7 @@
       - luks_unlock_manage_early_network is boolean
       - luks_unlock_update_grub is boolean
       - luks_unlock_rebuild_initramfs is boolean
+      - luks_unlock_force_rebuild_initramfs is boolean
       - luks_unlock_validate_dropbear_host_keys is boolean
       - luks_unlock_allow_luks_metadata_change is boolean
       - luks_unlock_header_backup_confirmed is boolean
@@ -129,6 +130,16 @@
     that:
       - luks_unlock_clevis_tang_url is match('^https?://[^/ ]+')
       - luks_unlock_clevis_tang_thumbprint | trim | length > 0
+      - luks_unlock_clevis_network_timeout_seconds is integer
+      - luks_unlock_clevis_network_timeout_seconds >= 1
+      - luks_unlock_clevis_network_timeout_seconds <= 600
+      - luks_unlock_clevis_tang_policy_effective is mapping
+      - luks_unlock_clevis_tang_policy_effective | length == 2
+      - luks_unlock_clevis_tang_policy_effective.url == luks_unlock_clevis_tang_url
+      - luks_unlock_clevis_tang_policy_effective.thp == luks_unlock_clevis_tang_thumbprint
+      - luks_unlock_clevis_tang_stored_policy_effective is mapping
+      - luks_unlock_clevis_tang_stored_policy_effective | length == 1
+      - luks_unlock_clevis_tang_stored_policy_effective.url == luks_unlock_clevis_tang_url
       - luks_unlock_devices is sequence
       - luks_unlock_devices is not string
       - luks_unlock_devices | length > 0
@@ -139,6 +150,19 @@
   when:
     - luks_unlock_enabled | bool
     - luks_unlock_method == 'clevis_tang'
+
+- name: Validate forced Clevis initramfs recovery
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_rebuild_initramfs | bool
+    fail_msg: >-
+      luks_unlock_force_rebuild_initramfs requires luks_unlock_rebuild_initramfs=true
+      in installed clevis_tang mode.
+  when:
+    - luks_unlock_enabled | bool
+    - luks_unlock_execution_mode == 'installed'
+    - luks_unlock_method == 'clevis_tang'
+    - luks_unlock_force_rebuild_initramfs | bool
 
 - name: Validate Clevis device declarations
   ansible.builtin.assert:
