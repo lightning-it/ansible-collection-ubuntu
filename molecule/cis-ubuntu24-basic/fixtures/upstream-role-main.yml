@@ -1,0 +1,18 @@
+---
+- name: Record the thin-wrapper upstream invocation
+  ansible.builtin.copy:
+    content: >-
+      {{
+        {
+          'audit_file_git': audit_file_git,
+          'audit_git_version': audit_git_version
+        }
+        | to_nice_json
+      }}
+    dest: /tmp/lit-ubuntu-cis-molecule-result.json
+    mode: "0600"
+  tags:
+    - level1-server
+    - level1-workstation
+    - level2-server
+    - level2-workstation

@@ -1,0 +1,37 @@
+---
+- name: Converge Ubuntu 24 CIS integration
+  hosts: localhost
+  gather_facts: false
+  vars:
+    cis_ubuntu24_profile_tag: level1-server
+    cis_ubuntu24_execution_mode: remediate
+    ubtu24cis_level_1: true
+    ubtu24cis_level_2: false
+    setup_audit: false
+    run_audit: false
+    audit_only: false
+    ubtu24cis_config_aide: true
+    ubtu24cis_rule_6_3_2: true
+    ubtu24cis_aide_scan: cron
+    ubtu24cis_rule_6_2_4_1: false
+    ubtu24cis_rule_6_2_4_4: true
+    cis_ubuntu24_audit_log_directory: /tmp/lit-ubuntu-cis-audit-log
+    ubtu24cis_rule_3_3_5: true
+    ubtu24cis_rule_3_3_8: true
+    ubtu24cis_rule_3_3_9: true
+    ubtu24cis_rule_3_3_11: true
+    cis_ubuntu24_network_sysctl_file: /tmp/lit-ubuntu-cis-network.conf
+    cis_ubuntu24_test_rule: false
+    cis_ubuntu24_exceptions:
+      - control_ids:
+          - TEST.1
+        scope: molecule
+        reason: Exercise the exception contract without changing the host.
+        compensating_control: Molecule validates the effective variable value.
+        variables:
+          - name: cis_ubuntu24_test_rule
+            value: false
+        audit_visibility: intentional_exception
+
+  roles:
+    - role: lit.ubuntu.cis_ubuntu24

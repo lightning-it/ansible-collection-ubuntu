@@ -1,0 +1,13 @@
+---
+- name: Clean up the Ubuntu 24 CIS integration fixture
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Remove the generated upstream role fixture
+      ansible.builtin.file:
+        path: >-
+          {{
+            lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY')
+          }}/roles/ansible-lockdown.ubuntu24_cis
+        state: absent
+      tags: always

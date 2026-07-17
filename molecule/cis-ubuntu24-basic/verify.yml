@@ -1,0 +1,103 @@
+---
+- name: Verify Ubuntu 24 CIS integration
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Read the upstream invocation evidence
+      ansible.builtin.slurp:
+        src: /tmp/lit-ubuntu-cis-molecule-result.json
+      register: cis_ubuntu24_test_evidence
+      tags: level1-server
+
+    - name: Verify the pinned dependency values reached the upstream role
+      ansible.builtin.assert:
+        that:
+          - >-
+            (
+              cis_ubuntu24_test_evidence.content
+              | b64decode
+              | from_json
+            ).audit_git_version
+            == '87efcc6d409d1a998a7cb809c5ce5a6afedf84c7'
+          - >-
+            (
+              cis_ubuntu24_test_evidence.content
+              | b64decode
+              | from_json
+            ).audit_file_git
+            == 'https://github.com/ansible-lockdown/UBUNTU24-CIS-Audit.git'
+      tags: level1-server
+
+    - name: Inspect the AIDE cron service mask
+      ansible.builtin.stat:
+        path: /etc/systemd/system/dailyaidecheck.service
+        follow: false
+      register: cis_ubuntu24_aide_service_mask
+      tags: level1-server
+
+    - name: Verify the unused static AIDE service is masked
+      ansible.builtin.assert:
+        that:
+          - cis_ubuntu24_aide_service_mask.stat.islnk
+          - cis_ubuntu24_aide_service_mask.stat.lnk_source == '/dev/null'
+      tags: level1-server
+
+    - name: Inspect the audit log directory
+      ansible.builtin.stat:
+        path: /tmp/lit-ubuntu-cis-audit-log
+      register: cis_ubuntu24_audit_log_directory
+      tags: level1-server
+
+    - name: Verify the audit log directory remains traversable
+      ansible.builtin.assert:
+        that:
+          - cis_ubuntu24_audit_log_directory.stat.isdir
+          - cis_ubuntu24_audit_log_directory.stat.mode == '0750'
+      tags: level1-server
+
+    - name: Read the persistent network kernel controls
+      ansible.builtin.slurp:
+        src: /tmp/lit-ubuntu-cis-network.conf
+      register: cis_ubuntu24_network_sysctls
+      tags: level1-server
+
+    - name: Verify the persistent network kernel controls
+      ansible.builtin.assert:
+        that:
+          - >-
+            'net.ipv4.conf.all.accept_redirects = 0'
+            in (cis_ubuntu24_network_sysctls.content | b64decode)
+          - >-
+            'net.ipv4.conf.default.accept_source_route = 0'
+            in (cis_ubuntu24_network_sysctls.content | b64decode)
+          - >-
+            'net.ipv4.conf.all.log_martians = 1'
+            in (cis_ubuntu24_network_sysctls.content | b64decode)
+          - >-
+            'net.ipv6.conf.default.accept_ra = 0'
+            in (cis_ubuntu24_network_sysctls.content | b64decode)
+      tags: level1-server
+
+    - name: Remove the AIDE cron service mask
+      ansible.builtin.file:
+        path: /etc/systemd/system/dailyaidecheck.service
+        state: absent
+      tags: level1-server
+
+    - name: Remove the test audit log directory
+      ansible.builtin.file:
+        path: /tmp/lit-ubuntu-cis-audit-log
+        state: absent
+      tags: level1-server
+
+    - name: Remove the persistent network kernel controls
+      ansible.builtin.file:
+        path: /tmp/lit-ubuntu-cis-network.conf
+        state: absent
+      tags: level1-server
+
+    - name: Remove the upstream invocation evidence
+      ansible.builtin.file:
+        path: /tmp/lit-ubuntu-cis-molecule-result.json
+        state: absent
+      tags: level1-server

@@ -1,0 +1,40 @@
+---
+dependency:
+  name: shell
+  command: >-
+    install -D -m 0644
+    "${MOLECULE_SCENARIO_DIRECTORY}/fixtures/upstream-role-main.yml"
+    "${MOLECULE_SCENARIO_DIRECTORY}/roles/ansible-lockdown.ubuntu24_cis/tasks/main.yml"
+
+driver:
+  name: default
+
+platforms:
+  - name: localhost
+    managed: false
+
+provisioner:
+  name: ansible
+  options:
+    tags: level1-server
+  inventory:
+    host_vars:
+      localhost:
+        ansible_connection: local
+  playbooks:
+    cleanup: cleanup.yml
+    converge: converge.yml
+    verify: verify.yml
+
+scenario:
+  name: cis-ubuntu24-basic
+  test_sequence:
+    - dependency
+    - syntax
+    - converge
+    - idempotence
+    - verify
+    - cleanup
+
+verifier:
+  name: ansible
