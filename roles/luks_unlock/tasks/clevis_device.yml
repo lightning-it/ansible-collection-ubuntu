@@ -1,0 +1,325 @@
+---
+- name: Initialize encrypted device resolution
+  ansible.builtin.set_fact:
+    luks_unlock_device_input_path: "{{ luks_unlock_device.device | default('', true) | trim }}"
+  changed_when: false
+
+- name: Read crypttab for encrypted device resolution
+  ansible.builtin.slurp:
+    src: "{{ luks_unlock_crypttab_path }}"
+  register: luks_unlock_device_crypttab_file
+  changed_when: false
+  when: luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+
+- name: Collect active crypttab entries
+  ansible.builtin.set_fact:
+    luks_unlock_device_crypttab_entries: >-
+      {{
+        (luks_unlock_device_crypttab_file.content | b64decode).splitlines()
+        | map('trim')
+        | reject('equalto', '')
+        | reject('match', '^#')
+        | list
+      }}
+  changed_when: false
+  when: luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+
+- name: Require valid active crypttab entries
+  ansible.builtin.assert:
+    that:
+      - item.split('#', 1)[0].split() | length >= 2
+    fail_msg: "Active crypttab entries must contain at least a target name and source device."
+  loop: "{{ luks_unlock_device_crypttab_entries | default([]) }}"
+  loop_control:
+    label: "{{ item.split()[0] | default('invalid-entry') }}"
+  when: luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+
+- name: Select automatic crypttab entry
+  ansible.builtin.set_fact:
+    luks_unlock_device_crypttab_matches: "{{ luks_unlock_device_crypttab_entries }}"
+  changed_when: false
+  when: luks_unlock_device.crypttab_name | default('', true) | trim == 'auto'
+
+- name: Select named crypttab entry
+  ansible.builtin.set_fact:
+    luks_unlock_device_crypttab_matches: >-
+      {{
+        luks_unlock_device_crypttab_entries
+        | select('match', '^' ~ (luks_unlock_device.crypttab_name | regex_escape) ~ '\\s+')
+        | list
+      }}
+  changed_when: false
+  when:
+    - luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+    - luks_unlock_device.crypttab_name | trim != 'auto'
+
+- name: Require exactly one selected crypttab entry
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_crypttab_matches | length == 1
+    fail_msg: >-
+      crypttab_name={{ luks_unlock_device.crypttab_name }} must select exactly one active entry in
+      {{ luks_unlock_crypttab_path }}; found {{ luks_unlock_device_crypttab_matches | length }}.
+  when: luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+
+- name: Record selected crypttab source
+  ansible.builtin.set_fact:
+    luks_unlock_device_crypttab_source: "{{ luks_unlock_device_crypttab_matches[0].split('#', 1)[0].split()[1] }}"
+  changed_when: false
+  when: luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+
+- name: Resolve UUID or PARTUUID crypttab source
+  ansible.builtin.command:
+    argv:
+      - findfs
+      - "{{ luks_unlock_device_crypttab_source }}"
+  register: luks_unlock_device_findfs
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+    - luks_unlock_device_crypttab_source is match('^(UUID|PARTUUID)=')
+
+- name: Require a resolvable crypttab UUID or PARTUUID
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_findfs.rc == 0
+      - luks_unlock_device_findfs.stdout | trim | length > 0
+    fail_msg: "{{ luks_unlock_device_crypttab_source }} did not resolve to a block device."
+  when:
+    - luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+    - luks_unlock_device_crypttab_source is match('^(UUID|PARTUUID)=')
+
+- name: Record resolved crypttab source candidate
+  ansible.builtin.set_fact:
+    luks_unlock_device_input_path: >-
+      {{
+        luks_unlock_device_findfs.stdout | trim
+        if luks_unlock_device_crypttab_source is match('^(UUID|PARTUUID)=')
+        else luks_unlock_device_crypttab_source
+      }}
+  changed_when: false
+  when: luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+
+- name: Require an absolute crypttab device source
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_input_path is match('^/dev/')
+    fail_msg: >-
+      crypttab source {{ luks_unlock_device_crypttab_source }} is not UUID=, PARTUUID=,
+      or an absolute /dev path; refusing to resolve it.
+  when: luks_unlock_device.crypttab_name | default('', true) | trim | length > 0
+
+- name: Canonicalize encrypted device path
+  ansible.builtin.command:
+    argv:
+      - readlink
+      - -f
+      - "{{ luks_unlock_device_input_path }}"
+  register: luks_unlock_device_readlink
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Require a canonical encrypted device path
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_readlink.rc == 0
+      - luks_unlock_device_readlink.stdout is match('^/dev/')
+    fail_msg: "The declared encrypted device could not be resolved to a canonical /dev path."
+
+- name: Record canonical encrypted device path
+  ansible.builtin.set_fact:
+    luks_unlock_device_resolved_path: "{{ luks_unlock_device_readlink.stdout | trim }}"
+  changed_when: false
+
+- name: Inspect declared encrypted device
+  ansible.builtin.stat:
+    path: "{{ luks_unlock_device_resolved_path }}"
+    follow: true
+  register: luks_unlock_device_stat
+  changed_when: false
+
+- name: Require an existing block device
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_stat.stat.exists
+      - luks_unlock_device_stat.stat.isblk | default(false)
+    fail_msg: "{{ luks_unlock_device_resolved_path }} is not an existing block device; refusing to continue."
+
+- name: Check that the declared device is LUKS
+  ansible.builtin.command:
+    argv:
+      - cryptsetup
+      - isLuks
+      - "{{ luks_unlock_device_resolved_path }}"
+  register: luks_unlock_device_is_luks
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Require an existing LUKS device
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_is_luks.rc == 0
+    fail_msg: "{{ luks_unlock_device_resolved_path }} is not LUKS; this role never formats devices."
+
+- name: Read LUKS2 JSON metadata
+  ansible.builtin.command:
+    argv:
+      - cryptsetup
+      - luksDump
+      - --dump-json-metadata
+      - "{{ luks_unlock_device_resolved_path }}"
+  register: luks_unlock_device_metadata_command
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Require LUKS2 JSON metadata
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_metadata_command.rc == 0
+      - luks_unlock_device_metadata_command.stdout | trim | length > 0
+    fail_msg: "Clevis automation currently requires LUKS2 JSON metadata; no metadata was changed."
+
+- name: Decode current LUKS2 metadata
+  ansible.builtin.set_fact:
+    luks_unlock_device_metadata: "{{ luks_unlock_device_metadata_command.stdout | from_json }}"
+  changed_when: false
+
+- name: Read requested Clevis keyslot
+  ansible.builtin.command:
+    argv:
+      - clevis
+      - luks
+      - list
+      - -d
+      - "{{ luks_unlock_device_resolved_path }}"
+      - -s
+      - "{{ luks_unlock_device.keyslot | string }}"
+  register: luks_unlock_device_clevis_list
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Record requested Clevis keyslot state
+  ansible.builtin.set_fact:
+    luks_unlock_device_slot_line: "{{ luks_unlock_device_clevis_list.stdout | trim }}"
+    luks_unlock_device_slot_present: >-
+      {{ luks_unlock_device_clevis_list.rc == 0 and luks_unlock_device_clevis_list.stdout | trim | length > 0 }}
+    luks_unlock_device_keyslot_occupied: >-
+      {{ (luks_unlock_device.keyslot | string) in luks_unlock_device_metadata.keyslots }}
+  changed_when: false
+
+- name: Split current Clevis keyslot description
+  ansible.builtin.set_fact:
+    luks_unlock_device_slot_parts: "{{ luks_unlock_device_slot_line.split(None, 2) }}"
+  changed_when: false
+  when: luks_unlock_device_slot_present | bool
+
+- name: Validate current Clevis keyslot description
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_slot_parts | length == 3
+      - luks_unlock_device_slot_parts[0] == (luks_unlock_device.keyslot | string) + ':'
+      - luks_unlock_device_slot_parts[2].startswith("'")
+      - luks_unlock_device_slot_parts[2].endswith("'")
+    fail_msg: "Clevis returned an unexpected keyslot description; refusing to modify LUKS metadata."
+  when: luks_unlock_device_slot_present | bool
+
+- name: Decode current Clevis keyslot policy
+  ansible.builtin.set_fact:
+    luks_unlock_device_current_pin: "{{ luks_unlock_device_slot_parts[1] }}"
+    luks_unlock_device_current_policy: "{{ luks_unlock_device_slot_parts[2][1:-1] | from_json }}"
+  changed_when: false
+  when: luks_unlock_device_slot_present | bool
+
+- name: Refuse a non-Clevis keyslot collision
+  ansible.builtin.assert:
+    that:
+      - not luks_unlock_device_keyslot_occupied | bool or luks_unlock_device_slot_present | bool
+    fail_msg: >-
+      Requested keyslot {{ luks_unlock_device.keyslot }} is occupied but is not a Clevis binding.
+      Choose a verified free keyslot; no metadata was changed.
+
+- name: Refuse Clevis policy drift
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_device_current_pin == 'tang'
+      - luks_unlock_device_current_policy == luks_unlock_clevis_tang_stored_policy_effective
+    fail_msg: >-
+      Existing Clevis keyslot {{ luks_unlock_device.keyslot }} does not match the requested pinned Tang policy.
+      This role never edits or unbinds an existing keyslot automatically.
+  when: luks_unlock_device_slot_present | bool
+
+- name: Report the Clevis binding that check mode would add
+  ansible.builtin.debug:
+    msg: >-
+      Would add the pinned Tang binding to declared device {{ luks_unlock_device.id }}
+      at keyslot {{ luks_unlock_device.keyslot }}.
+  changed_when: true
+  when:
+    - ansible_check_mode
+    - not luks_unlock_device_slot_present | bool
+
+- name: Authorize a new Clevis keyslot mutation
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_allow_luks_metadata_change | bool
+      - luks_unlock_header_backup_confirmed | bool
+      - luks_unlock_existing_passphrases[luks_unlock_device.id] | default('', true) | length > 0
+      - luks_unlock_device_metadata.keyslots | length >= 1
+    fail_msg: >-
+      A missing Clevis binding requires an explicit metadata-change opt-in, confirmed external LUKS header backup,
+      and the existing recovery passphrase for this device id.
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - not luks_unlock_device_slot_present | bool
+
+- name: Test the existing recovery passphrase before binding
+  ansible.builtin.command:
+    argv:
+      - cryptsetup
+      - open
+      - --test-passphrase
+      - --key-file=-
+      - "{{ luks_unlock_device_resolved_path }}"
+    stdin: "{{ luks_unlock_existing_passphrases[luks_unlock_device.id] }}"
+    stdin_add_newline: false
+  changed_when: false
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - not luks_unlock_device_slot_present | bool
+
+- name: Bind the verified free keyslot to the pinned Tang policy
+  ansible.builtin.include_tasks: clevis_bind.yml
+  when:
+    - not ansible_check_mode
+    - not luks_unlock_device_slot_present | bool
+
+- name: Verify the reconciled Clevis Tang binding
+  ansible.builtin.include_tasks: clevis_binding_verify.yml
+  when: not ansible_check_mode
+
+- name: Re-read LUKS2 metadata after reconciliation
+  ansible.builtin.command:
+    argv:
+      - cryptsetup
+      - luksDump
+      - --dump-json-metadata
+      - "{{ luks_unlock_device_resolved_path }}"
+  register: luks_unlock_device_metadata_after_command
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Confirm the recovery and Clevis keyslots remain present
+  ansible.builtin.assert:
+    that:
+      - (luks_unlock_device_metadata_after_command.stdout | from_json).keyslots | length >= 2
+      - (luks_unlock_device.keyslot | string) in (luks_unlock_device_metadata_after_command.stdout | from_json).keyslots
+    fail_msg: "Expected recovery and Clevis keyslots were not both found after reconciliation."
+  when: not ansible_check_mode

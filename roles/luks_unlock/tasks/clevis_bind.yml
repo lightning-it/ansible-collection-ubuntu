@@ -1,0 +1,20 @@
+---
+- name: Add the verified Clevis Tang binding
+  ansible.builtin.command:
+    argv:
+      - clevis
+      - luks
+      - bind
+      - -d
+      - "{{ luks_unlock_device_resolved_path }}"
+      - -s
+      - "{{ luks_unlock_device.keyslot | string }}"
+      - -k
+      - '-'
+      - tang
+      - "{{ luks_unlock_clevis_tang_enrollment_policy | to_json }}"
+    stdin: "{{ luks_unlock_existing_passphrases[luks_unlock_device.id] }}"
+    stdin_add_newline: false
+  changed_when: true
+  no_log: true
+  notify: LUKS unlock | Rebuild initramfs

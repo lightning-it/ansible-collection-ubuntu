@@ -1,0 +1,155 @@
+---
+- name: Prepare live LUKS and Tang integration fixture
+  hosts: luks_unlock_tang_heavy
+  become: false
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+    luks_unlock_test_backing_file: /tmp/lit-luks-unlock.img
+    luks_unlock_test_header_backup: /tmp/lit-luks-unlock.header
+    luks_unlock_test_loop_file: /tmp/lit-luks-unlock.loop
+    luks_unlock_test_passphrase: MoleculeRecoverySecret-DoNotUse
+    luks_unlock_test_tang_port: 17500
+
+  pre_tasks:
+    - name: Ensure Python is present
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get update && apt-get -y install python3
+        fi
+      changed_when: false
+
+  tasks:
+    - name: Install live integration fixture packages
+      ansible.builtin.apt:
+        name:
+          - clevis
+          - clevis-luks
+          - cryptsetup
+          - tang
+          - util-linux
+        state: present
+        update_cache: true
+
+    - name: Check whether the Tang fixture is already serving
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ luks_unlock_test_tang_port }}/adv"
+        method: GET
+        status_code: 200
+      register: luks_unlock_test_tang_probe
+      changed_when: false
+      failed_when: false
+
+    - name: Start the Tang fixture
+      ansible.builtin.command:
+        argv:
+          - runuser
+          - -u
+          - _tang
+          - --
+          - /usr/libexec/tangd
+          - -l
+          - -p
+          - "{{ luks_unlock_test_tang_port | string }}"
+          - /var/lib/tang
+      async: 1800
+      poll: 0
+      changed_when: true
+      when: luks_unlock_test_tang_probe.status | default(-1) != 200
+
+    - name: Wait for the Tang fixture
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ luks_unlock_test_tang_port }}/adv"
+        method: GET
+        status_code: 200
+      register: luks_unlock_test_tang_ready
+      changed_when: false
+      retries: 10
+      delay: 1
+      until: luks_unlock_test_tang_ready.status == 200
+
+    - name: Read the Tang signing thumbprint
+      ansible.builtin.command:
+        argv:
+          - tang-show-keys
+          - "{{ luks_unlock_test_tang_port | string }}"
+      register: luks_unlock_test_tang_thumbprint
+      changed_when: false
+
+    - name: Require a Tang signing thumbprint
+      ansible.builtin.assert:
+        that:
+          - luks_unlock_test_tang_thumbprint.stdout | trim | length > 0
+
+    - name: Require privileged loop-device access
+      ansible.builtin.command:
+        argv:
+          - losetup
+          - --find
+      register: luks_unlock_test_free_loop
+      changed_when: false
+      failed_when: false
+
+    - name: Require a usable loop device path
+      ansible.builtin.assert:
+        that:
+          - luks_unlock_test_free_loop.rc == 0
+          - luks_unlock_test_free_loop.stdout | trim is match('^/dev/loop[0-9]+$')
+        fail_msg: >-
+          This optional scenario requires a rootful Docker daemon and a privileged
+          container with usable loop devices; rootless Podman is not supported.
+
+    - name: Create the LUKS backing file
+      ansible.builtin.command:
+        argv:
+          - truncate
+          - -s
+          - 64M
+          - "{{ luks_unlock_test_backing_file }}"
+      changed_when: true
+
+    - name: Attach the LUKS backing file to a free loop device
+      ansible.builtin.command:
+        argv:
+          - losetup
+          - --find
+          - --show
+          - "{{ luks_unlock_test_backing_file }}"
+      register: luks_unlock_test_loop
+      changed_when: true
+
+    - name: Record the loop device for later phases and cleanup
+      ansible.builtin.copy:
+        dest: "{{ luks_unlock_test_loop_file }}"
+        content: "{{ luks_unlock_test_loop.stdout | trim }}\n"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Format the loop device as LUKS2 with a recovery keyslot
+      ansible.builtin.command:
+        argv:
+          - cryptsetup
+          - luksFormat
+          - --type
+          - luks2
+          - --batch-mode
+          - --key-file=-
+          - "{{ luks_unlock_test_loop.stdout | trim }}"
+        stdin: "{{ luks_unlock_test_passphrase }}"
+        stdin_add_newline: false
+      changed_when: true
+      no_log: true
+
+    - name: Back up the pristine LUKS2 header
+      ansible.builtin.command:
+        argv:
+          - cryptsetup
+          - luksHeaderBackup
+          - "{{ luks_unlock_test_loop.stdout | trim }}"
+          - --batch-mode
+          - --header-backup-file
+          - "{{ luks_unlock_test_header_backup }}"
+      changed_when: true
+      no_log: true

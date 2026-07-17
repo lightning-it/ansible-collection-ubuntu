@@ -43,3 +43,57 @@ releases:
     fragments:
       - podman-workbench-socket.yml
     release_date: '2026-06-23'
+  1.6.0:
+    changes:
+      minor_changes:
+        - developer_tools - Add optional actionlint installation from the upstream
+          release archive with checksum verification.
+    fragments:
+      - 84-ci-test-matrix.yml
+      - 84-developer-tools-actionlint.yml
+    release_date: '2026-07-05'
+  1.7.0:
+    changes:
+      bugfixes:
+        - shared_tooling - Dispatch collection publishing from protected main with
+          the managed release environment and Galaxy credential, make lint compatibility
+          detection rely on the execution environment, and ignore generated local
+          collection-install and Python cache artifacts.
+      minor_changes:
+        - Add the inventory-driven ``lit.ubuntu.openssh_server`` role with validated
+          multi-port transition support, Ubuntu systemd socket-activation reconciliation,
+          check-mode coverage, directive-injection protection, and secure public-key-only
+          defaults.
+        - Added guarded Ubuntu LUKS initramfs unlock automation with a secret-free
+          Hetzner installimage Dropbear bootstrap, pinned Clevis Tang bindings, and
+          a minimal Tang socket deployment role.
+        - developer_tools - Add configurable Node.js/npm/npx installation and markdownlint-cli2
+          validation support.
+        - docs - Apply the shared enterprise README structure.
+        - docs - Consolidate generated governance metadata and license policy on shared-assets-lit.
+        - netplan - Add validated rendering support for tagged VLAN interfaces.
+        - release_model - Add managed compatibility matrix documentation and structured
+          release evidence fields.
+    fragments:
+      - compatibility-release-evidence.yml
+      - developer-tools-nodejs-markdownlint.yml
+      - enterprise-readme-standard.yml
+      - luks-unlock-tang-deploy.yml
+      - netplan-vlan.yml
+      - openssh-server-hardening.yml
+      - shared-assets-lit-governance.yml
+      - shared-assets-publisher-lint-local-artifacts.yml
+    release_date: '2026-07-14'
+  1.8.0:
+    changes:
+      bugfixes:
+        - luks_unlock - Enforce the declared Tang signing thumbprint during preflight
+          and cached-advertisement enrollment, verify persisted bindings using Clevis's
+          URL-only representation, and bound an exact-keyslot online unlock test without
+          exposing key material.
+      minor_changes:
+        - luks_unlock - Add an explicitly non-idempotent, one-run recovery option
+          to rebuild initramfs after an existing Clevis binding passes every verifier.
+    fragments:
+      - luks-unlock-tang-verification.yml
+    release_date: '2026-07-14'

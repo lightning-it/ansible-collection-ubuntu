@@ -1,0 +1,38 @@
+---
+- name: Encrypt fixed preflight data with the pinned Tang policy
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/timeout
+      - --kill-after=5s
+      - "{{ luks_unlock_clevis_network_timeout_seconds | string }}s"
+      - clevis
+      - encrypt
+      - tang
+      - "{{ luks_unlock_clevis_tang_enrollment_policy | to_json }}"
+    stdin: "{{ luks_unlock_clevis_probe_plaintext }}"
+    stdin_add_newline: false
+  register: luks_unlock_clevis_probe_jwe
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Decrypt fixed Tang preflight data
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/timeout
+      - --kill-after=5s
+      - "{{ luks_unlock_clevis_network_timeout_seconds | string }}s"
+      - clevis
+      - decrypt
+    stdin: "{{ luks_unlock_clevis_probe_jwe.stdout }}"
+    stdin_add_newline: false
+  register: luks_unlock_clevis_probe_result
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Confirm the pinned Tang policy is usable
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_clevis_probe_result.stdout == luks_unlock_clevis_probe_plaintext
+    fail_msg: "Tang preflight failed; no LUKS metadata was changed."

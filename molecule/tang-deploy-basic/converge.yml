@@ -1,0 +1,25 @@
+---
+- name: Converge Tang deployment
+  hosts: tang_deploy
+  become: false
+  gather_facts: false
+  vars:
+    tang_deploy_test_dir: /tmp/lit-tang-deploy-molecule
+
+  pre_tasks:
+    - name: Create Tang deployment test directory
+      ansible.builtin.file:
+        path: "{{ tang_deploy_test_dir }}"
+        state: directory
+        mode: "0700"
+
+  roles:
+    - role: lit.ubuntu.tang_deploy
+      vars:
+        tang_deploy_enabled: true
+        tang_deploy_manage_packages: false
+        tang_deploy_manage_service: false
+        tang_deploy_manage_socket_override: true
+        tang_deploy_listen_port: 18080
+        tang_deploy_socket_override_path: "{{ tang_deploy_test_dir }}/tangd.socket.d/80-lit-listen.conf"
+        tang_deploy_validate: false

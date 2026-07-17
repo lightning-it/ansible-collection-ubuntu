@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  role_name: luks_unlock
+  namespace: lit
+  author: Lightning IT
+  company: Lightning IT
+  description: Configure guarded initramfs unlock with Dropbear or a pinned Clevis Tang policy on Ubuntu.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - ubuntu
+    - luks
+    - clevis
+    - tang
+    - dropbear
+    - security
+
+dependencies: []

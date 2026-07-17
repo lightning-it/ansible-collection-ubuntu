@@ -1,0 +1,23 @@
+---
+- name: Clean up live LUKS and Tang integration fixture
+  hosts: luks_unlock_tang_heavy
+  become: false
+  gather_facts: false
+  ignore_unreachable: true
+
+  tasks:
+    - name: Stop Tang and detach the fixture loop device
+      ansible.builtin.raw: |
+        pkill -TERM -x tangd 2>/dev/null || true
+        if [ -s /tmp/lit-luks-unlock.loop ]; then
+          IFS= read -r loop_device < /tmp/lit-luks-unlock.loop
+          case "$loop_device" in
+            /dev/loop[0-9]*) losetup --detach "$loop_device" 2>/dev/null || true ;;
+          esac
+        fi
+        rm -f \
+          /tmp/lit-luks-unlock.img \
+          /tmp/lit-luks-unlock.header \
+          /tmp/lit-luks-unlock.loop
+      changed_when: false
+      failed_when: false

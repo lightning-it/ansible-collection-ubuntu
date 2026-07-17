@@ -1,0 +1,184 @@
+---
+- name: Validate OpenSSH server control inputs
+  ansible.builtin.assert:
+    that:
+      - openssh_server_enabled is boolean
+      - openssh_server_manage_packages is boolean
+      - openssh_server_update_apt_cache is boolean
+      - openssh_server_validate_config is boolean
+      - openssh_server_manage_service is boolean
+      - openssh_server_service_enabled is boolean
+      - openssh_server_manage_socket_activation is boolean
+      - openssh_server_verify_listeners is boolean
+      - openssh_server_packages is sequence
+      - openssh_server_packages is not string
+      - openssh_server_ports is sequence
+      - openssh_server_ports is not string
+      - openssh_server_listen_addresses is sequence
+      - openssh_server_listen_addresses is not string
+      - openssh_server_allow_users is sequence
+      - openssh_server_allow_users is not string
+    fail_msg: "OpenSSH server control variables are invalid."
+    quiet: true
+
+- name: Validate enabled OpenSSH server inputs
+  ansible.builtin.assert:
+    that:
+      - openssh_server_config_path is string
+      - openssh_server_config_path is match('^/[^\x00\r\n]+$')
+      - openssh_server_config_owner is string
+      - openssh_server_config_owner is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
+      - openssh_server_config_group is string
+      - openssh_server_config_group is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
+      - openssh_server_config_mode is string
+      - openssh_server_config_mode is match('^0[0-7]{3}$')
+      - openssh_server_ports | length > 0
+      - openssh_server_permit_root_login in ['yes', 'no', 'prohibit-password', 'forced-commands-only']
+      - openssh_server_password_authentication in ['yes', 'no']
+      - openssh_server_kbd_interactive_authentication in ['yes', 'no']
+      - openssh_server_pubkey_authentication in ['yes', 'no']
+      - openssh_server_permit_empty_passwords in ['yes', 'no']
+      - openssh_server_x11_forwarding in ['yes', 'no']
+      - openssh_server_use_pam in ['yes', 'no']
+      - openssh_server_max_auth_tries is integer
+      - openssh_server_max_auth_tries >= 1
+      - openssh_server_max_sessions is integer
+      - openssh_server_max_sessions >= 1
+      - openssh_server_client_alive_interval is integer
+      - openssh_server_client_alive_interval >= 0
+      - openssh_server_client_alive_count_max is integer
+      - openssh_server_client_alive_count_max >= 0
+    fail_msg: "Enabled OpenSSH server variables are invalid or incomplete."
+    quiet: true
+  when: openssh_server_enabled | bool
+
+- name: Validate OpenSSH package inputs
+  ansible.builtin.assert:
+    that:
+      - openssh_server_packages | length > 0
+    fail_msg: "Package management requires a nonempty OpenSSH package list."
+    quiet: true
+  when:
+    - openssh_server_enabled | bool
+    - openssh_server_manage_packages | bool
+
+- name: Validate OpenSSH package names
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match('^[A-Za-z0-9][A-Za-z0-9.+:-]*$')
+    fail_msg: "OpenSSH package names must be nonempty apt package names."
+    quiet: true
+  loop: "{{ openssh_server_packages }}"
+  loop_control:
+    label: "OpenSSH package declaration"
+  when:
+    - openssh_server_enabled | bool
+    - openssh_server_manage_packages | bool
+
+- name: Validate unique OpenSSH package declarations
+  ansible.builtin.assert:
+    that:
+      - openssh_server_packages | unique | length == openssh_server_packages | length
+    fail_msg: "OpenSSH package declarations must be unique."
+    quiet: true
+  when:
+    - openssh_server_enabled | bool
+    - openssh_server_manage_packages | bool
+
+- name: Validate OpenSSH configuration validation inputs
+  ansible.builtin.assert:
+    that:
+      - openssh_server_binary is string
+      - openssh_server_binary is match('^/[A-Za-z0-9_./+-]+$')
+    fail_msg: "OpenSSH validation requires a safe absolute binary path."
+    quiet: true
+  when:
+    - openssh_server_enabled | bool
+    - openssh_server_validate_config | bool
+
+- name: Validate OpenSSH service management inputs
+  ansible.builtin.assert:
+    that:
+      - openssh_server_service_name is string
+      - openssh_server_service_name is match('^[A-Za-z0-9_.@:-]+$')
+      - openssh_server_service_state in ['started', 'stopped']
+    fail_msg: "OpenSSH service management variables are invalid."
+    quiet: true
+  when:
+    - openssh_server_enabled | bool
+    - openssh_server_manage_service | bool
+
+- name: Validate OpenSSH socket activation inputs
+  ansible.builtin.assert:
+    that:
+      - openssh_server_socket_name is string
+      - openssh_server_socket_name is match('^[A-Za-z0-9_.@:-]+$')
+    fail_msg: "OpenSSH socket activation requires a valid systemd socket unit name."
+    quiet: true
+  when:
+    - openssh_server_enabled | bool
+    - openssh_server_manage_service | bool
+    - openssh_server_manage_socket_activation | bool
+
+- name: Validate OpenSSH listener verification inputs
+  ansible.builtin.assert:
+    that:
+      - openssh_server_listener_verify_host is string
+      - openssh_server_listener_verify_host is match('^[A-Za-z0-9_.:%*\[\]-]+$')
+      - openssh_server_listener_verify_timeout is integer
+      - openssh_server_listener_verify_timeout >= 1
+    fail_msg: "OpenSSH listener verification variables are invalid."
+    quiet: true
+  when:
+    - openssh_server_enabled | bool
+    - openssh_server_manage_service | bool
+    - openssh_server_verify_listeners | bool
+    - openssh_server_service_state == 'started'
+
+- name: Validate OpenSSH listener ports
+  ansible.builtin.assert:
+    that:
+      - item is integer
+      - item >= 1
+      - item <= 65535
+    fail_msg: "OpenSSH listener ports must be integers from 1 through 65535."
+    quiet: true
+  loop: "{{ openssh_server_ports }}"
+  loop_control:
+    label: "OpenSSH port declaration"
+  when: openssh_server_enabled | bool
+
+- name: Validate OpenSSH listen addresses
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match('^[A-Za-z0-9_.:%*\[\]-]+$')
+    fail_msg: "OpenSSH listen addresses must be nonempty single-token values."
+    quiet: true
+  loop: "{{ openssh_server_listen_addresses }}"
+  loop_control:
+    label: "OpenSSH listen address declaration"
+  when: openssh_server_enabled | bool
+
+- name: Validate OpenSSH allowed users
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match('^[A-Za-z_][A-Za-z0-9_.-]*[$]?$')
+    fail_msg: "OpenSSH allowed users must be safe local account names."
+    quiet: true
+  loop: "{{ openssh_server_allow_users }}"
+  loop_control:
+    label: "OpenSSH allowed user declaration"
+  when: openssh_server_enabled | bool
+
+- name: Validate unique OpenSSH listener and user declarations
+  ansible.builtin.assert:
+    that:
+      - openssh_server_ports | unique | length == openssh_server_ports | length
+      - openssh_server_listen_addresses | unique | length == openssh_server_listen_addresses | length
+      - openssh_server_allow_users | unique | length == openssh_server_allow_users | length
+    fail_msg: "OpenSSH ports, listen addresses, and allowed users must be unique."
+    quiet: true
+  when: openssh_server_enabled | bool

@@ -1,0 +1,27 @@
+---
+- name: Validate Tang deployment inputs
+  ansible.builtin.assert:
+    that:
+      - tang_deploy_enabled is boolean
+      - tang_deploy_manage_packages is boolean
+      - tang_deploy_update_apt_cache is boolean
+      - tang_deploy_manage_service is boolean
+      - tang_deploy_manage_socket_override is boolean
+      - tang_deploy_socket_enabled is boolean
+      - tang_deploy_validate is boolean
+      - tang_deploy_packages is sequence
+      - tang_deploy_packages is not string
+      - tang_deploy_socket_state in ['started', 'stopped']
+    fail_msg: "Tang deployment variables are invalid."
+
+- name: Validate enabled Tang deployment inputs
+  ansible.builtin.assert:
+    that:
+      - tang_deploy_packages | length > 0
+      - tang_deploy_socket_unit | trim | length > 0
+      - tang_deploy_listen_port | int >= 1
+      - tang_deploy_listen_port | int <= 65535
+      - tang_deploy_socket_override_path is match('^/')
+      - tang_deploy_validate_url is match('^https?://')
+    fail_msg: "Enabled Tang deployment variables are invalid or incomplete."
+  when: tang_deploy_enabled | bool
