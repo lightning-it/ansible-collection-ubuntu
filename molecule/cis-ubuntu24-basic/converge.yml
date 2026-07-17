@@ -20,6 +20,8 @@
     ubtu24cis_rule_3_3_8: true
     ubtu24cis_rule_3_3_9: true
     ubtu24cis_rule_3_3_11: true
+    ubtu24cis_ipv6_required: true
+    ubtu24cis_is_router: false
     cis_ubuntu24_network_sysctl_file: /tmp/lit-ubuntu-cis-network.conf
     cis_ubuntu24_test_rule: false
     cis_ubuntu24_exceptions:
@@ -35,3 +37,22 @@
 
   roles:
     - role: lit.ubuntu.cis_ubuntu24
+
+  tasks:
+    - name: Exercise router and IPv6 applicability for persistent controls
+      ansible.builtin.include_role:
+        name: lit.ubuntu.cis_ubuntu24
+        tasks_from: network_sysctl_persistence.yml
+        apply:
+          tags: level1-server
+      # noqa var-naming[no-role-prefix] -- exercise upstream role public inputs
+      vars:
+        cis_ubuntu24_execution_mode: remediate
+        cis_ubuntu24_network_sysctl_file: /tmp/lit-ubuntu-cis-network-limited.conf
+        ubtu24cis_rule_3_3_5: false
+        ubtu24cis_rule_3_3_8: true
+        ubtu24cis_rule_3_3_9: true
+        ubtu24cis_rule_3_3_11: true
+        ubtu24cis_ipv6_required: false
+        ubtu24cis_is_router: true
+      tags: level1-server

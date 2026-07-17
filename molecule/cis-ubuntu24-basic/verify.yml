@@ -78,6 +78,26 @@
             in (cis_ubuntu24_network_sysctls.content | b64decode)
       tags: level1-server
 
+    - name: Read the applicability-limited network kernel controls
+      ansible.builtin.slurp:
+        src: /tmp/lit-ubuntu-cis-network-limited.conf
+      register: cis_ubuntu24_limited_network_sysctls
+      tags: level1-server
+
+    - name: Verify router and IPv6 applicability is preserved
+      ansible.builtin.assert:
+        that:
+          - >-
+            'net.ipv4.conf.all.log_martians = 1'
+            in (cis_ubuntu24_limited_network_sysctls.content | b64decode)
+          - >-
+            'accept_source_route'
+            not in (cis_ubuntu24_limited_network_sysctls.content | b64decode)
+          - >-
+            'net.ipv6.'
+            not in (cis_ubuntu24_limited_network_sysctls.content | b64decode)
+      tags: level1-server
+
     - name: Remove the AIDE cron service mask
       ansible.builtin.file:
         path: /etc/systemd/system/dailyaidecheck.service
@@ -93,6 +113,12 @@
     - name: Remove the persistent network kernel controls
       ansible.builtin.file:
         path: /tmp/lit-ubuntu-cis-network.conf
+        state: absent
+      tags: level1-server
+
+    - name: Remove the applicability-limited network kernel controls
+      ansible.builtin.file:
+        path: /tmp/lit-ubuntu-cis-network-limited.conf
         state: absent
       tags: level1-server
 
