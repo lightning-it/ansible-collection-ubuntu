@@ -1,5 +1,48 @@
 # ansible-collection-ubuntu
 
+<!-- BEGIN LIT_SHARED_RELEASE_MODEL -->
+
+## Release and Quality Model
+
+This repository follows the Lightning IT shared release and quality model.
+
+See [RELEASE.md](./RELEASE.md) for:
+
+- branch and release flow
+- required quality checks
+- test matrix
+- release evidence
+- artifact publishing
+- supported repository-specific release behavior
+
+Repository classification: **Ansible Collection**.
+Required test profiles: `pre-commit, lint, light, molecule-light, molecule-heavy-incus, release-validation`.
+Publishing targets: `github-release, ansible-galaxy`.
+
+## Supported and Tested Platforms
+
+| Platform / Product | Status | Validation |
+|---|---:|---|
+| ubuntu-latest | Supported | Molecule / Incus |
+| ubuntu-lts | Supported | Molecule / Incus |
+| ansible-core | Tested where applicable | Molecule / Incus |
+| molecule | Tested where applicable | Molecule / Incus |
+| incus | Tested where applicable | Molecule / Incus |
+
+<!-- END LIT_SHARED_RELEASE_MODEL -->
+
+<!-- BEGIN LIT_QUALITY_BADGES -->
+
+[![CI](https://github.com/lightning-it/ansible-collection-ubuntu/actions/workflows/collection-ci.yml/badge.svg?branch=develop)](https://github.com/lightning-it/ansible-collection-ubuntu/actions/workflows/collection-ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/lightning-it/ansible-collection-ubuntu?sort=semver)](https://github.com/lightning-it/ansible-collection-ubuntu/releases/latest)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lightning-it/ansible-collection-ubuntu/badge)](https://scorecard.dev/viewer/?uri=github.com/lightning-it/ansible-collection-ubuntu)
+[![Ansible Galaxy](https://img.shields.io/ansible/collection/v/lit/ubuntu?label=Ansible%20Galaxy)](https://galaxy.ansible.com/ui/repo/published/lit/ubuntu/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
+<!-- END LIT_QUALITY_BADGES -->
+
+[![Collection CI](https://github.com/lightning-it/ansible-collection-ubuntu/actions/workflows/collection-ci.yml/badge.svg?branch=develop)](https://github.com/lightning-it/ansible-collection-ubuntu/actions/workflows/collection-ci.yml)
+
 Ubuntu-focused Ansible collection covering OS baseline, apt repositories,
 automatic updates, users, developer tooling, desktop helpers, and day-2
 operational tasks.
@@ -31,6 +74,14 @@ Ubuntu-native package and repository management.
   optional generated inventory output.
 - `lit.ubuntu.netplan`
   Render and apply Ubuntu netplan interface configuration.
+- `lit.ubuntu.openssh_server`
+  Render and validate hardened OpenSSH server configuration with safe multi-port transitions and Ubuntu socket
+  activation reconciliation.
+- `lit.ubuntu.luks_unlock`
+  Stage secret-free Dropbear first-boot unlock hooks and safely add pinned Clevis Tang bindings to existing LUKS2
+  devices.
+- `lit.ubuntu.tang_deploy`
+  Install and validate a minimal systemd socket-activated Tang binding service.
 - `lit.ubuntu.podman`, `lit.ubuntu.gui`, `lit.ubuntu.xrdp`,
   `lit.ubuntu.firefox`, and `lit.ubuntu.vscode`
   Provide optional workstation and remote desktop building blocks.
@@ -82,3 +133,70 @@ Each role is expected to provide:
 - `meta/main.yml` with Galaxy metadata,
 - `defaults/main.yml` with documented variables,
 - `README.md` with a clear description and examples.
+
+## Security
+
+See [SECURITY.md](./SECURITY.md) for supported versions and vulnerability reporting.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution and review expectations.
+
+## License
+
+See [LICENSE](./LICENSE).
+
+<!-- BEGIN LIT_RELEASE_QUALITY_MODEL -->
+
+## Release and Quality Model
+
+This repository follows the Lightning IT shared release and quality model.
+The README shows the current supported and tested matrix.
+Exact per-version validation proof is stored with each GitHub Release as `release-evidence.md` and `release-evidence.json`.
+Releases are created from the protected `main` branch after a reviewed `develop -> main` release promotion.
+Collection releases validate collection sanity, Molecule scenarios, build integrity, and Ansible Galaxy publishing where enabled.
+
+See:
+
+- [RELEASE.md](./RELEASE.md)
+- [TESTING.md](./TESTING.md)
+- [GitHub Releases](../../releases)
+
+Repository classification: **Ansible Collection**.
+Required test profiles: `pre-commit, lint, light, molecule-light, molecule-heavy-incus, release-validation`.
+Publishing targets: `github-release, ansible-galaxy`.
+
+<!-- END LIT_RELEASE_QUALITY_MODEL -->
+
+<!-- BEGIN LIT_COMPATIBILITY_MATRIX -->
+
+## Compatibility Matrix
+
+| Collection Version | Platform | Product | Validation |
+|---|---|---|---|
+| Latest release | ubuntu-latest | ansible-core, molecule, incus | See release evidence |
+| Latest release | ubuntu-lts | ansible-core, molecule, incus | See release evidence |
+
+| Scenario | Test Type | Validation |
+|---|---|---|
+| collection-sanity | Collection sanity | See release evidence |
+| molecule-light | Molecule light | See release evidence |
+| molecule-heavy-incus | Heavy Incus | See release evidence |
+| galaxy-build | Galaxy build/publish | See release evidence |
+
+Validation proof for each released version is stored in the corresponding GitHub Release evidence.
+
+<!-- END LIT_COMPATIBILITY_MATRIX -->
+
+## Release Evidence
+
+Every released version includes immutable release evidence attached to the corresponding GitHub Release.
+The evidence records:
+
+- tested matrix combinations
+- GitHub Actions run links
+- artifact references
+- publish status
+- security scan status
+
+See [GitHub Releases](../../releases), [RELEASE.md](./RELEASE.md), and [TESTING.md](./TESTING.md) for the release process and validation model.

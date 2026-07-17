@@ -1,0 +1,312 @@
+---
+- name: Converge LUKS unlock
+  hosts: luks_unlock
+  become: false
+  gather_facts: false
+  vars:
+    luks_unlock_test_dir: /tmp/lit-luks-unlock-molecule
+    luks_unlock_test_bin_dir: /tmp/lit-luks-unlock-molecule/bin
+    luks_unlock_test_clevis_log: /tmp/lit-luks-unlock-molecule/clevis.log
+    luks_unlock_test_tang_url: http://tang.example.invalid
+    luks_unlock_test_tang_thumbprint: molecule-tang-signing-thumbprint
+    luks_unlock_rebuild_initramfs: false
+    luks_unlock_test_public_key: >-
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoleculeDocumentationKeyOnly000000000 molecule@example.invalid
+    luks_unlock_test_network:
+      method: static
+      interface: enp1s0
+      address: 192.0.2.10
+      gateway: 192.0.2.1
+      netmask: 255.255.255.0
+      hostname: molecule-host
+      dns:
+        - 192.0.2.53
+        - 192.0.2.54
+
+  pre_tasks:
+    - name: Create LUKS unlock test directory
+      ansible.builtin.file:
+        path: "{{ luks_unlock_test_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Create mock command directory
+      ansible.builtin.file:
+        path: "{{ luks_unlock_test_bin_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Install deterministic Clevis mock
+      ansible.builtin.copy:
+        dest: "{{ luks_unlock_test_bin_dir }}/clevis"
+        mode: "0700"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          : "${LUKS_UNLOCK_MOCK_LOG:?}"
+          printf '%s\n' "$*" >> "${LUKS_UNLOCK_MOCK_LOG}"
+
+          case "${1:-}" in
+            encrypt)
+              cat >/dev/null
+              printf 'molecule-jwe'
+              ;;
+            decrypt)
+              cat >/dev/null
+              printf 'lit-clevis-tang-preflight'
+              ;;
+            luks)
+              case "${2:-}" in
+                list)
+                  printf '7: tang '\''{"url":"%s"}'\''\n' \
+                    "${LUKS_UNLOCK_MOCK_LIST_URL:-http://tang.example.invalid}"
+                  ;;
+                pass)
+                  sleep "${LUKS_UNLOCK_MOCK_PASS_DELAY:-0}"
+                  printf 'MoleculeGeneratedPassphrase'
+                  ;;
+                bind)
+                  cat >/dev/null
+                  ;;
+                *)
+                  exit 64
+                  ;;
+              esac
+              ;;
+            *)
+              exit 64
+              ;;
+          esac
+
+    - name: Install deterministic cryptsetup mock
+      ansible.builtin.copy:
+        dest: "{{ luks_unlock_test_bin_dir }}/cryptsetup"
+        mode: "0700"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          : "${LUKS_UNLOCK_MOCK_LOG:?}"
+          printf 'cryptsetup %s\n' "$*" >> "${LUKS_UNLOCK_MOCK_LOG}"
+          cat >/dev/null
+
+    - name: Reset deterministic Clevis command log
+      ansible.builtin.copy:
+        dest: "{{ luks_unlock_test_clevis_log }}"
+        content: ""
+        mode: "0600"
+      tags:
+        - molecule-idempotence-notest
+
+  tasks:
+    - name: Stage installimage bootstrap hook
+      ansible.builtin.include_role:
+        name: lit.ubuntu.luks_unlock
+      vars:
+        luks_unlock_enabled: true
+        luks_unlock_execution_mode: rescue_stage
+        luks_unlock_method: dropbear
+        luks_unlock_rescue_stage_path: "{{ luks_unlock_test_dir }}/post-install.sh"
+        luks_unlock_early_network: "{{ luks_unlock_test_network }}"
+        luks_unlock_network_modules:
+          - igb
+        luks_unlock_dropbear_authorized_keys:
+          - "{{ luks_unlock_test_public_key }}"
+
+    - name: Confirm installimage bootstrap fact
+      ansible.builtin.assert:
+        that:
+          - luks_unlock_installimage_post_install_script_path == luks_unlock_test_dir + '/post-install.sh'
+
+    - name: Render installed Dropbear configuration without changing the test host boot artifacts
+      ansible.builtin.include_role:
+        name: lit.ubuntu.luks_unlock
+      vars:
+        luks_unlock_enabled: true
+        luks_unlock_execution_mode: installed
+        luks_unlock_method: dropbear
+        luks_unlock_manage_packages: false
+        luks_unlock_early_network: "{{ luks_unlock_test_network }}"
+        luks_unlock_network_modules:
+          - igb
+        luks_unlock_grub_dropin_path: "{{ luks_unlock_test_dir }}/grub.d/80-lit-initramfs-network.cfg"
+        luks_unlock_initramfs_modules_path: "{{ luks_unlock_test_dir }}/initramfs-tools/modules"
+        luks_unlock_update_grub: false
+        luks_unlock_rebuild_initramfs: false
+        luks_unlock_dropbear_authorized_keys:
+          - "{{ luks_unlock_test_public_key }}"
+        luks_unlock_dropbear_config_path: "{{ luks_unlock_test_dir }}/dropbear/dropbear.conf"
+        luks_unlock_dropbear_authorized_keys_path: "{{ luks_unlock_test_dir }}/dropbear/authorized_keys"
+        luks_unlock_validate_dropbear_host_keys: false
+
+    - name: Verify forced recovery requires initramfs rebuilding in Clevis mode
+      block:
+        - name: Attempt contradictory forced-recovery inputs
+          ansible.builtin.include_role:
+            name: lit.ubuntu.luks_unlock
+            tasks_from: assert
+          vars:
+            luks_unlock_enabled: true
+            luks_unlock_execution_mode: installed
+            luks_unlock_method: clevis_tang
+            luks_unlock_early_network:
+              method: dhcp
+              interface: eth0
+              dns: []
+            luks_unlock_clevis_tang_url: "{{ luks_unlock_test_tang_url }}"
+            luks_unlock_clevis_tang_thumbprint: "{{ luks_unlock_test_tang_thumbprint }}"
+            luks_unlock_devices:
+              - id: root
+                device: /dev/mapper/mock-luks
+                keyslot: 7
+                initramfs: true
+            luks_unlock_force_rebuild_initramfs: true
+            luks_unlock_rebuild_initramfs: false
+
+        - name: Fail when contradictory forced recovery was accepted
+          ansible.builtin.fail:
+            msg: "Forced recovery unexpectedly accepted rebuild_initramfs=false."
+
+      rescue:
+        - name: Confirm forced recovery caused the safe failure
+          ansible.builtin.assert:
+            that:
+              - "'requires luks_unlock_rebuild_initramfs=true' in ansible_failed_result.msg"
+
+    - name: Exercise pinned Clevis commands without a real LUKS device
+      environment:
+        PATH: "{{ luks_unlock_test_bin_dir }}:{{ lookup('ansible.builtin.env', 'PATH') }}"
+        LUKS_UNLOCK_MOCK_LOG: "{{ luks_unlock_test_clevis_log }}"
+      block:
+        - name: Exercise the pinned Tang preflight
+          ansible.builtin.include_role:
+            name: lit.ubuntu.luks_unlock
+            tasks_from: clevis_tang_preflight
+          vars:
+            luks_unlock_clevis_tang_enrollment_policy:
+              url: "{{ luks_unlock_test_tang_url }}"
+              thp: "{{ luks_unlock_test_tang_thumbprint }}"
+              adv:
+                protected: molecule-protected-advertisement
+                payload: molecule-advertisement-payload
+                signature: molecule-advertisement-signature
+
+        - name: Exercise noninteractive pinned Tang enrollment
+          ansible.builtin.include_role:
+            name: lit.ubuntu.luks_unlock
+            tasks_from: clevis_bind
+          vars:
+            luks_unlock_device_resolved_path: /dev/mapper/mock-luks
+            luks_unlock_device:
+              id: root
+              keyslot: 7
+            luks_unlock_existing_passphrases:
+              root: MoleculeRecoverySecret
+            luks_unlock_clevis_tang_enrollment_policy:
+              url: "{{ luks_unlock_test_tang_url }}"
+              thp: "{{ luks_unlock_test_tang_thumbprint }}"
+              adv:
+                protected: molecule-protected-advertisement
+                payload: molecule-advertisement-payload
+                signature: molecule-advertisement-signature
+          tags:
+            - molecule-idempotence-notest
+
+        - name: Exercise URL-only persisted policy and selected-slot validation
+          ansible.builtin.include_role:
+            name: lit.ubuntu.luks_unlock
+            tasks_from: clevis_binding_verify
+          vars:
+            luks_unlock_device_resolved_path: /dev/mapper/mock-luks
+            luks_unlock_device:
+              keyslot: 7
+            luks_unlock_clevis_tang_stored_policy_effective:
+              url: "{{ luks_unlock_test_tang_url }}"
+
+    - name: Verify persisted Tang URL drift fails before online unlock
+      environment:
+        PATH: "{{ luks_unlock_test_bin_dir }}:{{ lookup('ansible.builtin.env', 'PATH') }}"
+        LUKS_UNLOCK_MOCK_LOG: "{{ luks_unlock_test_clevis_log }}"
+        LUKS_UNLOCK_MOCK_LIST_URL: http://unexpected-tang.example.invalid
+      block:
+        - name: Attempt verification with a mismatched persisted Tang URL
+          ansible.builtin.include_role:
+            name: lit.ubuntu.luks_unlock
+            tasks_from: clevis_binding_verify
+          vars:
+            luks_unlock_device_resolved_path: /dev/mapper/mock-luks
+            luks_unlock_device:
+              keyslot: 7
+            luks_unlock_clevis_tang_stored_policy_effective:
+              url: "{{ luks_unlock_test_tang_url }}"
+
+        - name: Fail when persisted Tang URL drift was accepted
+          ansible.builtin.fail:
+            msg: "Persisted Tang URL drift was unexpectedly accepted."
+
+      rescue:
+        - name: Confirm persisted Tang URL drift caused the safe failure
+          ansible.builtin.assert:
+            that:
+              - "'does not match the declared Tang URL' in ansible_failed_result.msg"
+
+    - name: Verify an unavailable Tang service fails within the configured timeout
+      environment:
+        PATH: "{{ luks_unlock_test_bin_dir }}:{{ lookup('ansible.builtin.env', 'PATH') }}"
+        LUKS_UNLOCK_MOCK_LOG: "{{ luks_unlock_test_clevis_log }}"
+        LUKS_UNLOCK_MOCK_PASS_DELAY: "2"
+      block:
+        - name: Attempt selected-slot validation against an unavailable Tang service
+          ansible.builtin.include_role:
+            name: lit.ubuntu.luks_unlock
+            tasks_from: clevis_binding_verify
+          vars:
+            luks_unlock_clevis_network_timeout_seconds: 1
+            luks_unlock_device_resolved_path: /dev/mapper/mock-luks
+            luks_unlock_device:
+              keyslot: 7
+            luks_unlock_clevis_tang_stored_policy_effective:
+              url: "{{ luks_unlock_test_tang_url }}"
+
+        - name: Fail when the unavailable Tang service was accepted
+          ansible.builtin.fail:
+            msg: "Unavailable Tang service was unexpectedly accepted."
+
+      rescue:
+        - name: Confirm the bounded online check caused the safe failure
+          ansible.builtin.assert:
+            that:
+              - "'could not unlock through the live Tang server' in ansible_failed_result.msg"
+
+    - name: Create intentionally ambiguous crypttab fixture
+      ansible.builtin.copy:
+        dest: "{{ luks_unlock_test_dir }}/crypttab"
+        content: |
+          luks-first UUID=11111111-1111-1111-1111-111111111111 none luks,initramfs
+          luks-second UUID=22222222-2222-2222-2222-222222222222 none luks,initramfs
+        mode: "0600"
+
+    - name: Verify automatic crypttab selection rejects ambiguity
+      block:
+        - name: Attempt automatic selection with multiple active crypttab entries
+          ansible.builtin.include_role:
+            name: lit.ubuntu.luks_unlock
+            tasks_from: clevis_device
+          vars:
+            luks_unlock_crypttab_path: "{{ luks_unlock_test_dir }}/crypttab"
+            luks_unlock_device:
+              id: root
+              crypttab_name: auto
+              keyslot: 7
+              initramfs: true
+
+        - name: Fail when ambiguous automatic selection was accepted
+          ansible.builtin.fail:
+            msg: "crypttab_name=auto unexpectedly accepted multiple active entries."
+
+      rescue:
+        - name: Confirm ambiguity caused the safe failure
+          ansible.builtin.assert:
+            that:
+              - "'must select exactly one active entry' in ansible_failed_result.msg"

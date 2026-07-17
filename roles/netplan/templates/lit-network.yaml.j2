@@ -4,3 +4,7 @@ network:
   renderer: {{ netplan_renderer }}
   ethernets:
 {{ netplan_ethernet_config | to_nice_yaml(indent=2, sort_keys=True) | indent(4, true) }}
+{% if netplan_vlans | length > 0 %}
+  vlans:
+{{ netplan_vlans | to_nice_yaml(indent=2, sort_keys=True) | indent(4, true) }}
+{% endif %}

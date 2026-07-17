@@ -1,0 +1,21 @@
+---
+- name: Verify Tang deployment
+  hosts: tang_deploy
+  become: false
+  gather_facts: false
+  vars:
+    tang_deploy_test_dir: /tmp/lit-tang-deploy-molecule
+
+  tasks:
+    - name: Read rendered Tang socket override
+      ansible.builtin.slurp:
+        src: "{{ tang_deploy_test_dir }}/tangd.socket.d/80-lit-listen.conf"
+      register: tang_deploy_socket_override
+      changed_when: false
+
+    - name: Validate Tang socket override
+      ansible.builtin.assert:
+        that:
+          - "'[Socket]' in (tang_deploy_socket_override.content | b64decode)"
+          - "'ListenStream=' in (tang_deploy_socket_override.content | b64decode)"
+          - "'ListenStream=18080' in (tang_deploy_socket_override.content | b64decode)"

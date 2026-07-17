@@ -1,0 +1,30 @@
+---
+- name: Fetch Tang advertisement
+  ansible.builtin.uri:
+    url: "{{ tang_deploy_validate_url }}"
+    method: GET
+    status_code: 200
+    return_content: false
+  register: tang_deploy_advertisement
+  changed_when: false
+
+- name: Read public Tang signing thumbprints
+  ansible.builtin.command:
+    argv:
+      - tang-show-keys
+      - "{{ tang_deploy_listen_port | string }}"
+  register: tang_deploy_thumbprint_command
+  changed_when: false
+
+- name: Record public Tang signing thumbprints
+  ansible.builtin.set_fact:
+    tang_deploy_public_thumbprints: >-
+      {{ tang_deploy_thumbprint_command.stdout_lines | reject('equalto', '') | list }}
+  changed_when: false
+
+- name: Require at least one public Tang signing thumbprint
+  ansible.builtin.assert:
+    that:
+      - tang_deploy_advertisement.status == 200
+      - tang_deploy_public_thumbprints | length > 0
+    fail_msg: "Tang advertisement or public signing thumbprint validation failed."

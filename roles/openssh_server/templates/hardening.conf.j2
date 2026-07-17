@@ -1,0 +1,23 @@
+# Managed by Ansible (lit.ubuntu.openssh_server)
+# Active Ubuntu systemd socket listeners are reconciled by the role handlers.
+{% for port in openssh_server_ports %}
+Port {{ port }}
+{% endfor %}
+{% for address in openssh_server_listen_addresses %}
+ListenAddress {{ address }}
+{% endfor %}
+
+PermitRootLogin {{ openssh_server_permit_root_login }}
+PasswordAuthentication {{ openssh_server_password_authentication }}
+KbdInteractiveAuthentication {{ openssh_server_kbd_interactive_authentication }}
+PubkeyAuthentication {{ openssh_server_pubkey_authentication }}
+PermitEmptyPasswords {{ openssh_server_permit_empty_passwords }}
+X11Forwarding {{ openssh_server_x11_forwarding }}
+UsePAM {{ openssh_server_use_pam }}
+MaxAuthTries {{ openssh_server_max_auth_tries }}
+MaxSessions {{ openssh_server_max_sessions }}
+ClientAliveInterval {{ openssh_server_client_alive_interval }}
+ClientAliveCountMax {{ openssh_server_client_alive_count_max }}
+{% if openssh_server_allow_users | length > 0 %}
+AllowUsers {{ openssh_server_allow_users | join(' ') }}
+{% endif %}

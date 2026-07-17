@@ -1,0 +1,44 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Stage installimage post-install hook in the Rescue system
+  ansible.builtin.include_tasks: rescue_stage.yml
+  when:
+    - luks_unlock_enabled | bool
+    - luks_unlock_execution_mode == 'rescue_stage'
+
+- name: Configure early-boot networking
+  ansible.builtin.include_tasks: network.yml
+  when:
+    - luks_unlock_enabled | bool
+    - luks_unlock_execution_mode == 'installed'
+    - luks_unlock_manage_early_network | bool
+
+- name: Configure Dropbear initramfs unlock
+  ansible.builtin.include_tasks: dropbear.yml
+  when:
+    - luks_unlock_enabled | bool
+    - luks_unlock_execution_mode == 'installed'
+    - luks_unlock_method == 'dropbear'
+
+- name: Configure Clevis Tang unlock
+  ansible.builtin.include_tasks: clevis_tang.yml
+  when:
+    - luks_unlock_enabled | bool
+    - luks_unlock_execution_mode == 'installed'
+    - luks_unlock_method == 'clevis_tang'
+
+- name: Apply pending boot artifact handlers before validation
+  ansible.builtin.meta: flush_handlers
+  when:
+    - luks_unlock_enabled | bool
+    - luks_unlock_execution_mode == 'installed'
+    - not ansible_check_mode
+
+- name: Validate installed unlock configuration
+  ansible.builtin.include_tasks: validate.yml
+  when:
+    - luks_unlock_enabled | bool
+    - luks_unlock_execution_mode == 'installed'

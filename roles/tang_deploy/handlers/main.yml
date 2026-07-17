@@ -1,0 +1,14 @@
+---
+- name: Tang deploy | Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - tang_deploy_manage_service | bool
+    - not ansible_check_mode
+- name: Tang deploy | Restart socket
+  ansible.builtin.systemd_service:
+    name: "{{ tang_deploy_socket_unit }}"
+    state: restarted
+  when:
+    - tang_deploy_manage_service | bool
+    - not ansible_check_mode

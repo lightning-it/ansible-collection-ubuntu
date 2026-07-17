@@ -1,0 +1,126 @@
+---
+- name: Install OpenSSH server packages
+  ansible.builtin.apt:
+    name: "{{ openssh_server_packages }}"
+    state: present
+    update_cache: "{{ openssh_server_update_apt_cache | bool }}"
+  when: openssh_server_manage_packages | bool
+
+- name: Ensure OpenSSH drop-in directory exists
+  ansible.builtin.file:
+    path: "{{ openssh_server_config_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Inspect OpenSSH validation binary
+  ansible.builtin.stat:
+    path: "{{ openssh_server_binary }}"
+  register: _openssh_server_binary
+  changed_when: false
+  check_mode: false
+  when: openssh_server_validate_config | bool
+
+- name: Require an executable OpenSSH validation binary
+  ansible.builtin.assert:
+    that:
+      - _openssh_server_binary.stat.exists | default(false) | bool
+      - _openssh_server_binary.stat.isreg | default(false) | bool
+      - _openssh_server_binary.stat.executable | default(false) | bool
+    fail_msg: >-
+      openssh_server_validate_config=true requires an executable openssh_server_binary.
+      Install OpenSSH or disable validation explicitly.
+    quiet: true
+  when:
+    - openssh_server_validate_config | bool
+    - not ansible_check_mode
+
+- name: Inspect OpenSSH socket activation
+  ansible.builtin.systemd_service:
+    name: "{{ openssh_server_socket_name }}"
+  register: _openssh_server_socket_unit
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when:
+    - openssh_server_manage_service | bool
+    - openssh_server_manage_socket_activation | bool
+
+- name: Record whether OpenSSH socket activation is active
+  ansible.builtin.set_fact:
+    _openssh_server_socket_active: >-
+      {{
+        not (_openssh_server_socket_unit.failed | default(false) | bool)
+        and _openssh_server_socket_unit.status is defined
+        and _openssh_server_socket_unit.status.ActiveState | default('') == 'active'
+      }}
+  changed_when: false
+  when:
+    - openssh_server_manage_service | bool
+    - openssh_server_manage_socket_activation | bool
+
+- name: Render validated OpenSSH server hardening configuration
+  ansible.builtin.template:
+    src: hardening.conf.j2
+    dest: "{{ openssh_server_config_path }}"
+    owner: "{{ openssh_server_config_owner }}"
+    group: "{{ openssh_server_config_group }}"
+    mode: "{{ openssh_server_config_mode }}"
+    validate: >-
+      {{
+        (openssh_server_binary ~ ' -t -f %s')
+        if (
+          openssh_server_validate_config | bool
+          and (_openssh_server_binary.stat | default({})).executable | default(false) | bool
+        )
+        else omit
+      }}
+  notify: OpenSSH server | Restart service
+
+- name: Validate effective OpenSSH server configuration
+  ansible.builtin.command:
+    argv:
+      - "{{ openssh_server_binary }}"
+      - -t
+  changed_when: false
+  check_mode: false
+  when:
+    - openssh_server_validate_config | bool
+    - (_openssh_server_binary.stat | default({})).executable | default(false) | bool
+
+- name: Reconcile active OpenSSH socket lifecycle
+  ansible.builtin.systemd_service:
+    name: "{{ openssh_server_socket_name }}"
+    enabled: "{{ openssh_server_service_enabled | bool }}"
+    state: "{{ openssh_server_service_state }}"
+  when:
+    - openssh_server_manage_service | bool
+    - openssh_server_manage_socket_activation | bool
+    - _openssh_server_socket_active | default(false) | bool
+
+- name: Ensure OpenSSH service has the requested lifecycle state
+  ansible.builtin.systemd_service:
+    name: "{{ openssh_server_service_name }}"
+    enabled: "{{ openssh_server_service_enabled | bool }}"
+    state: "{{ openssh_server_service_state }}"
+  when: openssh_server_manage_service | bool
+
+- name: Apply pending OpenSSH handlers before listener verification
+  ansible.builtin.meta: flush_handlers
+  when:
+    - openssh_server_manage_service | bool
+    - not ansible_check_mode
+
+- name: Verify each declared OpenSSH listener locally
+  ansible.builtin.wait_for:
+    host: "{{ openssh_server_listener_verify_host }}"
+    port: "{{ item }}"
+    state: started
+    timeout: "{{ openssh_server_listener_verify_timeout }}"
+  loop: "{{ openssh_server_ports }}"
+  when:
+    - openssh_server_manage_service | bool
+    - openssh_server_verify_listeners | bool
+    - openssh_server_service_state == 'started'
+    - not ansible_check_mode

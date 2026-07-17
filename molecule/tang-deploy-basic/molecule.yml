@@ -1,0 +1,21 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: default
+platforms:
+  - name: tang_deploy
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    hosts:
+      all:
+        hosts:
+          tang_deploy:
+            ansible_connection: local
+            ansible_python_interpreter: "{{ ansible_playbook_python }}"
+verifier:
+  name: ansible

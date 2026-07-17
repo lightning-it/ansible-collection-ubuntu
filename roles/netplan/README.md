@@ -16,6 +16,7 @@ See `defaults/main.yml` for the full interface. Key variables:
 - `netplan_net_ifaces`: list of inventory network interfaces. Defaults to `net_ifaces`.
 - `netplan_dns_servers`: DNS resolver list. Defaults to `dns_servers`.
 - `netplan_ethernets`: explicit netplan `ethernets` mapping. When set, it bypasses `net_ifaces`.
+- `netplan_vlans`: explicit netplan `vlans` mapping for tagged interfaces.
 - `netplan_config_files_absent`: stale persistent netplan files to remove before applying netplan.
 - `netplan_runtime_networkd_files_absent`: runtime systemd-networkd files to remove before applying netplan.
 - `netplan_validate`: run `netplan generate` after rendering.
@@ -41,11 +42,15 @@ None.
             role: uplink
             ipv4: 10.34.71.99/24
             gw4: 10.34.71.1
-          - iface: ens34
-            role: mgmt
-            ipv4: 10.10.30.99/24
         dns_servers:
           - 1.1.1.1
+        netplan_vlans:
+          ens33.4001:
+            id: 4001
+            link: ens33
+            addresses:
+              - 10.10.30.99/24
+            mtu: 1400
 ```
 
 ## License
