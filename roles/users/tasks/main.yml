@@ -45,6 +45,7 @@
         | list
       }}
   when: users_manage_groups | bool and users_accounts_effective | length > 0
+  changed_when: false
 
 - name: Validate declared SSH key lists
   ansible.builtin.assert:
@@ -115,6 +116,7 @@
           | list
         )
       }}
+  changed_when: false
 
 - name: Manage authorized keys for present users
   ansible.posix.authorized_key:
@@ -153,6 +155,7 @@
           | list
         )
       }}
+  changed_when: false
 
 - name: Ensure passwordless sudo for configured users
   ansible.builtin.copy:
@@ -180,6 +183,7 @@
         | selectattr('passwordless_sudo', 'equalto', false)
         | list
       }}
+  changed_when: false
 
 - name: Remove explicitly disabled passwordless sudo files
   ansible.builtin.file:
