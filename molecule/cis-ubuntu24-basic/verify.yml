@@ -31,6 +31,45 @@
                 in (ansible_failed_result.msg | default(''))
           tags: level1-server
 
+    - name: Verify malformed exception variables fail closed
+      tags: level1-server
+      block:
+        - name: Exercise validation with a missing exception variable name
+          ansible.builtin.include_role:
+            name: lit.ubuntu.cis_ubuntu24
+            tasks_from: assert.yml
+            apply:
+              tags: level1-server
+          # noqa var-naming[no-role-prefix] -- exercise upstream role public inputs
+          vars:
+            cis_ubuntu24_profile_tag: level1-server
+            cis_ubuntu24_execution_mode: remediate
+            ubtu24cis_level_1: true
+            ubtu24cis_level_2: false
+            cis_ubuntu24_exceptions:
+              - control_ids:
+                  - TEST.2
+                scope: molecule
+                reason: Exercise fail-closed exception variable validation.
+                compensating_control: Molecule checks the wrapper failure.
+                variables:
+                  - value: false
+                audit_visibility: intentional_exception
+          tags: level1-server
+
+        - name: Fail when malformed exception variables pass validation
+          ansible.builtin.fail:
+            msg: Malformed exception variables unexpectedly passed validation.
+          tags: level1-server
+      rescue:
+        - name: Verify malformed variables use the wrapper failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'Each exception variable entry requires'
+                in (ansible_failed_result | string)
+          tags: level1-server
+
     - name: Read the upstream invocation evidence
       ansible.builtin.slurp:
         src: /tmp/lit-ubuntu-cis-molecule-result.json

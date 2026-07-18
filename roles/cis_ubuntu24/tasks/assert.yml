@@ -115,36 +115,67 @@
 - name: Validate the Ubuntu 24 CIS exception registry schema
   ansible.builtin.assert:
     that:
-      - item.control_ids is sequence
-      - item.control_ids is not string
-      - item.control_ids | length > 0
-      - item.scope is string
-      - item.scope | length > 0
-      - item.reason is string
-      - item.reason | length > 0
-      - item.compensating_control is string
-      - item.compensating_control | length > 0
-      - item.variables is sequence
-      - item.variables is not string
-      - item.variables | length > 0
+      - item is mapping
+      - item.control_ids | default([]) is sequence
+      - item.control_ids | default([]) is not string
+      - item.control_ids | default([]) | length > 0
+      - item.scope | default('') is string
+      - item.scope | default('') | length > 0
+      - item.reason | default('') is string
+      - item.reason | default('') | length > 0
+      - item.compensating_control | default('') is string
+      - item.compensating_control | default('') | length > 0
+      - item.variables | default([]) is sequence
+      - item.variables | default([]) is not string
+      - item.variables | default([]) | length > 0
       - >-
-        item.audit_visibility
+        item.audit_visibility | default('')
         in ['intentional_exception', 'manual_evidence', 'not_applicable']
   loop: "{{ cis_ubuntu24_exceptions }}"
   loop_control:
-    label: "{{ item.control_ids | join(',') }}"
+    label: >-
+      {{
+        item.control_ids
+        | default(['<missing control_ids>'])
+        | join(',')
+      }}
 
-- name: Validate the Ubuntu 24 CIS exception values against effective inventory
+- name: Validate Ubuntu 24 CIS exception variables against effective inventory
   ansible.builtin.assert:
     that:
-      - lookup('ansible.builtin.vars', item.1.name) == item.1.value
+      - item.1 is mapping
+      - item.1.name | default('') is string
+      - item.1.name | default('') | length > 0
+      - item.1.value is defined
+      - >-
+        lookup(
+          'ansible.builtin.vars',
+          item.1.name | default(''),
+          default=cis_ubuntu24_missing_exception_value
+        )
+        != cis_ubuntu24_missing_exception_value
+      - >-
+        lookup(
+          'ansible.builtin.vars',
+          item.1.name | default(''),
+          default=cis_ubuntu24_missing_exception_value
+        )
+        ==
+        (
+          item.1.value
+          | default(cis_ubuntu24_missing_exception_value)
+        )
     fail_msg: >-
-      Exception registry drift for {{ item.1.name }}: its documented value does
-      not match the effective inventory value.
+      Each exception variable entry requires a non-empty name and a value, and
+      its documented value must match effective inventory. Invalid entry:
+      {{ item.1.name | default('<missing name>') }}.
+  vars:
+    cis_ubuntu24_missing_exception_value: >-
+      __lit_ubuntu_cis_missing_exception_variable__
   loop: >-
     {{
       cis_ubuntu24_exceptions
       | subelements('variables', skip_missing=False)
     }}
   loop_control:
-    label: "{{ item.1.name }}"
+    label: "{{ item.1.name | default('<missing name>') }}"
