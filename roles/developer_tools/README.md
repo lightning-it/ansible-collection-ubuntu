@@ -22,6 +22,16 @@ developer_tools_pip_executable: pip3
 developer_tools_pip_packages_present: []
 developer_tools_pip_extra_args: ""
 
+developer_tools_python_venv_enabled: false
+developer_tools_python_venv_path: /opt/lit/developer-tools
+developer_tools_python_venv_python: python3
+developer_tools_python_venv_packages:
+  - ansible-core==2.18.18
+developer_tools_python_venv_commands:
+  - ansible
+  - ansible-playbook
+developer_tools_python_venv_link_dir: /usr/local/bin
+
 developer_tools_nodejs_enabled: false
 developer_tools_nodejs_package_source: os
 developer_tools_nodejs_packages_present:
@@ -33,6 +43,9 @@ developer_tools_npx_executable: npx
 developer_tools_nodejs_validate: true
 developer_tools_nodejs_expected_users:
   - ops-admin
+developer_tools_npm_packages_present:
+  - name: example-cli
+    version: 1.2.3
 
 developer_tools_markdownlint_cli2_enabled: false
 developer_tools_markdownlint_cli2_install_mode: global
@@ -66,6 +79,25 @@ developer_tools_terminal_config_manage_screen: true
 developer_tools_terminal_config_tmux_path: .tmux.conf
 developer_tools_terminal_config_screen_path: .screenrc
 
+developer_tools_workspace_enabled: false
+developer_tools_workspace_users:
+  - ops-admin
+developer_tools_workspace_directories:
+  - sources
+  - worktrees
+  - artifacts
+  - .cache/lit
+
+developer_tools_release_binary_cache_dir: /var/cache/lit/developer-tools
+developer_tools_release_binaries:
+  - name: example
+    version: 1.2.3
+    url: https://downloads.example.com/example-1.2.3-linux-amd64
+    filename: example-1.2.3-linux-amd64
+    checksum: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    dest: /usr/local/bin/example
+    archive: false
+
 developer_tools_argocd_cli_enabled: false
 developer_tools_argocd_cli_version: v3.3.3
 developer_tools_argocd_cli_url: "https://github.com/argoproj/argo-cd/releases/download/{{ developer_tools_argocd_cli_version }}/argocd-linux-amd64"
@@ -93,11 +125,13 @@ developer_tools_packer_archive_url: "https://releases.hashicorp.com/packer/{{ de
 developer_tools_packer_archive_path: "/var/tmp/packer_{{ developer_tools_packer_version }}_linux_{{ developer_tools_packer_arch }}.zip"
 developer_tools_packer_extract_dir: "/var/tmp/packer-{{ developer_tools_packer_version }}"
 developer_tools_packer_dest: /usr/local/bin/packer
+developer_tools_packer_checksum: ""  # Required when Packer is enabled.
 
 developer_tools_oc_cli_enabled: false
 developer_tools_oc_cli_version: 4.18.24
-developer_tools_oc_cli_archive_url: "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ developer_tools_oc_cli_version }}/openshift-client-linux-amd64-linux-{{ developer_tools_oc_cli_version }}.tar.gz"
-developer_tools_oc_cli_archive_path: "/var/tmp/openshift-client-linux-amd64-linux-{{ developer_tools_oc_cli_version }}.tar.gz"
+developer_tools_oc_cli_archive_url: "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ developer_tools_oc_cli_version }}/openshift-client-linux-{{ developer_tools_oc_cli_version }}.tar.gz"
+developer_tools_oc_cli_checksum: ""  # Required when the OpenShift CLI is enabled.
+developer_tools_oc_cli_archive_path: "/var/tmp/openshift-client-linux-{{ developer_tools_oc_cli_version }}.tar.gz"
 developer_tools_oc_cli_extract_dir: "/var/tmp/openshift-client-{{ developer_tools_oc_cli_version }}"
 developer_tools_oc_cli_dest: /usr/local/bin/oc
 
@@ -144,6 +178,14 @@ developer_tools_ssh_private_keys_vault_secret_id: ""
 - When `developer_tools_nodejs_enabled` is true, the role installs Node.js/npm/npx from the configured OS package
   source and validates `node --version`, `npm --version`, and `npx --version`. The default package source is `os`;
   external repositories such as NodeSource must be configured separately and explicitly before overriding package names.
+- `developer_tools_npm_packages_present` installs only explicitly versioned global npm packages. Authentication remains
+  user-scoped and must not be supplied through this list.
+- `developer_tools_python_venv_enabled` creates one isolated, pinned Python toolchain and exposes only the listed
+  command entry points through stable symlinks. This avoids `--break-system-packages` on Ubuntu 24.
+- `developer_tools_release_binaries` installs data-driven standalone binaries or archives only after an exact SHA-256
+  checksum succeeds. Keep environment-specific versions, URLs, and checksums in inventory.
+- `developer_tools_workspace_enabled` creates private source, worktree, artifact, and cache directories for existing
+  users without cloning, deleting, or overwriting repositories.
 - When `developer_tools_markdownlint_cli2_enabled` is true, the role installs `markdownlint-cli2` globally with npm
   by default and validates `npx markdownlint-cli2 --version`. Set `developer_tools_markdownlint_cli2_install_mode`
   to `npx` to avoid a global npm package and validate package execution through `npx --yes` instead.
@@ -151,7 +193,7 @@ developer_tools_ssh_private_keys_vault_secret_id: ""
 - When `developer_tools_actionlint_enabled` is true, the role downloads and installs the pinned `actionlint`
   standalone binary after verifying the upstream release checksum file.
 - When `developer_tools_packer_enabled` is true, the role downloads and installs the pinned HashiCorp Packer binary
-  from the official HashiCorp release assets.
+  from the official HashiCorp release assets. An exact `developer_tools_packer_checksum` is mandatory.
 - When `developer_tools_ssh_agent_enabled` is true, the role configures a persistent `systemd --user` `ssh-agent`
   service, exports `SSH_AUTH_SOCK` in the selected shell init files, and adds an `~/.ssh/config` block that can
   auto-add the configured identity files to the agent on first SSH use.

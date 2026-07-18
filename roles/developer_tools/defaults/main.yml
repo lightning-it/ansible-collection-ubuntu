@@ -6,6 +6,16 @@ developer_tools_pip_executable: pip3
 developer_tools_pip_packages_present: []
 developer_tools_pip_extra_args: ""
 
+# Optional isolated Python toolchain. This keeps operator tooling out of the
+# distribution Python environment while exposing selected entry points through
+# stable system-wide symlinks.
+developer_tools_python_venv_enabled: false
+developer_tools_python_venv_path: /opt/lit/developer-tools
+developer_tools_python_venv_python: python3
+developer_tools_python_venv_packages: []
+developer_tools_python_venv_commands: []
+developer_tools_python_venv_link_dir: /usr/local/bin
+
 developer_tools_nodejs_enabled: false
 developer_tools_nodejs_package_source: os
 developer_tools_nodejs_packages_present:
@@ -16,6 +26,7 @@ developer_tools_npm_executable: npm
 developer_tools_npx_executable: npx
 developer_tools_nodejs_validate: true
 developer_tools_nodejs_expected_users: []
+developer_tools_npm_packages_present: []
 
 developer_tools_markdownlint_cli2_enabled: false
 developer_tools_markdownlint_cli2_install_mode: global
@@ -67,6 +78,21 @@ developer_tools_terminal_config_screen_content: |
   term screen-256color
   caption always "%{= kw}%-w%{= wk}%n %t%{-}%+w"
   hardstatus alwayslastline "%H %l %Y-%m-%d %c"
+
+developer_tools_workspace_enabled: false
+developer_tools_workspace_users: []
+developer_tools_workspace_directories:
+  - sources
+  - worktrees
+  - artifacts
+  - .cache/lit
+
+# Supply-chain verified standalone binaries and archives. Each item requires
+# name, version, url, filename, checksum, and dest. Archive items additionally
+# require binary_path, which is resolved below a version-specific extraction
+# directory. Environment inventory owns concrete versions and URLs.
+developer_tools_release_binary_cache_dir: /var/cache/lit/developer-tools
+developer_tools_release_binaries: []
 
 developer_tools_argocd_cli_enabled: false
 developer_tools_argocd_cli_version: v3.3.3
@@ -121,6 +147,7 @@ developer_tools_packer_archive_url: >-
 developer_tools_packer_archive_path: >-
   /var/tmp/packer_{{ developer_tools_packer_version }}_linux_{{
   developer_tools_packer_arch }}.zip
+developer_tools_packer_checksum: ""
 developer_tools_packer_extract_dir: "/var/tmp/packer-{{ developer_tools_packer_version }}"
 developer_tools_packer_dest: /usr/local/bin/packer
 developer_tools_packer_unzip_package_name: unzip
@@ -130,10 +157,11 @@ developer_tools_oc_cli_version: 4.18.24
 developer_tools_oc_cli_archive_url: >-
   https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{
   developer_tools_oc_cli_version
-  }}/openshift-client-linux-amd64-{{
+  }}/openshift-client-linux-{{
   developer_tools_oc_cli_version }}.tar.gz
+developer_tools_oc_cli_checksum: ""
 developer_tools_oc_cli_archive_path: >-
-  /var/tmp/openshift-client-linux-amd64-{{
+  /var/tmp/openshift-client-linux-{{
   developer_tools_oc_cli_version }}.tar.gz
 developer_tools_oc_cli_extract_dir: "/var/tmp/openshift-client-{{ developer_tools_oc_cli_version }}"
 developer_tools_oc_cli_dest: /usr/local/bin/oc

@@ -1,0 +1,27 @@
+---
+- name: Gather passwd database for workspace users
+  ansible.builtin.getent:
+    database: passwd
+    split: ':'
+  changed_when: false
+
+- name: Validate workspace users
+  ansible.builtin.assert:
+    that:
+      - item | string | trim | length > 0
+      - (item | string) in ansible_facts.getent_passwd
+    fail_msg: "Configured workspace user '{{ item | default('') }}' does not exist."
+    quiet: true
+  loop: "{{ developer_tools_workspace_users }}"
+  changed_when: false
+
+- name: Create developer workspace directories
+  ansible.builtin.file:
+    path: "{{ ansible_facts.getent_passwd[item.0][4] }}/{{ item.1 }}"
+    state: directory
+    owner: "{{ item.0 }}"
+    group: "{{ item.0 }}"
+    mode: "0750"
+  loop: "{{ developer_tools_workspace_users | product(developer_tools_workspace_directories) | list }}"
+  loop_control:
+    label: "{{ item.0 }}:{{ item.1 }}"

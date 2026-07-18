@@ -3,7 +3,7 @@
 # Each item supports:
 #   name (required), state (present|absent), uid, gid, groups (list),
 #   shell, home, create_home, update_password, password_lock (bool), remove (bool),
-#   ssh_keys (list of authorized keys for ~/.ssh/authorized_keys).
+#   groups_append (bool), ssh_keys (list), and ssh_keys_exclusive (bool).
 users_accounts: []
 
 # Extra user definitions appended to `users_accounts`. Use this from

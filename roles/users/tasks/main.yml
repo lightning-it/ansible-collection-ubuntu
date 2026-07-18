@@ -62,7 +62,12 @@
     uid: "{{ item.uid | default(omit) }}"
     group: "{{ item.gid | default(omit) }}"
     groups: "{{ item.groups | default(omit) }}"
-    append: "{{ (item.groups | default([])) | length > 0 }}"
+    append: >-
+      {{
+        item.groups_append
+        | default((item.groups | default([]) | length) > 0)
+        | bool
+      }}
     shell: "{{ item.shell | default(omit) }}"
     home: "{{ item.home | default(omit) }}"
     create_home: "{{ item.create_home | default(omit) }}"
@@ -76,7 +81,7 @@
 
 - name: Build list of users with SSH keys in present state
   ansible.builtin.set_fact:
-    ubuntu_users_with_ssh_keys: >-
+    users_with_ssh_keys: >-
       {{
         (
           users_accounts_effective
@@ -100,20 +105,21 @@
 
 - name: Manage authorized keys for present users
   ansible.posix.authorized_key:
-    user: "{{ item.0.name }}"
+    user: "{{ item.name }}"
     state: present
-    key: "{{ item.1 }}"
+    key: "{{ item.ssh_keys | join('\n') }}"
+    exclusive: "{{ item.ssh_keys_exclusive | default(false) | bool }}"
     manage_dir: true
-  loop: "{{ ubuntu_users_with_ssh_keys | default([]) | subelements('ssh_keys') }}"
+  loop: "{{ users_with_ssh_keys | default([]) }}"
   when:
-    - ubuntu_users_with_ssh_keys is defined
-    - ubuntu_users_with_ssh_keys | length > 0
+    - users_with_ssh_keys is defined
+    - users_with_ssh_keys | length > 0
   loop_control:
-    label: "{{ item.0.name }}"
+    label: "{{ item.name }}"
 
 - name: Build list of users with passwordless sudo in present state
   ansible.builtin.set_fact:
-    ubuntu_users_with_passwordless_sudo: >-
+    users_with_passwordless_sudo: >-
       {{
         (
           users_accounts_effective
@@ -143,16 +149,16 @@
     group: root
     mode: '0440'
     validate: visudo -cf %s
-  loop: "{{ ubuntu_users_with_passwordless_sudo | default([]) }}"
+  loop: "{{ users_with_passwordless_sudo | default([]) }}"
   when:
-    - ubuntu_users_with_passwordless_sudo is defined
-    - ubuntu_users_with_passwordless_sudo | length > 0
+    - users_with_passwordless_sudo is defined
+    - users_with_passwordless_sudo | length > 0
   loop_control:
     label: "{{ item.name }}"
 
 - name: Build list of users with passwordless sudo explicitly disabled
   ansible.builtin.set_fact:
-    ubuntu_users_without_passwordless_sudo: >-
+    users_without_passwordless_sudo: >-
       {{
         users_accounts_effective
         | select('mapping')
@@ -166,9 +172,9 @@
   ansible.builtin.file:
     path: "/etc/sudoers.d/{{ item.sudoers_name }}"
     state: absent
-  loop: "{{ ubuntu_users_without_passwordless_sudo | default([]) }}"
+  loop: "{{ users_without_passwordless_sudo | default([]) }}"
   when:
-    - ubuntu_users_without_passwordless_sudo is defined
-    - ubuntu_users_without_passwordless_sudo | length > 0
+    - users_without_passwordless_sudo is defined
+    - users_without_passwordless_sudo | length > 0
   loop_control:
     label: "{{ item.name }}"

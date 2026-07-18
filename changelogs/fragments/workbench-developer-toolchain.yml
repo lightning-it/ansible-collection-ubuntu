@@ -1,0 +1,16 @@
+---
+minor_changes:
+  - >-
+    developer_tools - Add isolated pinned Python tooling, pinned global npm
+    packages, private workspace directories, and SHA-256-verified standalone
+    release binaries for reproducible development hosts.
+  - >-
+    podman - Exercise the role in its basic Molecule scenario with isolated,
+    non-mutating inputs instead of a syntax-only marker stub.
+  - >-
+    users - Add opt-in exact supplementary-group and exclusive authorized-key
+    reconciliation for security-sensitive developer accounts.
+bugfixes:
+  - >-
+    developer_tools - Require an exact Packer archive checksum and prevent the
+    OpenShift client archive from reporting changes on every run.

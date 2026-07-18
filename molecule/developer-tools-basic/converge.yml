@@ -1,22 +1,30 @@
 ---
-- name: Converge developer tools syntax coverage
+- name: Converge developer tools role execution
   hosts: localhost
   connection: local
   gather_facts: false
   vars:
-    developer_tools_molecule_execute_role: false
-    developer_tools_nodejs_enabled: true
-    developer_tools_markdownlint_cli2_enabled: true
-    developer_tools_nodejs_expected_users:
-      - molecule-user
+    developer_tools_molecule_execute_role: true
+    developer_tools_python_venv_enabled: false
+    developer_tools_python_venv_packages:
+      - ansible-core==2.18.18
+    developer_tools_python_venv_commands:
+      - ansible
+    developer_tools_nodejs_enabled: false
+    developer_tools_workspace_enabled: true
+    developer_tools_workspace_users:
+      - root
+    developer_tools_workspace_directories:
+      - .cache/lit-molecule-developer-tools
+    developer_tools_release_binaries: []
   tasks:
-    - name: Import lit.ubuntu.developer_tools for syntax coverage
+    - name: Execute lit.ubuntu.developer_tools with non-mutating inputs
       ansible.builtin.import_role:
         name: lit.ubuntu.developer_tools
       when: developer_tools_molecule_execute_role | bool
 
-    - name: Record lit.ubuntu.developer_tools Molecule coverage marker
+    - name: Record lit.ubuntu.developer_tools Molecule execution marker
       ansible.builtin.copy:
         dest: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/developer_tools-syntax-coverage"
-        content: "syntax_stub\n"
+        content: "role_executed\n"
         mode: "0644"

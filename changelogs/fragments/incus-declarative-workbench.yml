@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - >-
+    incus - Add fail-closed JSON discovery, optional preseed initialization,
+    and declarative project and profile reconciliation for Incus hosts.

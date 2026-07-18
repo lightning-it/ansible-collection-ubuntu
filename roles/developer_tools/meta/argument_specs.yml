@@ -18,6 +18,26 @@ argument_specs:
       developer_tools_pip_extra_args:
         type: str
         default: ""
+      developer_tools_python_venv_enabled:
+        type: bool
+        default: false
+      developer_tools_python_venv_path:
+        type: path
+        default: /opt/lit/developer-tools
+      developer_tools_python_venv_python:
+        type: str
+        default: python3
+      developer_tools_python_venv_packages:
+        type: list
+        elements: str
+        default: []
+      developer_tools_python_venv_commands:
+        type: list
+        elements: str
+        default: []
+      developer_tools_python_venv_link_dir:
+        type: path
+        default: /usr/local/bin
       developer_tools_nodejs_enabled:
         type: bool
         default: false
@@ -47,6 +67,10 @@ argument_specs:
       developer_tools_nodejs_expected_users:
         type: list
         elements: str
+        default: []
+      developer_tools_npm_packages_present:
+        type: list
+        elements: dict
         default: []
       developer_tools_markdownlint_cli2_enabled:
         type: bool
@@ -126,6 +150,28 @@ argument_specs:
         type: str
       developer_tools_terminal_config_screen_content:
         type: str
+      developer_tools_workspace_enabled:
+        type: bool
+        default: false
+      developer_tools_workspace_users:
+        type: list
+        elements: str
+        default: []
+      developer_tools_workspace_directories:
+        type: list
+        elements: str
+        default:
+          - sources
+          - worktrees
+          - artifacts
+          - .cache/lit
+      developer_tools_release_binary_cache_dir:
+        type: path
+        default: /var/cache/lit/developer-tools
+      developer_tools_release_binaries:
+        type: list
+        elements: dict
+        default: []
       developer_tools_argocd_cli_enabled:
         type: bool
         default: false
@@ -197,6 +243,33 @@ argument_specs:
       developer_tools_actionlint_dest:
         type: str
         default: /usr/local/bin/actionlint
+      developer_tools_packer_enabled:
+        type: bool
+        default: false
+      developer_tools_packer_version:
+        type: str
+        default: 1.15.4
+      developer_tools_packer_arch:
+        type: str
+        default: >-
+          {{ 'arm64'
+             if (ansible_architecture | default('x86_64')) in ['aarch64', 'arm64']
+             else 'amd64' }}
+      developer_tools_packer_archive_url:
+        type: str
+      developer_tools_packer_archive_path:
+        type: path
+      developer_tools_packer_checksum:
+        type: str
+        default: ""
+      developer_tools_packer_extract_dir:
+        type: path
+      developer_tools_packer_dest:
+        type: path
+        default: /usr/local/bin/packer
+      developer_tools_packer_unzip_package_name:
+        type: str
+        default: unzip
       developer_tools_oc_cli_enabled:
         type: bool
         default: false
@@ -208,12 +281,15 @@ argument_specs:
         default: >-
           https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{
           developer_tools_oc_cli_version
-          }}/openshift-client-linux-amd64-{{
+          }}/openshift-client-linux-{{
           developer_tools_oc_cli_version }}.tar.gz
+      developer_tools_oc_cli_checksum:
+        type: str
+        default: ""
       developer_tools_oc_cli_archive_path:
         type: str
         default: >-
-          /var/tmp/openshift-client-linux-amd64-{{
+          /var/tmp/openshift-client-linux-{{
           developer_tools_oc_cli_version }}.tar.gz
       developer_tools_oc_cli_extract_dir:
         type: str

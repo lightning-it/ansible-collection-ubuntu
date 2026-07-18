@@ -1,22 +1,23 @@
 ---
-- name: Converge podman syntax coverage
+- name: Converge podman role execution
   hosts: localhost
   connection: local
   gather_facts: false
   vars:
-    podman_molecule_execute_role: false
+    podman_molecule_execute_role: true
+    podman_packages: []
+    podman_registries_conf_dir: >-
+      {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/containers
+    podman_system_socket_enabled: false
+    podman_user_socket_enabled: false
   tasks:
-    - name: Import lit.ubuntu.podman for syntax coverage
+    - name: Execute lit.ubuntu.podman with non-mutating inputs
       ansible.builtin.import_role:
         name: lit.ubuntu.podman
-      vars:
-        podman_user_socket_enabled: true
-        podman_user_socket_users:
-          - root
       when: podman_molecule_execute_role | bool
 
-    - name: Record lit.ubuntu.podman Molecule coverage marker
+    - name: Record lit.ubuntu.podman Molecule execution marker
       ansible.builtin.copy:
         dest: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/podman-syntax-coverage"
-        content: "syntax_stub\n"
+        content: "role_executed\n"
         mode: "0644"

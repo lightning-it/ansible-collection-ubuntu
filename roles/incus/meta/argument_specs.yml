@@ -1,0 +1,74 @@
+---
+argument_specs:
+  main:
+    short_description: Install and configure Incus on Ubuntu
+    options:
+      incus_enabled:
+        type: bool
+        default: true
+      incus_packages:
+        type: list
+        elements: str
+        default:
+          - bridge-utils
+          - incus
+          - incus-client
+          - qemu-system-x86
+          - qemu-utils
+          - uidmap
+      incus_update_apt_cache:
+        type: bool
+        default: true
+      incus_initialize:
+        type: bool
+        default: true
+      incus_preseed:
+        type: dict
+        default: {}
+      incus_projects:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+          config:
+            type: dict
+            default: {}
+      incus_profiles:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+          project:
+            type: str
+            required: true
+          description:
+            type: str
+            default: ""
+          config:
+            type: dict
+            default: {}
+          devices:
+            type: dict
+            default: {}
+      incus_services:
+        type: list
+        elements: str
+        default:
+          - incus.socket
+          - incus-startup.service
+      incus_users:
+        type: list
+        elements: str
+        default: []
+      incus_user_groups:
+        type: list
+        elements: str
+        default:
+          - incus-admin
+          - kvm

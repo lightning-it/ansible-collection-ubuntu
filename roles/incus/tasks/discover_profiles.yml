@@ -1,0 +1,33 @@
+---
+- name: Read Incus profiles in project
+  ansible.builtin.command:
+    argv:
+      - incus
+      - profile
+      - list
+      - --project
+      - "{{ incus_profile_project_name }}"
+      - --format
+      - json
+  register: incus_profile_list
+  changed_when: false
+  failed_when: incus_profile_list.rc != 0
+  check_mode: false
+  when: incus_profile_project_name in (incus_projects_current | map(attribute='name') | list)
+
+- name: Decode Incus profile discovery
+  ansible.builtin.set_fact:
+    incus_profiles_current_by_project: >-
+      {{
+        incus_profiles_current_by_project
+        | combine({incus_profile_project_name: incus_profile_list.stdout | from_json})
+      }}
+  changed_when: false
+  when: incus_profile_project_name in (incus_projects_current | map(attribute='name') | list)
+
+- name: Record empty profile discovery for a new Incus project
+  ansible.builtin.set_fact:
+    incus_profiles_current_by_project: >-
+      {{ incus_profiles_current_by_project | combine({incus_profile_project_name: []}) }}
+  changed_when: false
+  when: incus_profile_project_name not in (incus_projects_current | map(attribute='name') | list)

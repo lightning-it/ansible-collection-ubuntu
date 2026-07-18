@@ -1,0 +1,45 @@
+---
+- name: Resolve current Incus project state
+  ansible.builtin.set_fact:
+    incus_project_current: >-
+      {{
+        incus_projects_current
+        | selectattr('name', 'equalto', incus_project.name)
+        | list
+        | first
+        | default({}, true)
+      }}
+  changed_when: false
+
+- name: Create Incus project
+  ansible.builtin.command:
+    argv:
+      - incus
+      - project
+      - create
+      - "{{ incus_project.name }}"
+  changed_when: true
+  when: incus_project_current | length == 0
+
+- name: Set changed Incus project configuration
+  ansible.builtin.command:
+    argv:
+      - incus
+      - project
+      - set
+      - "{{ incus_project.name }}"
+      - "{{ incus_project_config_entry.key }}={{ incus_project_config_entry.value }}"
+  loop: "{{ incus_project.config | default({}) | dict2items }}"
+  loop_control:
+    label: "{{ incus_project_config_entry.key }}"
+    loop_var: incus_project_config_entry
+  changed_when: true
+  when:
+    - >-
+      incus_project_current | length == 0
+      or incus_project_current.config | default({})
+      | dict2items
+      | selectattr('key', 'equalto', incus_project_config_entry.key)
+      | map(attribute='value')
+      | first
+      | default(none) != incus_project_config_entry.value
