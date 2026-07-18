@@ -1,0 +1,10 @@
+---
+- name: Preserve traversal on the audit log directory when recursive remediation is disabled
+  when:
+    - cis_ubuntu24_execution_mode == 'remediate'
+    - not (ubtu24cis_rule_6_2_4_1 | default(true) | bool)
+    - ubtu24cis_rule_6_2_4_4 | default(true) | bool
+  ansible.builtin.file:
+    path: "{{ cis_ubuntu24_audit_log_directory }}"
+    state: directory
+    mode: '0750'

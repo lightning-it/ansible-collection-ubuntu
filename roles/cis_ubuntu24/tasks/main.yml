@@ -1,4 +1,39 @@
 ---
+- name: Validate Ubuntu 24 CIS inputs
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Normalize the upstream AIDE scheduler integration
+  ansible.builtin.import_tasks: aide_scheduler.yml
+  tags:
+    - level1-server
+    - level1-workstation
+    - level2-server
+    - level2-workstation
+
+- name: Preserve a traversable upstream audit log directory
+  ansible.builtin.import_tasks: audit_log_directory.yml
+  tags:
+    - level1-server
+    - level1-workstation
+    - level2-server
+    - level2-workstation
+
+- name: Persist the network kernel controls audited independently
+  ansible.builtin.import_tasks: network_sysctl_persistence.yml
+  tags:
+    - level1-server
+    - level1-workstation
+    - level2-server
+    - level2-workstation
+
 - name: Apply ansible-lockdown Ubuntu 24 CIS role
+  # Keep this static import untagged so the upstream tasks retain their native
+  # profile and audit tag filtering. Tags here would propagate to every
+  # imported task and make non-matching upstream controls eligible to run.
   ansible.builtin.import_role:
-    name: ansible-lockdown.ubuntu24_cis
+    name: ansible-lockdown.ubuntu24_cis  # noqa syntax-check[specific] -- EE-installed dependency
+  # noqa var-naming[no-role-prefix] -- these are the upstream role's public inputs
+  vars:
+    audit_file_git: "{{ cis_ubuntu24_audit_dependency.repository }}"
+    audit_git_version: "{{ cis_ubuntu24_audit_dependency.commit }}"

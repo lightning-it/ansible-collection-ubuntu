@@ -1,0 +1,59 @@
+---
+- name: Reconcile the independently audited network kernel controls
+  when: cis_ubuntu24_execution_mode == 'remediate'
+  vars:
+    cis_ubuntu24_network_controls_apply: >-
+      {{
+        (ubtu24cis_rule_3_3_5 | default(false) | bool)
+        or
+        (
+          (ubtu24cis_rule_3_3_8 | default(false) | bool)
+          and not (ubtu24cis_is_router | default(false) | bool)
+        )
+        or (ubtu24cis_rule_3_3_9 | default(false) | bool)
+        or
+        (
+          (ubtu24cis_rule_3_3_11 | default(false) | bool)
+          and (ubtu24cis_ipv6_required | default(false) | bool)
+        )
+      }}
+  block:
+    - name: Persist the independently audited network kernel controls
+      when: cis_ubuntu24_network_controls_apply | bool
+      ansible.builtin.copy:
+        dest: "{{ cis_ubuntu24_network_sysctl_file }}"
+        content: |
+          # Managed by lit.ubuntu.cis_ubuntu24.
+          {% if ubtu24cis_rule_3_3_5 | default(false) | bool %}
+          net.ipv4.conf.all.accept_redirects = 0
+          net.ipv4.conf.default.accept_redirects = 0
+          {% if ubtu24cis_ipv6_required | default(false) | bool %}
+          net.ipv6.conf.all.accept_redirects = 0
+          net.ipv6.conf.default.accept_redirects = 0
+          {% endif %}
+          {% endif %}
+          {% if ubtu24cis_rule_3_3_8 | default(false) | bool and not (ubtu24cis_is_router | default(false) | bool) %}
+          net.ipv4.conf.all.accept_source_route = 0
+          net.ipv4.conf.default.accept_source_route = 0
+          {% if ubtu24cis_ipv6_required | default(false) | bool %}
+          net.ipv6.conf.all.accept_source_route = 0
+          net.ipv6.conf.default.accept_source_route = 0
+          {% endif %}
+          {% endif %}
+          {% if ubtu24cis_rule_3_3_9 | default(false) | bool %}
+          net.ipv4.conf.all.log_martians = 1
+          net.ipv4.conf.default.log_martians = 1
+          {% endif %}
+          {% if ubtu24cis_rule_3_3_11 | default(false) | bool and ubtu24cis_ipv6_required | default(false) | bool %}
+          net.ipv6.conf.all.accept_ra = 0
+          net.ipv6.conf.default.accept_ra = 0
+          {% endif %}
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Remove stale independently audited network kernel controls
+      when: not (cis_ubuntu24_network_controls_apply | bool)
+      ansible.builtin.file:
+        path: "{{ cis_ubuntu24_network_sysctl_file }}"
+        state: absent
