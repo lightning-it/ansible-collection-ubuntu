@@ -28,6 +28,18 @@
             == 'https://github.com/ansible-lockdown/UBUNTU24-CIS-Audit.git'
       tags: level1-server
 
+    - name: Inspect the non-matching upstream profile evidence
+      ansible.builtin.stat:
+        path: /tmp/lit-ubuntu-cis-molecule-excluded
+      register: cis_ubuntu24_excluded_profile_evidence
+      tags: level1-server
+
+    - name: Verify the static import preserves upstream profile filtering
+      ansible.builtin.assert:
+        that:
+          - not cis_ubuntu24_excluded_profile_evidence.stat.exists
+      tags: level1-server
+
     - name: Inspect the AIDE cron service mask
       ansible.builtin.stat:
         path: /etc/systemd/system/dailyaidecheck.service
@@ -96,6 +108,36 @@
           - >-
             'net.ipv6.'
             not in (cis_ubuntu24_limited_network_sysctls.content | b64decode)
+      tags: level1-server
+
+    - name: Seed stale persistent network kernel controls
+      ansible.builtin.copy:
+        content: stale wrapper-owned controls
+        dest: /tmp/lit-ubuntu-cis-network-disabled.conf
+        mode: "0644"
+      tags: level1-server
+
+    - name: Reconcile persistent controls with undefined upstream inputs
+      ansible.builtin.include_role:
+        name: lit.ubuntu.cis_ubuntu24
+        tasks_from: network_sysctl_persistence.yml
+        apply:
+          tags: level1-server
+      vars:
+        cis_ubuntu24_execution_mode: remediate
+        cis_ubuntu24_network_sysctl_file: /tmp/lit-ubuntu-cis-network-disabled.conf
+      tags: level1-server
+
+    - name: Inspect the disabled persistent network kernel controls
+      ansible.builtin.stat:
+        path: /tmp/lit-ubuntu-cis-network-disabled.conf
+      register: cis_ubuntu24_disabled_network_sysctls
+      tags: level1-server
+
+    - name: Verify stale persistent network kernel controls are removed
+      ansible.builtin.assert:
+        that:
+          - not cis_ubuntu24_disabled_network_sysctls.stat.exists
       tags: level1-server
 
     - name: Remove the AIDE cron service mask

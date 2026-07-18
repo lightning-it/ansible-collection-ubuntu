@@ -11,3 +11,15 @@
           }}/roles/ansible-lockdown.ubuntu24_cis
         state: absent
       tags: always
+
+    - name: Remove the non-matching upstream profile evidence
+      ansible.builtin.file:
+        path: /tmp/lit-ubuntu-cis-molecule-excluded
+        state: absent
+      tags: always
+
+    - name: Remove the disabled persistent network kernel controls
+      ansible.builtin.file:
+        path: /tmp/lit-ubuntu-cis-network-disabled.conf
+        state: absent
+      tags: always
