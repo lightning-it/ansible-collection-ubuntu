@@ -2,6 +2,7 @@
 - name: Converge Ubuntu 24 CIS integration
   hosts: localhost
   gather_facts: false
+  become: true
   vars:
     cis_ubuntu24_profile_tag: level1-server
     cis_ubuntu24_execution_mode: remediate

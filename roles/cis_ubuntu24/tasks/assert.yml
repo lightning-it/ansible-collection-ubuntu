@@ -49,17 +49,17 @@
         (
           cis_ubuntu24_profile_tag is match('^level1-')
           and
-          ubtu24cis_level_1 | bool
+          ubtu24cis_level_1 | default(false) | bool
           and
-          not (ubtu24cis_level_2 | bool)
+          not (ubtu24cis_level_2 | default(false) | bool)
         )
         or
         (
           cis_ubuntu24_profile_tag is match('^level2-')
           and
-          ubtu24cis_level_1 | bool
+          ubtu24cis_level_1 | default(false) | bool
           and
-          ubtu24cis_level_2 | bool
+          ubtu24cis_level_2 | default(false) | bool
         )
       - >-
         cis_ubuntu24_execution_mode != 'audit'

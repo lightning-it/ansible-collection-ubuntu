@@ -2,7 +2,35 @@
 - name: Verify Ubuntu 24 CIS integration
   hosts: localhost
   gather_facts: false
+  become: true
   tasks:
+    - name: Verify missing profile booleans fail closed
+      tags: level1-server
+      block:
+        - name: Exercise validation without upstream profile booleans
+          ansible.builtin.include_role:
+            name: lit.ubuntu.cis_ubuntu24
+            tasks_from: assert.yml
+            apply:
+              tags: level1-server
+          vars:
+            cis_ubuntu24_profile_tag: level1-server
+            cis_ubuntu24_execution_mode: remediate
+          tags: level1-server
+
+        - name: Fail when missing profile booleans pass validation
+          ansible.builtin.fail:
+            msg: Missing upstream profile booleans unexpectedly passed validation.
+          tags: level1-server
+      rescue:
+        - name: Verify missing profile booleans use the wrapper failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'Run remediation with exactly'
+                in (ansible_failed_result.msg | default(''))
+          tags: level1-server
+
     - name: Read the upstream invocation evidence
       ansible.builtin.slurp:
         src: /tmp/lit-ubuntu-cis-molecule-result.json
@@ -138,34 +166,4 @@
       ansible.builtin.assert:
         that:
           - not cis_ubuntu24_disabled_network_sysctls.stat.exists
-      tags: level1-server
-
-    - name: Remove the AIDE cron service mask
-      ansible.builtin.file:
-        path: /etc/systemd/system/dailyaidecheck.service
-        state: absent
-      tags: level1-server
-
-    - name: Remove the test audit log directory
-      ansible.builtin.file:
-        path: /tmp/lit-ubuntu-cis-audit-log
-        state: absent
-      tags: level1-server
-
-    - name: Remove the persistent network kernel controls
-      ansible.builtin.file:
-        path: /tmp/lit-ubuntu-cis-network.conf
-        state: absent
-      tags: level1-server
-
-    - name: Remove the applicability-limited network kernel controls
-      ansible.builtin.file:
-        path: /tmp/lit-ubuntu-cis-network-limited.conf
-        state: absent
-      tags: level1-server
-
-    - name: Remove the upstream invocation evidence
-      ansible.builtin.file:
-        path: /tmp/lit-ubuntu-cis-molecule-result.json
-        state: absent
       tags: level1-server
