@@ -46,6 +46,19 @@
       }}
   when: users_manage_groups | bool and users_accounts_effective | length > 0
 
+- name: Validate declared SSH key lists
+  ansible.builtin.assert:
+    that:
+      - item.ssh_keys is sequence
+      - item.ssh_keys is not string
+      - item.ssh_keys | select('string') | list | length == item.ssh_keys | length
+    fail_msg: "ssh_keys for {{ item.name | default('unnamed user') }} must be a list of strings."
+    quiet: true
+  loop: "{{ users_accounts_effective | select('mapping') | selectattr('ssh_keys', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed user') }}"
+  changed_when: false
+
 - name: Ensure referenced groups exist
   ansible.builtin.group:
     name: "{{ item }}"

@@ -25,7 +25,9 @@
       - --project
       - "{{ incus_profile.project }}"
   changed_when: true
-  when: incus_profile_current | length == 0
+  when:
+    - not ansible_check_mode
+    - incus_profile_current | length == 0
 
 - name: Edit changed Incus profile
   ansible.builtin.command:
@@ -41,6 +43,7 @@
   changed_when: true
   no_log: true
   when:
+    - not ansible_check_mode
     - >-
       (incus_profile_current | length == 0 and incus_profile_desired_payload != {
         'config': {}, 'description': '', 'devices': {}

@@ -12,6 +12,9 @@ minor_changes:
     reconciliation for security-sensitive developer accounts.
 bugfixes:
   - >-
+    users - Reject malformed SSH key declarations before authorized-key
+    reconciliation.
+  - >-
     developer_tools - Install Python virtual-environment support before
     creating the isolated toolchain on Ubuntu hosts.
   - >-

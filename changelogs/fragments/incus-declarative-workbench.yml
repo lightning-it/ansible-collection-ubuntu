@@ -7,3 +7,6 @@ bugfixes:
   - >-
     incus - Treat the recognized uninitialized-daemon response as empty
     storage state while failing closed for unrelated discovery errors.
+  - >-
+    incus - Prevent initialization, project, and profile mutations during
+    Ansible check mode.

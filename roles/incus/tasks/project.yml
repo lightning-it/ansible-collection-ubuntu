@@ -19,7 +19,9 @@
       - create
       - "{{ incus_project.name }}"
   changed_when: true
-  when: incus_project_current | length == 0
+  when:
+    - not ansible_check_mode
+    - incus_project_current | length == 0
 
 - name: Set changed Incus project configuration
   ansible.builtin.command:
@@ -35,6 +37,7 @@
     loop_var: incus_project_config_entry
   changed_when: true
   when:
+    - not ansible_check_mode
     - >-
       incus_project_current | length == 0
       or incus_project_current.config | default({})

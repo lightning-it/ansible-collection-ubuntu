@@ -72,6 +72,7 @@
   changed_when: true
   no_log: true
   when:
+    - not ansible_check_mode
     - incus_initialize | bool
     - incus_storage_pools_current | length == 0
     - incus_preseed | length > 0
@@ -85,6 +86,7 @@
       - --minimal
   changed_when: true
   when:
+    - not ansible_check_mode
     - incus_initialize | bool
     - incus_storage_pools_current | length == 0
     - incus_preseed | length == 0
