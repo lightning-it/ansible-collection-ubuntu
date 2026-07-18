@@ -1,0 +1,22 @@
+---
+- name: Inspect standalone release binary cache
+  ansible.builtin.stat:
+    path: "{{ developer_tools_release_binary_cache_dir }}"
+  register: developer_tools_release_binary_cache_state
+  changed_when: false
+  check_mode: false
+
+- name: Ensure standalone release binary cache exists
+  ansible.builtin.file:
+    path: "{{ developer_tools_release_binary_cache_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install supply-chain verified standalone release binaries
+  ansible.builtin.include_tasks: release_binary.yml
+  loop: "{{ developer_tools_release_binaries }}"
+  loop_control:
+    loop_var: developer_tools_release_binary
+    label: "{{ developer_tools_release_binary.name | default('invalid-release-binary') }}"

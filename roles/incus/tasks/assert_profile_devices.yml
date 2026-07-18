@@ -1,0 +1,14 @@
+---
+- name: Validate Incus profile device values
+  ansible.builtin.assert:
+    that:
+      - incus_profile_device.value is mapping
+      - >-
+        incus_profile_device.value | dict2items | selectattr('value', 'string')
+        | list | length == incus_profile_device.value | length
+    fail_msg: "Incus profile devices must be mappings with string values."
+  loop: "{{ incus_profile_to_validate.devices | default({}) | dict2items }}"
+  loop_control:
+    label: "{{ incus_profile_device.key }}"
+    loop_var: incus_profile_device
+  changed_when: false

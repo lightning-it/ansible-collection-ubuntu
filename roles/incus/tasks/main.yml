@@ -12,6 +12,40 @@
     name: "{{ incus_packages }}"
     state: present
     update_cache: "{{ incus_update_apt_cache | bool }}"
+  when: incus_packages | length > 0
+
+- name: Check Incus CLI availability
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - command -v incus
+  register: incus_cli_lookup
+  changed_when: false
+  failed_when: incus_cli_lookup.rc not in [0, 1, 127]
+  check_mode: false
+
+- name: Record Incus CLI availability
+  ansible.builtin.set_fact:
+    incus_cli_available: "{{ incus_cli_lookup.rc == 0 }}"
+  changed_when: false
+
+- name: Require the Incus CLI after normal package reconciliation
+  ansible.builtin.assert:
+    that:
+      - incus_cli_available | bool
+    fail_msg: >-
+      The Incus CLI is unavailable after package reconciliation; service management
+      and Incus state discovery cannot continue.
+    quiet: true
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - >-
+      incus_services | length > 0
+      or incus_initialize | bool
+      or incus_projects | length > 0
+      or incus_profiles | length > 0
 
 - name: Ensure Incus services are enabled
   ansible.builtin.systemd_service:
@@ -19,22 +53,170 @@
     state: started
     enabled: true
   loop: "{{ incus_services }}"
+  when: not ansible_check_mode or incus_cli_available | bool
+
+- name: Initialize Incus storage discovery state
+  ansible.builtin.set_fact:
+    incus_storage_pools_current: []
+  changed_when: false
+  when: incus_initialize | bool
 
 - name: Check Incus storage pools
   ansible.builtin.command:
-    cmd: incus storage list --format csv
-  register: incus_storage_pools
+    argv:
+      - incus
+      - storage
+      - list
+      - --format
+      - json
+  register: incus_storage_list
   changed_when: false
   failed_when: false
-  when: incus_initialize | bool
+  check_mode: false
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+
+- name: Validate Incus storage discovery result
+  ansible.builtin.assert:
+    that:
+      - >-
+        incus_storage_list.rc == 0
+        or (incus_storage_list.stderr | lower)
+        is search('not initialized|not configured|first run')
+    fail_msg: >-
+      Incus storage discovery failed for a reason other than an
+      uninitialized daemon: {{ incus_storage_list.stderr | default('') }}
+    quiet: true
+  changed_when: false
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+
+- name: Decode Incus storage pool discovery
+  ansible.builtin.set_fact:
+    incus_storage_pools_current: >-
+      {{
+        (incus_storage_list.stdout | from_json)
+        if incus_storage_list.rc == 0
+        else []
+      }}
+  changed_when: false
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+
+- name: Initialize Incus from the supplied preseed
+  ansible.builtin.command:
+    argv:
+      - incus
+      - admin
+      - init
+      - --preseed
+    stdin: "{{ incus_preseed | to_nice_json }}"
+    stdin_add_newline: true
+  changed_when: true
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - incus_initialize | bool
+    - incus_storage_pools_current | length == 0
+    - incus_preseed | length > 0
 
 - name: Initialize Incus with minimal defaults
   ansible.builtin.command:
-    cmd: incus admin init --minimal
+    argv:
+      - incus
+      - admin
+      - init
+      - --minimal
   changed_when: true
   when:
+    - not ansible_check_mode
     - incus_initialize | bool
-    - incus_storage_pools.rc != 0 or (incus_storage_pools.stdout | trim | length == 0)
+    - incus_storage_pools_current | length == 0
+    - incus_preseed | length == 0
+
+- name: Initialize Incus project discovery state
+  ansible.builtin.set_fact:
+    incus_projects_current: []
+  changed_when: false
+  when: incus_projects | length > 0 or incus_profiles | length > 0
+
+- name: Discover Incus projects
+  ansible.builtin.command:
+    argv:
+      - incus
+      - project
+      - list
+      - --format
+      - json
+  register: incus_project_list
+  changed_when: false
+  failed_when: incus_project_list.rc != 0
+  check_mode: false
+  when:
+    - incus_projects | length > 0 or incus_profiles | length > 0
+    - incus_cli_available | bool
+
+- name: Decode Incus project discovery
+  ansible.builtin.set_fact:
+    incus_projects_current: "{{ incus_project_list.stdout | from_json }}"
+  changed_when: false
+  when:
+    - incus_projects | length > 0 or incus_profiles | length > 0
+    - incus_cli_available | bool
+
+- name: Collect Incus profile project names
+  ansible.builtin.set_fact:
+    incus_profile_project_names: >-
+      {{ incus_profiles | map(attribute='project') | unique | list }}
+  changed_when: false
+  when: incus_profiles | length > 0
+
+- name: Validate Incus profile projects exist or are declared
+  ansible.builtin.assert:
+    that:
+      - >-
+        incus_profile_project_name
+        in (
+          incus_projects_current | map(attribute='name') | list
+          + incus_projects | map(attribute='name') | list
+        )
+    fail_msg: >-
+      Profile project {{ incus_profile_project_name }} neither exists nor has a declaration in incus_projects.
+  loop: "{{ incus_profile_project_names | default([]) }}"
+  loop_control:
+    label: "{{ incus_profile_project_name }}"
+    loop_var: incus_profile_project_name
+  changed_when: false
+
+- name: Initialize discovered Incus profiles
+  ansible.builtin.set_fact:
+    incus_profiles_current_by_project: {}
+  changed_when: false
+  when: incus_profiles | length > 0
+
+- name: Discover Incus profiles by project
+  ansible.builtin.include_tasks: discover_profiles.yml
+  loop: "{{ incus_profile_project_names | default([]) }}"
+  loop_control:
+    label: "{{ incus_profile_project_name }}"
+    loop_var: incus_profile_project_name
+
+- name: Reconcile Incus projects
+  ansible.builtin.include_tasks: project.yml
+  loop: "{{ incus_projects }}"
+  loop_control:
+    label: "{{ incus_project.name }}"
+    loop_var: incus_project
+
+- name: Reconcile Incus profiles
+  ansible.builtin.include_tasks: profile.yml
+  loop: "{{ incus_profiles }}"
+  loop_control:
+    label: "{{ incus_profile.project }}/{{ incus_profile.name }}"
+    loop_var: incus_profile
 
 - name: Ensure Incus users are in runtime groups
   ansible.builtin.user:

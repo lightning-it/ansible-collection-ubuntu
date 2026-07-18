@@ -11,6 +11,10 @@ incus_packages:
 
 incus_update_apt_cache: true
 incus_initialize: true
+incus_preseed: {}
+
+incus_projects: []
+incus_profiles: []
 
 incus_services:
   - incus.socket

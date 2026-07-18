@@ -4,6 +4,19 @@
     that:
       - developer_tools_pip_executable | trim | length > 0
       - developer_tools_pip_extra_args is string
+      - developer_tools_python_venv_enabled is boolean
+      - developer_tools_python_venv_path is match('^/')
+      - developer_tools_python_venv_python | trim | length > 0
+      - developer_tools_python_venv_support_packages is sequence
+      - developer_tools_python_venv_support_packages is not string
+      - developer_tools_python_venv_packages is sequence
+      - developer_tools_python_venv_packages is not string
+      - developer_tools_python_venv_commands is sequence
+      - developer_tools_python_venv_commands is not string
+      - developer_tools_python_venv_link_dir is match('^/')
+      - >-
+        not developer_tools_python_venv_enabled | bool
+        or developer_tools_python_venv_packages | length > 0
       - developer_tools_nodejs_package_source in ['os']
       - developer_tools_nodejs_packages_present is sequence
       - developer_tools_nodejs_packages_present is not string
@@ -13,6 +26,11 @@
       - developer_tools_nodejs_validate is boolean
       - developer_tools_nodejs_expected_users is sequence
       - developer_tools_nodejs_expected_users is not string
+      - developer_tools_npm_packages_present is sequence
+      - developer_tools_npm_packages_present is not string
+      - >-
+        developer_tools_npm_packages_present | length == 0
+        or developer_tools_nodejs_enabled | bool
       - developer_tools_markdownlint_cli2_install_mode in ['global', 'npx']
       - developer_tools_markdownlint_cli2_package_name | trim | length > 0
       - developer_tools_markdownlint_cli2_validate is boolean
@@ -63,6 +81,20 @@
         not developer_tools_terminal_config_enabled | bool
         or developer_tools_terminal_config_manage_tmux | bool
         or developer_tools_terminal_config_manage_screen | bool
+      - developer_tools_workspace_enabled is boolean
+      - developer_tools_workspace_users is sequence
+      - developer_tools_workspace_users is not string
+      - developer_tools_workspace_directories is sequence
+      - developer_tools_workspace_directories is not string
+      - >-
+        not developer_tools_workspace_enabled | bool
+        or developer_tools_workspace_users | length > 0
+      - >-
+        not developer_tools_workspace_enabled | bool
+        or developer_tools_workspace_directories | length > 0
+      - developer_tools_release_binary_cache_dir is match('^/')
+      - developer_tools_release_binaries is sequence
+      - developer_tools_release_binaries is not string
       - developer_tools_argocd_cli_dest | trim | length > 0
       - not developer_tools_terragrunt_enabled | bool or developer_tools_terragrunt_version | trim | length > 0
       - not developer_tools_terragrunt_enabled | bool or developer_tools_terragrunt_url | trim | length > 0
@@ -76,6 +108,9 @@
       - developer_tools_actionlint_dest | trim | length > 0
       - not developer_tools_packer_enabled | bool or developer_tools_packer_version | trim | length > 0
       - not developer_tools_packer_enabled | bool or developer_tools_packer_archive_url | trim | length > 0
+      - >-
+        not developer_tools_packer_enabled | bool
+        or developer_tools_packer_checksum is match('^sha256:[a-fA-F0-9]{64}$')
       - developer_tools_packer_archive_path | trim | length > 0
       - developer_tools_packer_extract_dir | trim | length > 0
       - developer_tools_packer_dest | trim | length > 0
@@ -86,6 +121,9 @@
       - developer_tools_kubectl_cli_dest | trim | length > 0
       - not developer_tools_argocd_cli_enabled | bool or developer_tools_argocd_cli_url | trim | length > 0
       - not developer_tools_oc_cli_enabled | bool or developer_tools_oc_cli_archive_url | trim | length > 0
+      - >-
+        not developer_tools_oc_cli_enabled | bool
+        or developer_tools_oc_cli_checksum is match('^sha256:[a-fA-F0-9]{64}$')
       - not developer_tools_ssh_agent_enabled | bool or developer_tools_ssh_agent_service_name | trim | length > 0
       - not developer_tools_ssh_agent_enabled | bool or developer_tools_ssh_agent_socket | trim | length > 0
       - not developer_tools_ssh_agent_enabled | bool or developer_tools_ssh_agent_package_name | trim | length > 0
@@ -153,5 +191,107 @@
         or developer_tools_ssh_private_keys_vault_auth_ok | bool
       - developer_tools_ssh_private_keys_known_hosts_entries is sequence
       - developer_tools_ssh_private_keys_known_hosts_entries is not string
+  changed_when: false
+  when: developer_tools_enabled | bool
+
+- name: Validate pinned npm package definitions
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.name | default('', true) | string | trim | length > 0
+      - >-
+        item.version
+        | default('', true)
+        | string
+        | trim
+        is match('^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$')
+    fail_msg: "Each global npm package requires a non-empty name and pinned version."
+    quiet: true
+  loop: "{{ developer_tools_npm_packages_present }}"
+  loop_control:
+    label: "{{ item.name | default('invalid-npm-package') }}"
+  changed_when: false
+  when: developer_tools_enabled | bool
+
+- name: Validate isolated Python package pins
+  ansible.builtin.assert:
+    that:
+      - >-
+        item
+        | string
+        | trim
+        is match('^[A-Za-z0-9_.-]+(?:\[[A-Za-z0-9_,.-]+\])?==[^=\s]+$')
+    fail_msg: "Each isolated Python package must use an exact name==version pin."
+    quiet: true
+  loop: "{{ developer_tools_python_venv_packages }}"
+  loop_control:
+    label: "{{ item | string }}"
+  changed_when: false
+  when: developer_tools_enabled | bool
+
+- name: Validate Python virtual environment support package names
+  ansible.builtin.assert:
+    that:
+      - item | string | trim is match('^[A-Za-z0-9.+-]+$')
+    fail_msg: "Each Python virtual environment support package must be a safe package name."
+    quiet: true
+  loop: "{{ developer_tools_python_venv_support_packages }}"
+  changed_when: false
+  when: developer_tools_enabled | bool
+
+- name: Validate isolated Python command names
+  ansible.builtin.assert:
+    that:
+      - item | string | trim is match('^[A-Za-z0-9._+-]+$')
+    fail_msg: "Each isolated Python command must be a safe basename."
+    quiet: true
+  loop: "{{ developer_tools_python_venv_commands }}"
+  changed_when: false
+  when: developer_tools_enabled | bool
+
+- name: Validate relative workspace directories
+  ansible.builtin.assert:
+    that:
+      - >-
+        item
+        | string
+        | trim
+        is match('^(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$')
+    fail_msg: "Workspace directories must be non-traversing relative paths."
+    quiet: true
+  loop: "{{ developer_tools_workspace_directories }}"
+  changed_when: false
+  when: developer_tools_enabled | bool
+
+- name: Validate standalone release binary definitions
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.name | default('', true) | string | trim | length > 0
+      - item.name | default('', true) | string | trim is match('^[A-Za-z0-9._+-]+$')
+      - item.version | default('', true) | string | trim | length > 0
+      - item.url | default('', true) | string | trim is match('^https://')
+      - item.filename | default('', true) | string | trim | length > 0
+      - item.filename | default('', true) | string | trim is match('^[A-Za-z0-9._+-]+$')
+      - item.checksum | default('', true) | string | trim is match('^sha256:[a-fA-F0-9]{64}$')
+      - item.dest | default('', true) | string | trim is match('^/')
+      - item.archive | default(false) is boolean
+      - item.mode | default('0755') | string is match('^0[0-7]{3}$')
+      - >-
+        not (item.archive | default(false) | bool)
+        or (
+          item.binary_path
+          | default('', true)
+          | string
+          | trim
+          is match('^(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$')
+        )
+    fail_msg: >-
+      Each standalone release binary requires a pinned version, HTTPS URL,
+      exact SHA-256 checksum, destination, and archive metadata when needed.
+    quiet: true
+  loop: "{{ developer_tools_release_binaries }}"
+  loop_control:
+    label: "{{ item.name | default('invalid-release-binary') }}"
   changed_when: false
   when: developer_tools_enabled | bool

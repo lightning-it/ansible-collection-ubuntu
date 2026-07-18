@@ -1,5 +1,5 @@
 ---
-- name: Verify developer tools syntax coverage
+- name: Verify developer tools role execution
   hosts: localhost
   connection: local
   gather_facts: false
@@ -9,8 +9,15 @@
         path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/developer_tools-syntax-coverage"
       register: developer_tools_molecule_coverage_marker
 
-    - name: Assert lit.ubuntu.developer_tools coverage stub ran
+    - name: Check isolated developer workspace
+      ansible.builtin.stat:
+        path: /root/.cache/lit-molecule-developer-tools
+      register: developer_tools_molecule_workspace
+
+    - name: Assert lit.ubuntu.developer_tools executed safely
       ansible.builtin.assert:
         that:
           - developer_tools_molecule_coverage_marker.stat.exists
+          - developer_tools_molecule_coverage_marker.stat.size == 14
+          - developer_tools_molecule_workspace.stat.isdir
         quiet: true
