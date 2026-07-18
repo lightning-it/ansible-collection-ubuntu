@@ -1,0 +1,92 @@
+---
+- name: Validate users role collection inputs
+  ansible.builtin.assert:
+    that:
+      - users_manage_groups is boolean
+      - users_accounts is mapping or (users_accounts is sequence and users_accounts is not string)
+      - users_accounts_extra is mapping or (users_accounts_extra is sequence and users_accounts_extra is not string)
+    fail_msg: >-
+      users_manage_groups must be a boolean, and users_accounts and users_accounts_extra
+      must each be a list or mapping of user definitions.
+    quiet: true
+  changed_when: false
+
+- name: Validate declared user definitions
+  vars:
+    users_accounts_to_validate: >-
+      {{
+        (
+          users_accounts | dict2items | map(attribute='value') | list
+          if users_accounts is mapping
+          else users_accounts
+        )
+        +
+        (
+          users_accounts_extra | dict2items | map(attribute='value') | list
+          if users_accounts_extra is mapping
+          else users_accounts_extra
+        )
+      }}
+  block:
+    - name: Validate declared user definition shapes
+      ansible.builtin.assert:
+        that:
+          - users_accounts_to_validate | select('mapping') | list | length == users_accounts_to_validate | length
+        fail_msg: "Every users account definition must be a mapping."
+        quiet: true
+      changed_when: false
+
+    - name: Validate declared user account values
+      ansible.builtin.assert:
+        that:
+          - item.name | default('') is string
+          - item.name | default('') | trim | length > 0
+          - item.state | default('present') in ['present', 'absent']
+          - item.uid is not defined or item.uid is integer
+          - item.gid is not defined or item.gid is string or item.gid is integer
+          - item.shell is not defined or item.shell is string
+          - item.home is not defined or item.home is string
+          - item.password is not defined or item.password is string
+          - item.update_password | default('always') in ['always', 'on_create']
+          - item.sudoers_name is not defined or item.sudoers_name is string
+          - item.create_home | default(true) is boolean
+          - item.password_lock | default(false) is boolean
+          - item.remove | default(false) is boolean
+          - item.passwordless_sudo | default(false) is boolean
+          - item.groups_append | default(true) is boolean
+          - item.ssh_keys_exclusive | default(false) is boolean
+        fail_msg: "The user definition for {{ item.name | default('unnamed user') }} contains invalid values."
+        quiet: true
+      loop: "{{ users_accounts_to_validate | select('mapping') | list }}"
+      loop_control:
+        label: "{{ item.name | default('unnamed user') }}"
+      changed_when: false
+
+    - name: Validate declared supplementary group lists
+      ansible.builtin.assert:
+        that:
+          - item.groups is sequence
+          - item.groups is not string
+          - item.groups | select('string') | list | length == item.groups | length
+          - >-
+            item.groups | select('string') | map('trim') | reject('equalto', '') | list | length
+            == item.groups | length
+        fail_msg: "groups for {{ item.name }} must be a list of non-empty strings."
+        quiet: true
+      loop: "{{ users_accounts_to_validate | select('mapping') | selectattr('groups', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.name | default('unnamed user') }}"
+      changed_when: false
+
+    - name: Validate declared SSH key lists
+      ansible.builtin.assert:
+        that:
+          - item.ssh_keys is sequence
+          - item.ssh_keys is not string
+          - item.ssh_keys | select('string') | list | length == item.ssh_keys | length
+        fail_msg: "ssh_keys for {{ item.name }} must be a list of strings."
+        quiet: true
+      loop: "{{ users_accounts_to_validate | select('mapping') | selectattr('ssh_keys', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.name | default('unnamed user') }}"
+      changed_when: false
