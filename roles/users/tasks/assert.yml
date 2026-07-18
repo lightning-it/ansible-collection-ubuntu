@@ -84,7 +84,13 @@
           - item.ssh_keys is sequence
           - item.ssh_keys is not string
           - item.ssh_keys | select('string') | list | length == item.ssh_keys | length
-        fail_msg: "ssh_keys for {{ item.name }} must be a list of strings."
+          - >-
+            item.ssh_keys | select('string') | map('trim') | reject('equalto', '') | list | length
+            == item.ssh_keys | length
+          - >-
+            item.ssh_keys | select('string') | select('match', '^[^\r\n]+\Z') | list | length
+            == item.ssh_keys | length
+        fail_msg: "ssh_keys for {{ item.name }} must be a list of non-empty, single-line strings."
         quiet: true
       loop: "{{ users_accounts_to_validate | select('mapping') | selectattr('ssh_keys', 'defined') | list }}"
       loop_control:

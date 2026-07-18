@@ -41,3 +41,55 @@
           ssh-ed25519
           AAAAC3NzaC1lZDI1NTE5AAAAIEjzifs06betrcygee7kUrE1IMhU4p0M3P5ZsaMVsEbo
           desired@molecule.invalid
+
+    - name: Verify whitespace-only SSH keys fail closed
+      block:
+        - name: Exercise users validation with a whitespace-only SSH key
+          ansible.builtin.include_role:
+            name: lit.ubuntu.users
+            tasks_from: assert.yml
+          vars:
+            users_accounts:
+              - name: invalid-whitespace-key
+                ssh_keys:
+                  - "   "
+            users_accounts_extra: []
+            users_manage_groups: false
+
+        - name: Fail when a whitespace-only SSH key passes validation
+          ansible.builtin.fail:
+            msg: "A whitespace-only SSH key unexpectedly passed validation."
+      rescue:
+        - name: Confirm whitespace-only SSH keys use the safe validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'must be a list of non-empty, single-line strings'
+                in (ansible_failed_result | string)
+
+    - name: Verify multiline SSH keys fail closed
+      block:
+        - name: Exercise users validation with a multiline SSH key
+          ansible.builtin.include_role:
+            name: lit.ubuntu.users
+            tasks_from: assert.yml
+          vars:
+            users_accounts:
+              - name: invalid-multiline-key
+                ssh_keys:
+                  - |-
+                    ssh-ed25519 AAAA-invalid-first-line
+                    ssh-ed25519 AAAA-injected-second-line
+            users_accounts_extra: []
+            users_manage_groups: false
+
+        - name: Fail when a multiline SSH key passes validation
+          ansible.builtin.fail:
+            msg: "A multiline SSH key unexpectedly passed validation."
+      rescue:
+        - name: Confirm multiline SSH keys use the safe validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'must be a list of non-empty, single-line strings'
+                in (ansible_failed_result | string)

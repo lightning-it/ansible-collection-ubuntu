@@ -14,12 +14,52 @@
     update_cache: "{{ incus_update_apt_cache | bool }}"
   when: incus_packages | length > 0
 
+- name: Check Incus CLI availability
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - command -v incus
+  register: incus_cli_lookup
+  changed_when: false
+  failed_when: incus_cli_lookup.rc not in [0, 1, 127]
+  check_mode: false
+
+- name: Record Incus CLI availability
+  ansible.builtin.set_fact:
+    incus_cli_available: "{{ incus_cli_lookup.rc == 0 }}"
+  changed_when: false
+
+- name: Require the Incus CLI after normal package reconciliation
+  ansible.builtin.assert:
+    that:
+      - incus_cli_available | bool
+    fail_msg: >-
+      The Incus CLI is unavailable after package reconciliation; service management
+      and Incus state discovery cannot continue.
+    quiet: true
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - >-
+      incus_services | length > 0
+      or incus_initialize | bool
+      or incus_projects | length > 0
+      or incus_profiles | length > 0
+
 - name: Ensure Incus services are enabled
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     state: started
     enabled: true
   loop: "{{ incus_services }}"
+  when: not ansible_check_mode or incus_cli_available | bool
+
+- name: Initialize Incus storage discovery state
+  ansible.builtin.set_fact:
+    incus_storage_pools_current: []
+  changed_when: false
+  when: incus_initialize | bool
 
 - name: Check Incus storage pools
   ansible.builtin.command:
@@ -33,7 +73,9 @@
   changed_when: false
   failed_when: false
   check_mode: false
-  when: incus_initialize | bool
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
 
 - name: Validate Incus storage discovery result
   ansible.builtin.assert:
@@ -47,7 +89,9 @@
       uninitialized daemon: {{ incus_storage_list.stderr | default('') }}
     quiet: true
   changed_when: false
-  when: incus_initialize | bool
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
 
 - name: Decode Incus storage pool discovery
   ansible.builtin.set_fact:
@@ -58,7 +102,9 @@
         else []
       }}
   changed_when: false
-  when: incus_initialize | bool
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
 
 - name: Initialize Incus from the supplied preseed
   ansible.builtin.command:
@@ -91,6 +137,12 @@
     - incus_storage_pools_current | length == 0
     - incus_preseed | length == 0
 
+- name: Initialize Incus project discovery state
+  ansible.builtin.set_fact:
+    incus_projects_current: []
+  changed_when: false
+  when: incus_projects | length > 0 or incus_profiles | length > 0
+
 - name: Discover Incus projects
   ansible.builtin.command:
     argv:
@@ -103,13 +155,17 @@
   changed_when: false
   failed_when: incus_project_list.rc != 0
   check_mode: false
-  when: incus_projects | length > 0 or incus_profiles | length > 0
+  when:
+    - incus_projects | length > 0 or incus_profiles | length > 0
+    - incus_cli_available | bool
 
 - name: Decode Incus project discovery
   ansible.builtin.set_fact:
     incus_projects_current: "{{ incus_project_list.stdout | from_json }}"
   changed_when: false
-  when: incus_projects | length > 0 or incus_profiles | length > 0
+  when:
+    - incus_projects | length > 0 or incus_profiles | length > 0
+    - incus_cli_available | bool
 
 - name: Collect Incus profile project names
   ansible.builtin.set_fact:

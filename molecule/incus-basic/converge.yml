@@ -27,7 +27,6 @@
             type: disk
             path: /
             pool: default
-
   pre_tasks:
     - name: Ensure python3 is present
       ansible.builtin.raw: |
@@ -43,6 +42,19 @@
         owner: root
         group: root
         mode: "0755"
+      when: not ansible_check_mode
 
   roles:
     - role: lit.ubuntu.incus
+
+  post_tasks:
+    - name: Assert absent-CLI check mode used safe empty discovery state
+      ansible.builtin.assert:
+        that:
+          - not incus_cli_available | bool
+          - incus_storage_pools_current == []
+          - incus_projects_current == []
+          - >-
+            incus_profiles_current_by_project == {'workbench': []}
+        quiet: true
+      when: ansible_check_mode
