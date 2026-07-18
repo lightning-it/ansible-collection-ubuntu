@@ -12,5 +12,8 @@ minor_changes:
     reconciliation for security-sensitive developer accounts.
 bugfixes:
   - >-
+    developer_tools - Install Python virtual-environment support before
+    creating the isolated toolchain on Ubuntu hosts.
+  - >-
     developer_tools - Require an exact Packer archive checksum and prevent the
     OpenShift client archive from reporting changes on every run.

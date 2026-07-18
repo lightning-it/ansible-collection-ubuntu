@@ -27,6 +27,11 @@ argument_specs:
       developer_tools_python_venv_python:
         type: str
         default: python3
+      developer_tools_python_venv_support_packages:
+        type: list
+        elements: str
+        default:
+          - python3-venv
       developer_tools_python_venv_packages:
         type: list
         elements: str

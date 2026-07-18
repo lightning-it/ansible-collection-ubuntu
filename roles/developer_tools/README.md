@@ -25,6 +25,8 @@ developer_tools_pip_extra_args: ""
 developer_tools_python_venv_enabled: false
 developer_tools_python_venv_path: /opt/lit/developer-tools
 developer_tools_python_venv_python: python3
+developer_tools_python_venv_support_packages:
+  - python3-venv
 developer_tools_python_venv_packages:
   - ansible-core==2.18.18
 developer_tools_python_venv_commands:

@@ -31,13 +31,32 @@
       - json
   register: incus_storage_list
   changed_when: false
-  failed_when: incus_storage_list.rc != 0
+  failed_when: false
   check_mode: false
+  when: incus_initialize | bool
+
+- name: Validate Incus storage discovery result
+  ansible.builtin.assert:
+    that:
+      - >-
+        incus_storage_list.rc == 0
+        or (incus_storage_list.stderr | lower)
+        is search('not initialized|not configured|first run')
+    fail_msg: >-
+      Incus storage discovery failed for a reason other than an
+      uninitialized daemon: {{ incus_storage_list.stderr | default('') }}
+    quiet: true
+  changed_when: false
   when: incus_initialize | bool
 
 - name: Decode Incus storage pool discovery
   ansible.builtin.set_fact:
-    incus_storage_pools_current: "{{ incus_storage_list.stdout | from_json }}"
+    incus_storage_pools_current: >-
+      {{
+        (incus_storage_list.stdout | from_json)
+        if incus_storage_list.rc == 0
+        else []
+      }}
   changed_when: false
   when: incus_initialize | bool
 

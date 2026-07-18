@@ -7,6 +7,8 @@
       - developer_tools_python_venv_enabled is boolean
       - developer_tools_python_venv_path is match('^/')
       - developer_tools_python_venv_python | trim | length > 0
+      - developer_tools_python_venv_support_packages is sequence
+      - developer_tools_python_venv_support_packages is not string
       - developer_tools_python_venv_packages is sequence
       - developer_tools_python_venv_packages is not string
       - developer_tools_python_venv_commands is sequence
@@ -224,6 +226,16 @@
   loop: "{{ developer_tools_python_venv_packages }}"
   loop_control:
     label: "{{ item | string }}"
+  changed_when: false
+  when: developer_tools_enabled | bool
+
+- name: Validate Python virtual environment support package names
+  ansible.builtin.assert:
+    that:
+      - item | string | trim is match('^[A-Za-z0-9.+-]+$')
+    fail_msg: "Each Python virtual environment support package must be a safe package name."
+    quiet: true
+  loop: "{{ developer_tools_python_venv_support_packages }}"
   changed_when: false
   when: developer_tools_enabled | bool
 

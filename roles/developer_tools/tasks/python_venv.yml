@@ -14,6 +14,12 @@
     group: root
     mode: "0755"
 
+- name: Ensure Python virtual environment support is installed
+  ansible.builtin.apt:
+    name: "{{ developer_tools_python_venv_support_packages }}"
+    state: present
+  when: developer_tools_python_venv_support_packages | length > 0
+
 - name: Install isolated Python toolchain
   ansible.builtin.pip:
     name: "{{ developer_tools_python_venv_packages }}"

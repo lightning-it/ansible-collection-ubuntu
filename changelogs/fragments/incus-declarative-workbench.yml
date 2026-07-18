@@ -3,3 +3,7 @@ minor_changes:
   - >-
     incus - Add fail-closed JSON discovery, optional preseed initialization,
     and declarative project and profile reconciliation for Incus hosts.
+bugfixes:
+  - >-
+    incus - Treat the recognized uninitialized-daemon response as empty
+    storage state while failing closed for unrelated discovery errors.
