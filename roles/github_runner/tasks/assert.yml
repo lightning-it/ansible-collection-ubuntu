@@ -43,6 +43,7 @@
       - item.runner_group | default('') is string
       - item.external_service_name | default('') is string
       - item.external_service_unit_path | default('') is string
+      - not (item.external_service_name | default('') | regex_search('/'))
       - >-
         (item.external_service_name | default('') | trim | length > 0)
         == (item.external_service_unit_path | default('') | trim | length > 0)
@@ -51,7 +52,12 @@
         or item.state | default('present') == 'absent'
       - >-
         item.external_service_unit_path | default('') | length == 0
-        or item.external_service_unit_path | regex_search('^/')
+        or item.external_service_unit_path
+        | regex_search('^/etc/systemd/system/[A-Za-z0-9_.@-]+\.service$')
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or item.external_service_unit_path | basename
+        == item.external_service_name | default('')
       - >-
         item.external_service_unit_path | default('') | length == 0
         or item.external_service_unit_path | trim != '/'

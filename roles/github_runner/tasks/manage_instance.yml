@@ -37,6 +37,9 @@
     - github_runner_instance.state | default('present') == 'absent'
     - github_runner_instance.external_service_name | default('') | trim | length > 0
     - github_runner_instance_external_service_unit_file.stat.exists | default(false)
+    - >-
+      github_runner_instance_external_service_unit_file.stat.isreg | default(false)
+      or github_runner_instance_external_service_unit_file.stat.islnk | default(false)
 
 - name: Stop service before changing {{ github_runner_instance.name }}
   ansible.builtin.systemd_service:
@@ -126,6 +129,10 @@
     - github_runner_manage_service | bool
     - github_runner_instance.state | default('present') == 'absent'
     - github_runner_instance.external_service_unit_path | default('') | trim | length > 0
+    - github_runner_instance_external_service_unit_file.stat.exists | default(false)
+    - >-
+      github_runner_instance_external_service_unit_file.stat.isreg | default(false)
+      or github_runner_instance_external_service_unit_file.stat.islnk | default(false)
 
 - name: Reload systemd after removing external service for {{ github_runner_instance.name }}
   ansible.builtin.systemd_service:
