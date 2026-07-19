@@ -33,6 +33,7 @@ github_runner_user_groups_extra: []
 github_runner_register: true
 github_runner_replace: false
 github_runner_url: ""
+github_runner_runner_group: ""
 github_runner_name: "{{ inventory_hostname_short | default(inventory_hostname) }}"
 github_runner_labels:
   - self-hosted
@@ -54,8 +55,11 @@ github_runner_instances:
     dir: "{{ github_runner_dir }}"
     work_dir: "{{ github_runner_work_dir }}"
     labels: "{{ github_runner_labels }}"
+    runner_group: "{{ github_runner_runner_group }}"
     registration_token: "{{ github_runner_registration_token }}"
     remove_token: "{{ github_runner_remove_token }}"
     replace: "{{ github_runner_replace }}"
     state: present
     service_state: "{{ github_runner_service_state }}"
+    external_service_name: ""
+    external_service_unit_path: ""

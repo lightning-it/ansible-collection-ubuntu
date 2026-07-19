@@ -17,6 +17,7 @@
         dir: /opt/actions-runner-01
         work_dir: _work-01
         labels: [self-hosted, linux, x64, incus]
+        runner_group: Protected Incus
       - name: incus-runner-02
         dir: /opt/actions-runner-02
         work_dir: _work-02
@@ -54,6 +55,7 @@
             dir: /opt/actions-runner-01
             work_dir: _work-01
             labels: [self-hosted, linux, x64, incus]
+            runner_group: Protected Incus
           - name: incus-runner-02
             dir: /opt/actions-runner-02
             work_dir: _work-02
