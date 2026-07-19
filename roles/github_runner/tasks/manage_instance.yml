@@ -37,6 +37,7 @@
     chdir: "{{ github_runner_instance.dir }}"
   changed_when: true
   when:
+    - not ansible_check_mode
     - github_runner_manage_service | bool
     - github_runner_instance_service_exists | bool
     - >-
@@ -48,6 +49,7 @@
     path: "{{ github_runner_instance.dir }}/.service"
     state: absent
   when:
+    - github_runner_manage_service | bool
     - github_runner_instance_service_exists | bool
     - >-
       github_runner_instance.replace | default(false) | bool
@@ -80,6 +82,7 @@
   no_log: true
   changed_when: true
   when:
+    - not ansible_check_mode
     - github_runner_register | bool
     - github_runner_instance_config_exists | bool
     - >-
@@ -161,6 +164,7 @@
       no_log: true
       changed_when: true
       when:
+        - not ansible_check_mode
         - github_runner_register | bool
         - (not github_runner_instance_config_exists | bool) or github_runner_instance.replace | default(false) | bool
 
@@ -176,6 +180,7 @@
         chdir: "{{ github_runner_instance.dir }}"
         creates: "{{ github_runner_instance.dir }}/.service"
       when:
+        - not ansible_check_mode
         - github_runner_manage_service | bool
         - github_runner_register | bool
         - github_runner_instance_config_after.stat.exists
