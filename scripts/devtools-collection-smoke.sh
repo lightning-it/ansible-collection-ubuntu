@@ -22,6 +22,7 @@ COLLECTION_NAME="$COLLECTION_NAME" \
 EXAMPLE_PLAYBOOK="$EXAMPLE_PLAYBOOK" \
 WUNDER_DEVTOOLS_NETWORK=bridge \
 WUNDER_DEVTOOLS_ROOTFS_MODE=rw \
+WUNDER_DEVTOOLS_RUN_AS_ROOT=1 \
 CONTAINER_HOME=/tmp/wunder \
 bash scripts/wunder-devtools-ee.sh bash -c '
   set -euo pipefail
