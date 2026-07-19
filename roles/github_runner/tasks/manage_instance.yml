@@ -55,17 +55,27 @@
       github_runner_instance.replace | default(false) | bool
       or github_runner_instance.state | default('present') == 'absent'
 
-- name: Require token for registration change
+- name: Require registration token for registration change
   ansible.builtin.assert:
     that: github_runner_instance.registration_token | default('') | trim | length > 0
-    fail_msg: "A short-lived token is required to register, replace, or remove {{ github_runner_instance.name }}."
+    fail_msg: "A short-lived registration token is required to register or replace {{ github_runner_instance.name }}."
   no_log: true
   when:
     - github_runner_register | bool
+    - github_runner_instance.state | default('present') == 'present'
+    - (not github_runner_instance_config_exists | bool) or github_runner_instance.replace | default(false) | bool
+
+- name: Require remove token for registration removal
+  ansible.builtin.assert:
+    that: github_runner_instance.remove_token | default('') | trim | length > 0
+    fail_msg: "A short-lived remove token is required to replace or remove {{ github_runner_instance.name }}."
+  no_log: true
+  when:
+    - github_runner_register | bool
+    - github_runner_instance_config_exists | bool
     - >-
-      (github_runner_instance.state | default('present') == 'present'
-      and ((not github_runner_instance_config_exists | bool) or github_runner_instance.replace | default(false) | bool))
-      or (github_runner_instance.state | default('present') == 'absent' and github_runner_instance_config_exists | bool)
+      github_runner_instance.replace | default(false) | bool
+      or github_runner_instance.state | default('present') == 'absent'
 
 - name: Remove registration for {{ github_runner_instance.name }}
   ansible.builtin.command:
@@ -77,7 +87,7 @@
       - ./config.sh
       - remove
       - --token
-      - "{{ github_runner_instance.registration_token }}"
+      - "{{ github_runner_instance.remove_token }}"
     chdir: "{{ github_runner_instance.dir }}"
   no_log: true
   changed_when: true

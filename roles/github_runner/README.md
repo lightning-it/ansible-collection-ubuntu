@@ -16,17 +16,19 @@ See `defaults/main.yml` for the full interface. Key variables:
 - `github_runner_version` (string, default: `"2.335.1"`): Pinned GitHub runner version.
 - `github_runner_url` (string, default: `""`): Repository or organization URL for runner registration.
 - `github_runner_registration_token` (string, default: `""`): Short-lived registration token.
+- `github_runner_remove_token` (string, default: `""`): Short-lived runner removal token.
 - `github_runner_name` (string, default: inventory host short name): Runner name in GitHub.
 - `github_runner_labels` (list): Labels passed to `config.sh`.
 - `github_runner_user_groups_extra` (list, default: `[]`): Extra groups for the runner user.
 - `github_runner_replace` (bool, default: `false`): Remove and recreate an existing runner registration.
 - `github_runner_manage_service` (bool, default: `true`): Install and manage the systemd service.
 - `github_runner_instances` (list): Runner instances. Each mapping requires unique `name`, `dir`, and relative
-  `work_dir` values, plus `labels`; optional per-instance keys are `registration_token`, `replace`, `state`, and
-  `service_state`. Its default maps the legacy single-runner variables, preserving backward compatibility.
+  `work_dir` values, plus `labels`; optional per-instance keys are `registration_token`, `remove_token`, `replace`,
+  `state`, and `service_state`. Its default maps the legacy single-runner variables, preserving backward compatibility.
 
-Set an instance to `state: absent` with a fresh token to unregister it, uninstall its service, and remove its
-installation directory. Set `replace: true` only for the instance that must be re-registered. Runner services are
+Set an instance to `state: absent` with a fresh remove token to unregister it, uninstall its service, and remove its
+installation directory. Set `replace: true` only for the instance that must be re-registered and provide both fresh
+token types. Runner services are
 installed from each instance directory, enabled when `service_state: started`, and therefore survive reboots.
 
 ## Dependencies

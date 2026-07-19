@@ -33,6 +33,10 @@
       - item is mapping
       - item.name | default('') | trim | length > 0
       - item.dir | default('') | trim | length > 0
+      - item.dir | default('') | regex_search('^/')
+      - item.dir | default('') | trim != '/'
+      - not (item.dir | default('') | regex_search('//'))
+      - not (item.dir | default('') | regex_search('(^|/)\.\.?(/|$)'))
       - item.work_dir | default('') | trim | length > 0
       - item.labels | default([]) is sequence
       - item.labels | default([]) is not string
