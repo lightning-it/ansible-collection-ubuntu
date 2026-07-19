@@ -4,9 +4,9 @@
   become: false
   gather_facts: false
   vars:
-    luks_unlock_test_dir: /tmp/lit-luks-unlock-molecule
-    luks_unlock_test_bin_dir: /tmp/lit-luks-unlock-molecule/bin
-    luks_unlock_test_clevis_log: /tmp/lit-luks-unlock-molecule/clevis.log
+    luks_unlock_test_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/lit-luks-unlock-molecule"
+    luks_unlock_test_bin_dir: "{{ luks_unlock_test_dir }}/bin"
+    luks_unlock_test_clevis_log: "{{ luks_unlock_test_dir }}/clevis.log"
     luks_unlock_test_tang_url: http://tang.example.invalid
     luks_unlock_test_tang_thumbprint: molecule-tang-signing-thumbprint
     luks_unlock_rebuild_initramfs: false
