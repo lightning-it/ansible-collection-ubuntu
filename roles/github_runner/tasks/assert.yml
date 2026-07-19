@@ -33,7 +33,7 @@
       - item is mapping
       - item.name | default('') | trim | length > 0
       - item.dir | default('') | trim | length > 0
-      - item.dir | default('') is match('^/')
+      - item.dir | default('', true) is match('^/')
       - item.dir | default('') | trim != '/'
       - not (item.dir | default('') | regex_search('//'))
       - not (item.dir | default('') | regex_search('(^|/)\.\.?(/|$)'))
@@ -52,7 +52,7 @@
         or item.state | default('present') == 'absent'
       - >-
         item.external_service_unit_path | default('') | length == 0
-        or item.external_service_unit_path
+        or item.external_service_unit_path | default('', true)
         is match('^/etc/systemd/system/[A-Za-z0-9_.@-]+\.service$')
       - >-
         item.external_service_unit_path | default('') | length == 0
