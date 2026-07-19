@@ -16,5 +16,34 @@
         fi
       changed_when: false
 
+    - name: Validate five isolated runner definitions
+      ansible.builtin.include_role:
+        name: lit.ubuntu.github_runner
+        tasks_from: assert.yml
+      vars:
+        github_runner_enabled: true
+        github_runner_url: https://github.com/example/example
+        github_runner_instances:
+          - name: incus-runner-01
+            dir: /opt/actions-runner-01
+            work_dir: _work-01
+            labels: [self-hosted, linux, x64, incus]
+          - name: incus-runner-02
+            dir: /opt/actions-runner-02
+            work_dir: _work-02
+            labels: [self-hosted, linux, x64, incus]
+          - name: incus-runner-03
+            dir: /opt/actions-runner-03
+            work_dir: _work-03
+            labels: [self-hosted, linux, x64, incus]
+          - name: incus-runner-04
+            dir: /opt/actions-runner-04
+            work_dir: _work-04
+            labels: [self-hosted, linux, x64, incus]
+          - name: incus-runner-05
+            dir: /opt/actions-runner-05
+            work_dir: _work-05
+            labels: [self-hosted, linux, x64, incus]
+
   roles:
     - role: lit.ubuntu.github_runner

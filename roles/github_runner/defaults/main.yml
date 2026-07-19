@@ -44,3 +44,16 @@ github_runner_registration_token: ""
 github_runner_manage_service: true
 github_runner_service_user: "{{ github_runner_user }}"
 github_runner_service_state: started
+
+# Define multiple isolated runners on one host. The default preserves the
+# legacy single-runner interface; inventory can replace this with any number of
+# explicit instance mappings.
+github_runner_instances:
+  - name: "{{ github_runner_name }}"
+    dir: "{{ github_runner_dir }}"
+    work_dir: "{{ github_runner_work_dir }}"
+    labels: "{{ github_runner_labels }}"
+    registration_token: "{{ github_runner_registration_token }}"
+    replace: "{{ github_runner_replace }}"
+    state: present
+    service_state: "{{ github_runner_service_state }}"

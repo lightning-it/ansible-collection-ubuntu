@@ -20,6 +20,40 @@
       - not github_runner_register | bool or github_runner_url | trim | length > 0
       - github_runner_service_user | trim | length > 0
       - github_runner_service_state in ['started', 'stopped', 'restarted', 'reloaded']
+      - github_runner_instances is sequence
+      - github_runner_instances is not string
+      - github_runner_instances | length > 0
     fail_msg: "GitHub runner role variables are invalid."
+  changed_when: false
+  when: github_runner_enabled | bool
+
+- name: Validate GitHub runner instance inputs
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.name | default('') | trim | length > 0
+      - item.dir | default('') | trim | length > 0
+      - item.work_dir | default('') | trim | length > 0
+      - item.labels | default([]) is sequence
+      - item.labels | default([]) is not string
+      - item.state | default('present') in ['present', 'absent']
+      - item.service_state | default(github_runner_service_state) in ['started', 'stopped', 'restarted', 'reloaded']
+      - not (item.work_dir | default('') | regex_search('^/'))
+      - item.work_dir | default('') | split('/') | reject('in', ['', '.', '..']) | list | length
+        == item.work_dir | default('') | split('/') | length
+    fail_msg: "Each github_runner_instances entry must define a valid isolated runner."
+  loop: "{{ github_runner_instances }}"
+  loop_control:
+    label: "{{ item.name | default('invalid') }}"
+  changed_when: false
+  when: github_runner_enabled | bool
+
+- name: Validate GitHub runner instance isolation
+  ansible.builtin.assert:
+    that:
+      - github_runner_instances | map(attribute='name') | unique | length == github_runner_instances | length
+      - github_runner_instances | map(attribute='dir') | unique | length == github_runner_instances | length
+      - github_runner_instances | map(attribute='work_dir') | unique | length == github_runner_instances | length
+    fail_msg: "Runner names, installation directories, and effective working directories must be unique."
   changed_when: false
   when: github_runner_enabled | bool
