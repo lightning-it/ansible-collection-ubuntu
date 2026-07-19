@@ -54,6 +54,6 @@
       - github_runner_instances | map(attribute='name') | unique | length == github_runner_instances | length
       - github_runner_instances | map(attribute='dir') | unique | length == github_runner_instances | length
       - github_runner_instances | map(attribute='work_dir') | unique | length == github_runner_instances | length
-    fail_msg: "Runner names, installation directories, and effective working directories must be unique."
+    fail_msg: "Runner names, installation directories, and work_dir values must be unique."
   changed_when: false
   when: github_runner_enabled | bool

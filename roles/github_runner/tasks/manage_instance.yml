@@ -43,6 +43,16 @@
       github_runner_instance.replace | default(false) | bool
       or github_runner_instance.state | default('present') == 'absent'
 
+- name: Remove uninstalled service marker for {{ github_runner_instance.name }}
+  ansible.builtin.file:
+    path: "{{ github_runner_instance.dir }}/.service"
+    state: absent
+  when:
+    - github_runner_instance_service_exists | bool
+    - >-
+      github_runner_instance.replace | default(false) | bool
+      or github_runner_instance.state | default('present') == 'absent'
+
 - name: Require token for registration change
   ansible.builtin.assert:
     that: github_runner_instance.registration_token | default('') | trim | length > 0
