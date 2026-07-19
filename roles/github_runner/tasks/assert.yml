@@ -40,6 +40,33 @@
       - item.work_dir | default('') | trim | length > 0
       - item.labels | default([]) is sequence
       - item.labels | default([]) is not string
+      - item.runner_group | default('') is string
+      - item.external_service_name | default('') is string
+      - item.external_service_unit_path | default('') is string
+      - not (item.external_service_name | default('') | regex_search('/'))
+      - >-
+        (item.external_service_name | default('') | trim | length > 0)
+        == (item.external_service_unit_path | default('') | trim | length > 0)
+      - >-
+        item.external_service_name | default('') | trim | length == 0
+        or item.state | default('present') == 'absent'
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or item.external_service_unit_path
+        | regex_search('^/etc/systemd/system/[A-Za-z0-9_.@-]+\.service$')
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or item.external_service_unit_path | basename
+        == item.external_service_name | default('')
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or item.external_service_unit_path | trim != '/'
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or not (item.external_service_unit_path | regex_search('//'))
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or not (item.external_service_unit_path | regex_search('(^|/)\.\.?(/|$)'))
       - item.state | default('present') in ['present', 'absent']
       - item.service_state | default(github_runner_service_state) in ['started', 'stopped', 'restarted', 'reloaded']
       - not (item.work_dir | default('') | regex_search('^/'))

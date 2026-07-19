@@ -20,6 +20,27 @@
   changed_when: false
   when: github_runner_instance_service_exists | bool
 
+- name: Check external service unit for {{ github_runner_instance.name }}
+  ansible.builtin.stat:
+    path: "{{ github_runner_instance.external_service_unit_path }}"
+  register: github_runner_instance_external_service_unit_file
+  changed_when: false
+  when: github_runner_instance.external_service_unit_path | default('') | trim | length > 0
+
+- name: Stop external service before removing {{ github_runner_instance.name }}
+  ansible.builtin.systemd_service:
+    name: "{{ github_runner_instance.external_service_name }}"
+    state: stopped
+    enabled: false
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_instance.state | default('present') == 'absent'
+    - github_runner_instance.external_service_name | default('') | trim | length > 0
+    - github_runner_instance_external_service_unit_file.stat.exists | default(false)
+    - >-
+      github_runner_instance_external_service_unit_file.stat.isreg | default(false)
+      or github_runner_instance_external_service_unit_file.stat.islnk | default(false)
+
 - name: Stop service before changing {{ github_runner_instance.name }}
   ansible.builtin.systemd_service:
     name: "{{ github_runner_instance_service_name.content | b64decode | trim }}"
@@ -99,6 +120,28 @@
       github_runner_instance.replace | default(false) | bool
       or github_runner_instance.state | default('present') == 'absent'
 
+- name: Remove external service unit for {{ github_runner_instance.name }}
+  ansible.builtin.file:
+    path: "{{ github_runner_instance.external_service_unit_path }}"
+    state: absent
+  register: github_runner_instance_external_service_unit
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_instance.state | default('present') == 'absent'
+    - github_runner_instance.external_service_unit_path | default('') | trim | length > 0
+    - github_runner_instance_external_service_unit_file.stat.exists | default(false)
+    - >-
+      github_runner_instance_external_service_unit_file.stat.isreg | default(false)
+      or github_runner_instance_external_service_unit_file.stat.islnk | default(false)
+
+- name: Reload systemd after removing external service for {{ github_runner_instance.name }}
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - github_runner_instance_external_service_unit is defined
+    - github_runner_instance_external_service_unit.changed | default(false)
+
 - name: Remove installation for {{ github_runner_instance.name }}
   ansible.builtin.file:
     path: "{{ github_runner_instance.dir }}"
@@ -150,26 +193,35 @@
         group: "{{ github_runner_group }}"
         recurse: true
 
+    - name: Build registration command for {{ github_runner_instance.name }}
+      ansible.builtin.set_fact:
+        github_runner_instance_config_command: >-
+          {{
+            [
+              'sudo', '-n', '-u', github_runner_user, './config.sh',
+              '--url', github_runner_url,
+              '--token', github_runner_instance.registration_token,
+              '--name', github_runner_instance.name,
+              '--labels', github_runner_instance.labels | join(','),
+              '--work', github_runner_instance.work_dir
+            ]
+            + (
+              ['--runnergroup', github_runner_instance.runner_group]
+              if github_runner_instance.runner_group | default('') | trim | length > 0
+              else []
+            )
+            + ['--unattended', '--replace']
+          }}
+      no_log: true
+      changed_when: false
+      when:
+        - not ansible_check_mode
+        - github_runner_register | bool
+        - (not github_runner_instance_config_exists | bool) or github_runner_instance.replace | default(false) | bool
+
     - name: Configure registration for {{ github_runner_instance.name }}
       ansible.builtin.command:
-        argv:
-          - sudo
-          - -n
-          - -u
-          - "{{ github_runner_user }}"
-          - ./config.sh
-          - --url
-          - "{{ github_runner_url }}"
-          - --token
-          - "{{ github_runner_instance.registration_token }}"
-          - --name
-          - "{{ github_runner_instance.name }}"
-          - --labels
-          - "{{ github_runner_instance.labels | join(',') }}"
-          - --work
-          - "{{ github_runner_instance.work_dir }}"
-          - --unattended
-          - --replace
+        argv: "{{ github_runner_instance_config_command }}"
         chdir: "{{ github_runner_instance.dir }}"
       no_log: true
       changed_when: true
