@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - >-
+    github_runner - add a backward-compatible, data-driven multi-instance interface with isolated installation and
+    work directories, per-instance registration lifecycle with distinct registration and removal tokens, and
+    independent systemd service management.
