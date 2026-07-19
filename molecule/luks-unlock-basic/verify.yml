@@ -4,8 +4,8 @@
   become: false
   gather_facts: false
   vars:
-    luks_unlock_test_dir: /tmp/lit-luks-unlock-molecule
-    luks_unlock_test_clevis_log: /tmp/lit-luks-unlock-molecule/clevis.log
+    luks_unlock_test_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/lit-luks-unlock-molecule"
+    luks_unlock_test_clevis_log: "{{ luks_unlock_test_dir }}/clevis.log"
     luks_unlock_test_public_key: >-
       ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoleculeDocumentationKeyOnly000000000 molecule@example.invalid
 
