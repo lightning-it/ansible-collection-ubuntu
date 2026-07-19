@@ -33,7 +33,6 @@
   # imported task and make non-matching upstream controls eligible to run.
   ansible.builtin.import_role:
     name: ansible-lockdown.ubuntu24_cis  # noqa syntax-check[specific] -- EE-installed dependency
-  # noqa var-naming[no-role-prefix] -- these are the upstream role's public inputs
   vars:
-    audit_file_git: "{{ cis_ubuntu24_audit_dependency.repository }}"
-    audit_git_version: "{{ cis_ubuntu24_audit_dependency.commit }}"
+    audit_file_git: "{{ cis_ubuntu24_audit_dependency.repository }}"  # noqa: var-naming[no-role-prefix]
+    audit_git_version: "{{ cis_ubuntu24_audit_dependency.commit }}"  # noqa: var-naming[no-role-prefix]

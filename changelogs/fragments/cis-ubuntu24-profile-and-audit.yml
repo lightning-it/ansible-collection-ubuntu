@@ -1,4 +1,10 @@
 ---
+breaking_changes:
+  - >-
+    Raise collection minimum ``requires_ansible`` from ``>=2.16.1`` to
+    ``>=2.18``. Consumers running ansible-core below 2.18 must upgrade before
+    using this collection release.
+
 minor_changes:
   - >-
     Harden the cis_ubuntu24 integration with separate fail-closed remediation
