@@ -33,10 +33,10 @@
     executable: "{{ developer_tools_npm_executable }}"
     state: present
   environment:
-    npm_config_fetch_timeout: "{{ developer_tools_npm_fetch_timeout_ms }}"
-    npm_config_fetch_retries: "{{ developer_tools_npm_fetch_retries }}"
-    npm_config_fetch_retry_mintimeout: "{{ developer_tools_npm_fetch_retry_min_timeout_ms }}"
-    npm_config_fetch_retry_maxtimeout: "{{ developer_tools_npm_fetch_retry_max_timeout_ms }}"
+    npm_config_fetch_timeout: "{{ developer_tools_npm_fetch_timeout_ms | string }}"
+    npm_config_fetch_retries: "{{ developer_tools_npm_fetch_retries | string }}"
+    npm_config_fetch_retry_mintimeout: "{{ developer_tools_npm_fetch_retry_min_timeout_ms | string }}"
+    npm_config_fetch_retry_maxtimeout: "{{ developer_tools_npm_fetch_retry_max_timeout_ms | string }}"
   loop: "{{ developer_tools_npm_packages_present }}"
   loop_control:
     label: "{{ item.name | default('invalid-npm-package') }}@{{ item.version | default('missing') }}"
@@ -67,6 +67,11 @@
     global: true
     executable: "{{ developer_tools_npm_executable }}"
     state: present
+  environment:
+    npm_config_fetch_timeout: "{{ developer_tools_npm_fetch_timeout_ms | string }}"
+    npm_config_fetch_retries: "{{ developer_tools_npm_fetch_retries | string }}"
+    npm_config_fetch_retry_mintimeout: "{{ developer_tools_npm_fetch_retry_min_timeout_ms | string }}"
+    npm_config_fetch_retry_maxtimeout: "{{ developer_tools_npm_fetch_retry_max_timeout_ms | string }}"
   when:
     - developer_tools_markdownlint_cli2_enabled | bool
     - developer_tools_markdownlint_cli2_install_mode == "global"
@@ -147,6 +152,11 @@
       - --yes
       - "{{ developer_tools_markdownlint_cli2_npx_package_spec }}"
       - --version
+  environment:
+    npm_config_fetch_timeout: "{{ developer_tools_npm_fetch_timeout_ms | string }}"
+    npm_config_fetch_retries: "{{ developer_tools_npm_fetch_retries | string }}"
+    npm_config_fetch_retry_mintimeout: "{{ developer_tools_npm_fetch_retry_min_timeout_ms | string }}"
+    npm_config_fetch_retry_maxtimeout: "{{ developer_tools_npm_fetch_retry_max_timeout_ms | string }}"
   changed_when: false
   when:
     - developer_tools_markdownlint_cli2_enabled | bool
