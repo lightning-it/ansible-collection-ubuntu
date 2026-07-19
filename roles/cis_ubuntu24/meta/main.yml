@@ -6,7 +6,7 @@ galaxy_info:
   description: Thin wrapper for the ansible-lockdown Ubuntu 24 CIS role.
   company: Lightning IT
   license: MIT
-  min_ansible_version: "2.16.1"
+  min_ansible_version: "2.18"
   platforms:
     - name: Ubuntu
       versions: ["noble"]

@@ -40,12 +40,11 @@
             tasks_from: assert.yml
             apply:
               tags: level1-server
-          # noqa var-naming[no-role-prefix] -- exercise upstream role public inputs
           vars:
             cis_ubuntu24_profile_tag: level1-server
             cis_ubuntu24_execution_mode: remediate
-            ubtu24cis_level_1: true
-            ubtu24cis_level_2: false
+            ubtu24cis_level_1: true  # noqa: var-naming[no-role-prefix]
+            ubtu24cis_level_2: false  # noqa: var-naming[no-role-prefix]
             cis_ubuntu24_exceptions:
               - control_ids:
                   - TEST.2
