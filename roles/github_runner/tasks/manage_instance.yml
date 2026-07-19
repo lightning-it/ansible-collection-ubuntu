@@ -138,6 +138,7 @@
   ansible.builtin.systemd_service:
     daemon_reload: true
   when:
+    - not ansible_check_mode
     - github_runner_instance_external_service_unit is defined
     - github_runner_instance_external_service_unit.changed | default(false)
 
