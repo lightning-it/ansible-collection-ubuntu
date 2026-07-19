@@ -56,5 +56,5 @@ bash scripts/wunder-devtools-ee.sh bash -c '
   # -------------------------------------------------------------------
   # 3) Run example playbook
   # -------------------------------------------------------------------
-  ansible-playbook -i localhost, "${example}"
+  ansible-playbook --check -i localhost, "${example}"
 '
