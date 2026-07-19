@@ -218,4 +218,7 @@
       when:
         - github_runner_manage_service | bool
         - github_runner_register | bool
-        - github_runner_instance_service_name_after.content | default('', true) | b64decode | trim | length > 0
+        - github_runner_instance_service_name_after is defined
+        - not (github_runner_instance_service_name_after.skipped | default(false))
+        - github_runner_instance_service_name_after.content is defined
+        - github_runner_instance_service_name_after.content | b64decode | trim | length > 0
