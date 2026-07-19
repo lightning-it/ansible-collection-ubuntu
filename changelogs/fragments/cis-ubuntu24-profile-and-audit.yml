@@ -1,7 +1,7 @@
 ---
 breaking_changes:
   - >-
-    Raise collection minimum ``requires_ansible`` from ``>=2.15.0`` to
+    Raise collection minimum ``requires_ansible`` from ``>=2.16.1`` to
     ``>=2.18``. Consumers running ansible-core below 2.18 must upgrade before
     using this collection release.
 
