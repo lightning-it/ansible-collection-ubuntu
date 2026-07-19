@@ -1,0 +1,45 @@
+---
+- name: Inspect the package AIDE systemd service override
+  when:
+    - cis_ubuntu24_execution_mode == 'remediate'
+    - ubtu24cis_config_aide | default(false) | bool
+    - ubtu24cis_rule_6_3_2 | default(true) | bool
+  ansible.builtin.stat:
+    path: /etc/systemd/system/dailyaidecheck.service
+    follow: false
+  register: cis_ubuntu24_aide_service_override
+
+- name: Mask the unused static AIDE service for cron scheduling
+  when:
+    - cis_ubuntu24_execution_mode == 'remediate'
+    - ubtu24cis_config_aide | default(false) | bool
+    - ubtu24cis_rule_6_3_2 | default(true) | bool
+    - ubtu24cis_aide_scan | default('cron') == 'cron'
+    - >-
+      not (cis_ubuntu24_aide_service_override.stat.exists | default(false))
+      or
+      (
+        cis_ubuntu24_aide_service_override.stat.islnk | default(false)
+        and
+        cis_ubuntu24_aide_service_override.stat.lnk_source | default('')
+        == '/dev/null'
+      )
+  ansible.builtin.file:
+    src: /dev/null
+    dest: /etc/systemd/system/dailyaidecheck.service
+    state: link
+    force: false
+
+- name: Remove the wrapper-owned AIDE service mask for timer scheduling
+  when:
+    - cis_ubuntu24_execution_mode == 'remediate'
+    - ubtu24cis_config_aide | default(false) | bool
+    - ubtu24cis_rule_6_3_2 | default(true) | bool
+    - ubtu24cis_aide_scan | default('cron') == 'timer'
+    - cis_ubuntu24_aide_service_override.stat.islnk | default(false)
+    - >-
+      cis_ubuntu24_aide_service_override.stat.lnk_source | default('')
+      == '/dev/null'
+  ansible.builtin.file:
+    path: /etc/systemd/system/dailyaidecheck.service
+    state: absent

@@ -1,0 +1,75 @@
+---
+- name: Inspect isolated Python toolchain
+  ansible.builtin.stat:
+    path: "{{ developer_tools_python_venv_path }}"
+  register: developer_tools_python_venv_state
+  changed_when: false
+  check_mode: false
+
+- name: Ensure isolated Python toolchain parent exists
+  ansible.builtin.file:
+    path: "{{ developer_tools_python_venv_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure Python virtual environment support is installed
+  ansible.builtin.apt:
+    name: "{{ developer_tools_python_venv_support_packages }}"
+    state: present
+  when: developer_tools_python_venv_support_packages | length > 0
+
+- name: Install isolated Python toolchain
+  ansible.builtin.pip:
+    name: "{{ developer_tools_python_venv_packages }}"
+    state: present
+    virtualenv: "{{ developer_tools_python_venv_path }}"
+    virtualenv_command: "{{ developer_tools_python_venv_python }} -m venv"
+  when:
+    - >-
+      not ansible_check_mode
+      or developer_tools_python_venv_state.stat.isdir | default(false)
+
+- name: Ensure isolated Python command link directory exists
+  ansible.builtin.file:
+    path: "{{ developer_tools_python_venv_link_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: developer_tools_python_venv_commands | length > 0
+
+- name: Check isolated Python command entry points
+  ansible.builtin.stat:
+    path: "{{ developer_tools_python_venv_path }}/bin/{{ item }}"
+  loop: "{{ developer_tools_python_venv_commands }}"
+  register: developer_tools_python_venv_command_stats
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Validate isolated Python command entry points
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg | default(false)
+      - item.stat.executable | default(false)
+    fail_msg: >-
+      The pinned Python toolchain did not provide the expected
+      {{ item.item }} entry point.
+    quiet: true
+  loop: "{{ developer_tools_python_venv_command_stats.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: not ansible_check_mode
+
+- name: Expose isolated Python commands through stable links
+  ansible.builtin.file:
+    src: "{{ developer_tools_python_venv_path }}/bin/{{ item }}"
+    dest: "{{ developer_tools_python_venv_link_dir }}/{{ item }}"
+    state: link
+    owner: root
+    group: root
+    force: false
+  loop: "{{ developer_tools_python_venv_commands }}"
+  when: not ansible_check_mode

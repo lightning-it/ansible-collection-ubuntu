@@ -1,0 +1,58 @@
+---
+- name: Resolve desired and current Incus profile state
+  ansible.builtin.set_fact:
+    incus_profile_desired_payload:
+      config: "{{ incus_profile.config | default({}) }}"
+      description: "{{ incus_profile.description | default('') }}"
+      devices: "{{ incus_profile.devices | default({}) }}"
+    incus_profile_current: >-
+      {{
+        incus_profiles_current_by_project[incus_profile.project]
+        | selectattr('name', 'equalto', incus_profile.name)
+        | list
+        | first
+        | default({}, true)
+      }}
+  changed_when: false
+
+- name: Create Incus profile
+  ansible.builtin.command:
+    argv:
+      - incus
+      - profile
+      - create
+      - "{{ incus_profile.name }}"
+      - --project
+      - "{{ incus_profile.project }}"
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - incus_profile_current | length == 0
+
+- name: Edit changed Incus profile
+  ansible.builtin.command:
+    argv:
+      - incus
+      - profile
+      - edit
+      - "{{ incus_profile.name }}"
+      - --project
+      - "{{ incus_profile.project }}"
+    stdin: "{{ incus_profile_desired_payload | to_nice_json }}"
+    stdin_add_newline: true
+  changed_when: true
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - >-
+      (incus_profile_current | length == 0 and incus_profile_desired_payload != {
+        'config': {}, 'description': '', 'devices': {}
+      })
+      or (
+        incus_profile_current | length > 0
+        and (
+          incus_profile_current.config | default({}, true) != incus_profile_desired_payload.config
+          or incus_profile_current.description | default('', true) != incus_profile_desired_payload.description
+          or incus_profile_current.devices | default({}, true) != incus_profile_desired_payload.devices
+        )
+      )

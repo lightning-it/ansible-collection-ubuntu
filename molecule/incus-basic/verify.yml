@@ -5,14 +5,85 @@
   gather_facts: false
 
   tasks:
-    - name: Check Incus binary
-      ansible.builtin.stat:
-        path: /usr/bin/incus
-      register: incus_binary
+    - name: Read Incus storage state
+      ansible.builtin.command:
+        argv:
+          - incus
+          - storage
+          - list
+          - --format
+          - json
+      register: incus_storage_state
       changed_when: false
 
-    - name: Assert disabled role did not install Incus
+    - name: Read Incus project state
+      ansible.builtin.command:
+        argv:
+          - incus
+          - project
+          - list
+          - --format
+          - json
+      register: incus_project_state
+      changed_when: false
+
+    - name: Read Incus profile state
+      ansible.builtin.command:
+        argv:
+          - incus
+          - profile
+          - list
+          - --project
+          - workbench
+          - --format
+          - json
+      register: incus_profile_state
+      changed_when: false
+
+    - name: Read fake Incus mutation log
+      ansible.builtin.command:
+        cmd: grep -v '^$' /var/lib/incus-fake/mutations.log
+      register: incus_mutations
+      changed_when: false
+
+    - name: Read applied Incus preseed
+      ansible.builtin.slurp:
+        src: /var/lib/incus-fake/preseed.json
+      register: incus_preseed_state
+
+    - name: Decode fake Incus state
+      ansible.builtin.set_fact:
+        incus_storage_state_decoded: "{{ incus_storage_state.stdout | from_json }}"
+        incus_project_state_decoded: "{{ incus_project_state.stdout | from_json }}"
+        incus_profile_state_decoded: "{{ incus_profile_state.stdout | from_json }}"
+        incus_preseed_state_decoded: "{{ incus_preseed_state.content | b64decode | from_json }}"
+      changed_when: false
+
+    - name: Assert declarative Incus state and idempotent mutation count
       ansible.builtin.assert:
         that:
-          - not incus_binary.stat.exists
-        fail_msg: "Disabled incus role installed Incus"
+          - incus_storage_state_decoded | map(attribute='name') | list == ['default']
+          - incus_project_state_decoded | selectattr('name', 'equalto', 'workbench') | list | length == 1
+          - >-
+            incus_project_state_decoded
+            | selectattr('name', 'equalto', 'workbench')
+            | map(attribute='config')
+            | first == expected_incus_project_config
+          - incus_profile_state_decoded | length == 1
+          - incus_profile_state_decoded.0.description == 'Workbench test profile'
+          - incus_profile_state_decoded.0.config == expected_incus_profile_config
+          - incus_profile_state_decoded.0.devices.root.type == 'disk'
+          - incus_preseed_state_decoded.config | default({}) | length == 0
+          - incus_mutations.stdout_lines == expected_incus_mutations
+        fail_msg: "Incus fake state did not match the declaration or the role mutated it more than once."
+      vars:
+        expected_incus_project_config:
+          features.images: "false"
+        expected_incus_profile_config:
+          limits.cpu: "2"
+        expected_incus_mutations:
+          - admin init --preseed
+          - project create workbench
+          - project set workbench features.images=false
+          - profile create workbench --project workbench
+          - profile edit workbench --project workbench

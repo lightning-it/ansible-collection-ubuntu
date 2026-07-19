@@ -1,5 +1,5 @@
 ---
-- name: Verify podman syntax coverage
+- name: Verify podman role execution
   hosts: localhost
   connection: local
   gather_facts: false
@@ -9,8 +9,15 @@
         path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/podman-syntax-coverage"
       register: podman_molecule_coverage_marker
 
-    - name: Assert lit.ubuntu.podman coverage stub ran
+    - name: Check isolated containers configuration directory
+      ansible.builtin.stat:
+        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/containers"
+      register: podman_molecule_containers_dir
+
+    - name: Assert lit.ubuntu.podman executed safely
       ansible.builtin.assert:
         that:
           - podman_molecule_coverage_marker.stat.exists
+          - podman_molecule_coverage_marker.stat.size == 14
+          - podman_molecule_containers_dir.stat.isdir
         quiet: true

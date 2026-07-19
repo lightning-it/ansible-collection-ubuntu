@@ -19,6 +19,7 @@ users_accounts:
     uid: 1001
     gid: ops                  # primary group name or GID
     groups: ["sudo", "devs"]  # supplementary groups
+    groups_append: true        # false makes supplementary groups exact
     shell: /bin/bash
     home: /home/ops-admin
     create_home: true
@@ -29,6 +30,7 @@ users_accounts:
     sudoers_name: ops-admin   # optional sudoers file name; removed when passwordless_sudo is false
     ssh_keys:
       - "ssh-ed25519 AAAA... comment"
+    ssh_keys_exclusive: false  # true removes undeclared authorized keys
 ```
 
 ### `users_manage_groups`

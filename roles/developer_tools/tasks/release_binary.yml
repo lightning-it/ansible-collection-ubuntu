@@ -1,0 +1,107 @@
+---
+- name: Validate standalone release binary definition
+  ansible.builtin.assert:
+    that:
+      - developer_tools_release_binary is mapping
+      - developer_tools_release_binary.name | default('', true) | string | trim | length > 0
+      - >-
+        developer_tools_release_binary.name
+        | default('', true)
+        | string
+        | trim
+        is match('^[A-Za-z0-9._+-]+$')
+      - developer_tools_release_binary.version | default('', true) | string | trim | length > 0
+      - developer_tools_release_binary.url | default('', true) | string | trim is match('^https://')
+      - developer_tools_release_binary.filename | default('', true) | string | trim | length > 0
+      - >-
+        developer_tools_release_binary.filename
+        | default('', true)
+        | string
+        | trim
+        is match('^[A-Za-z0-9._+-]+$')
+      - >-
+        developer_tools_release_binary.checksum
+        | default('', true)
+        | string
+        | trim
+        is match('^sha256:[a-fA-F0-9]{64}$')
+      - developer_tools_release_binary.dest | default('', true) | string | trim is match('^/')
+      - developer_tools_release_binary.archive | default(false) is boolean
+      - >-
+        developer_tools_release_binary.mode
+        | default('0755')
+        | string
+        is match('^0[0-7]{3}$')
+      - >-
+        not (developer_tools_release_binary.archive | default(false) | bool)
+        or (
+          developer_tools_release_binary.binary_path
+          | default('', true)
+          | string
+          | trim
+          is match('^(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$')
+        )
+    fail_msg: >-
+      Each standalone release binary requires a name, version, HTTPS URL,
+      filename, exact SHA-256 checksum, absolute destination, and an archive
+      binary_path when archive=true.
+    quiet: true
+
+- name: Resolve standalone release binary paths
+  ansible.builtin.set_fact:
+    developer_tools_release_binary_download_path: >-
+      {{ developer_tools_release_binary_cache_dir }}/{{ developer_tools_release_binary.filename }}
+    developer_tools_release_binary_extract_dir: >-
+      {{ developer_tools_release_binary_cache_dir }}/{{ developer_tools_release_binary.name }}-{{
+      developer_tools_release_binary.version }}
+  changed_when: false
+
+- name: Download standalone release binary with exact checksum
+  ansible.builtin.get_url:
+    url: "{{ developer_tools_release_binary.url }}"
+    dest: "{{ developer_tools_release_binary_download_path }}"
+    checksum: "{{ developer_tools_release_binary.checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - >-
+      not ansible_check_mode
+      or developer_tools_release_binary_cache_state.stat.isdir | default(false)
+
+- name: Ensure standalone release binary extraction directory exists
+  ansible.builtin.file:
+    path: "{{ developer_tools_release_binary_extract_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not ansible_check_mode
+    - developer_tools_release_binary.archive | default(false) | bool
+
+- name: Extract standalone release binary archive once
+  ansible.builtin.unarchive:
+    src: "{{ developer_tools_release_binary_download_path }}"
+    dest: "{{ developer_tools_release_binary_extract_dir }}"
+    remote_src: true
+    creates: >-
+      {{ developer_tools_release_binary_extract_dir }}/{{ developer_tools_release_binary.binary_path }}
+  when:
+    - not ansible_check_mode
+    - developer_tools_release_binary.archive | default(false) | bool
+
+- name: Install standalone release binary
+  ansible.builtin.copy:
+    src: >-
+      {{
+        developer_tools_release_binary_extract_dir ~ '/' ~ developer_tools_release_binary.binary_path
+        if (developer_tools_release_binary.archive | default(false) | bool)
+        else developer_tools_release_binary_download_path
+      }}
+    dest: "{{ developer_tools_release_binary.dest }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "{{ developer_tools_release_binary.mode | default('0755') }}"
+  when: not ansible_check_mode

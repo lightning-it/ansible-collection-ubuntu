@@ -6,8 +6,27 @@
   vars:
     ansible_user: root
     ansible_python_interpreter: /usr/bin/python3
-    incus_enabled: false
-
+    incus_packages: []
+    incus_services: []
+    incus_preseed:
+      storage_pools:
+        - name: default
+          driver: dir
+    incus_projects:
+      - name: workbench
+        config:
+          features.images: "false"
+    incus_profiles:
+      - name: workbench
+        project: workbench
+        description: Workbench test profile
+        config:
+          limits.cpu: "2"
+        devices:
+          root:
+            type: disk
+            path: /
+            pool: default
   pre_tasks:
     - name: Ensure python3 is present
       ansible.builtin.raw: |
@@ -16,5 +35,26 @@
         fi
       changed_when: false
 
+    - name: Install fake Incus CLI
+      ansible.builtin.copy:
+        src: incus-fake.py
+        dest: /usr/local/bin/incus
+        owner: root
+        group: root
+        mode: "0755"
+      when: not ansible_check_mode
+
   roles:
     - role: lit.ubuntu.incus
+
+  post_tasks:
+    - name: Assert absent-CLI check mode used safe empty discovery state
+      ansible.builtin.assert:
+        that:
+          - not incus_cli_available | bool
+          - incus_storage_pools_current == []
+          - incus_projects_current == []
+          - >-
+            incus_profiles_current_by_project == {'workbench': []}
+        quiet: true
+      when: ansible_check_mode

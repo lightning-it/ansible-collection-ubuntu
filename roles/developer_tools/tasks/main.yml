@@ -21,6 +21,10 @@
     extra_args: "{{ developer_tools_pip_extra_args | default(omit, true) }}"
   when: (developer_tools_pip_packages_present | default([], true) | length) > 0
 
+- name: Configure isolated Python developer toolchain
+  ansible.builtin.include_tasks: python_venv.yml
+  when: developer_tools_python_venv_enabled | bool
+
 - name: Configure Node.js developer tooling
   ansible.builtin.include_tasks: nodejs.yml
   when: developer_tools_nodejs_enabled | bool
@@ -65,6 +69,14 @@
   ansible.builtin.include_tasks: terminal_config.yml
   when: developer_tools_terminal_config_enabled | bool
 
+- name: Configure developer workspace directories
+  ansible.builtin.include_tasks: workspace.yml
+  when: developer_tools_workspace_enabled | bool
+
+- name: Install supply-chain verified standalone tools
+  ansible.builtin.include_tasks: release_binaries.yml
+  when: developer_tools_release_binaries | length > 0
+
 - name: Ensure Argo CD CLI is installed when enabled
   ansible.builtin.get_url:
     url: "{{ developer_tools_argocd_cli_url }}"
@@ -84,6 +96,7 @@
     url: "{{ developer_tools_actionlint_checksum_url }}"
     return_content: true
   register: developer_tools_actionlint_checksum_response
+  check_mode: false
   when: developer_tools_actionlint_enabled | bool
 
 - name: Resolve actionlint archive checksum when enabled
@@ -135,7 +148,9 @@
     dest: "{{ developer_tools_actionlint_extract_dir }}"
     remote_src: true
     creates: "{{ developer_tools_actionlint_extract_dir }}/actionlint"
-  when: developer_tools_actionlint_enabled | bool
+  when:
+    - developer_tools_actionlint_enabled | bool
+    - not ansible_check_mode
 
 - name: Ensure actionlint CLI is installed when enabled
   ansible.builtin.copy:
@@ -143,7 +158,9 @@
     dest: "{{ developer_tools_actionlint_dest }}"
     remote_src: true
     mode: "0755"
-  when: developer_tools_actionlint_enabled | bool
+  when:
+    - developer_tools_actionlint_enabled | bool
+    - not ansible_check_mode
 
 - name: Ensure Packer archive dependencies are installed when enabled
   ansible.builtin.package:
@@ -155,6 +172,7 @@
   ansible.builtin.get_url:
     url: "{{ developer_tools_packer_archive_url }}"
     dest: "{{ developer_tools_packer_archive_path }}"
+    checksum: "{{ developer_tools_packer_checksum }}"
     mode: "0644"
   when: developer_tools_packer_enabled | bool
 
@@ -171,7 +189,9 @@
     dest: "{{ developer_tools_packer_extract_dir }}"
     remote_src: true
     creates: "{{ developer_tools_packer_extract_dir }}/packer"
-  when: developer_tools_packer_enabled | bool
+  when:
+    - developer_tools_packer_enabled | bool
+    - not ansible_check_mode
 
 - name: Ensure Packer CLI is installed when enabled
   ansible.builtin.copy:
@@ -179,12 +199,15 @@
     dest: "{{ developer_tools_packer_dest }}"
     remote_src: true
     mode: "0755"
-  when: developer_tools_packer_enabled | bool
+  when:
+    - developer_tools_packer_enabled | bool
+    - not ansible_check_mode
 
 - name: Ensure OpenShift CLI archive is downloaded when enabled
   ansible.builtin.get_url:
     url: "{{ developer_tools_oc_cli_archive_url }}"
     dest: "{{ developer_tools_oc_cli_archive_path }}"
+    checksum: "{{ developer_tools_oc_cli_checksum }}"
     mode: "0644"
   when: developer_tools_oc_cli_enabled | bool
 
@@ -200,7 +223,10 @@
     src: "{{ developer_tools_oc_cli_archive_path }}"
     dest: "{{ developer_tools_oc_cli_extract_dir }}"
     remote_src: true
-  when: developer_tools_oc_cli_enabled | bool
+    creates: "{{ developer_tools_oc_cli_extract_dir }}/oc"
+  when:
+    - developer_tools_oc_cli_enabled | bool
+    - not ansible_check_mode
 
 - name: Ensure oc CLI is installed when enabled
   ansible.builtin.copy:
@@ -208,7 +234,9 @@
     dest: "{{ developer_tools_oc_cli_dest }}"
     remote_src: true
     mode: "0755"
-  when: developer_tools_oc_cli_enabled | bool
+  when:
+    - developer_tools_oc_cli_enabled | bool
+    - not ansible_check_mode
 
 - name: Ensure kubectl CLI from OpenShift client archive is installed when enabled
   ansible.builtin.copy:
@@ -219,6 +247,7 @@
   when:
     - developer_tools_oc_cli_enabled | bool
     - developer_tools_kubectl_cli_enabled | bool
+    - not ansible_check_mode
 
 - name: Configure persistent ssh-agent for developer users
   ansible.builtin.import_tasks: ssh_agent.yml

@@ -50,17 +50,18 @@ PR feedback available even when the Incus runner pool is offline.
 | `vscode-deploy-basic` | desktop | GitHub-hosted Ubuntu |
 | `vscode-destroy-basic` | desktop | GitHub-hosted Ubuntu |
 | `xrdp-basic` | desktop | GitHub-hosted Ubuntu |
-| `incus-basic` | incus | self-hosted Ubuntu Incus |
+| `incus-basic` | incus | GitHub-hosted Ubuntu (stateful CLI double) |
 | `incus-image-basic` | incus | self-hosted Ubuntu Incus |
 | `incus-instance-basic` | incus | self-hosted Ubuntu Incus |
 | `netplan-basic` | incus/network | self-hosted Ubuntu Incus |
 
 ## Protected Incus Scenarios
 
-Incus scenarios are marked with `.molecule-mode` set to `protected-incus`.
-They only run when `MOLECULE_RUN_PROTECTED=true`, which the workflow sets only
-for the self-hosted Incus and heavy jobs. This prevents protected Incus
-coverage from running accidentally on GitHub-hosted runners.
+Incus scenarios that require a real Incus daemon are marked with
+`.molecule-mode` set to `protected-incus`. They only run when
+`MOLECULE_RUN_PROTECTED=true`, which the workflow sets only for the self-hosted
+Incus and heavy jobs. The light `incus-basic` contract test uses a stateful CLI
+double and is intentionally safe on GitHub-hosted runners.
 
 ## Branch Protection
 

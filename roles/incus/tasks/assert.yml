@@ -2,14 +2,88 @@
 - name: Validate Incus role inputs
   ansible.builtin.assert:
     that:
+      - incus_enabled is boolean
       - incus_packages is sequence
       - incus_packages is not string
+      - incus_packages | select('string') | list | length == incus_packages | length
+      - incus_update_apt_cache is boolean
+      - incus_initialize is boolean
+      - incus_preseed is mapping
+      - incus_projects is sequence
+      - incus_projects is not string
+      - incus_profiles is sequence
+      - incus_profiles is not string
       - incus_services is sequence
       - incus_services is not string
+      - incus_services | select('string') | list | length == incus_services | length
       - incus_users is sequence
       - incus_users is not string
+      - incus_users | select('string') | list | length == incus_users | length
       - incus_user_groups is sequence
       - incus_user_groups is not string
+      - incus_user_groups | select('string') | list | length == incus_user_groups | length
+      - incus_users | length == 0 or incus_user_groups | length > 0
     fail_msg: "Incus role variables are invalid."
   changed_when: false
+  when: incus_enabled | bool
+
+- name: Validate Incus project definitions
+  ansible.builtin.assert:
+    that:
+      - incus_project_to_validate.name | default('') is string
+      - incus_project_to_validate.name | default('') | trim | length > 0
+      - incus_project_to_validate.config | default({}) is mapping
+      - >-
+        incus_project_to_validate.config | default({}) | dict2items
+        | selectattr('value', 'string') | list | length
+        == incus_project_to_validate.config | default({}) | length
+      - >-
+        incus_projects | selectattr('name', 'equalto', incus_project_to_validate.name)
+        | list | length == 1
+    fail_msg: "Each Incus project requires a unique non-empty name and string configuration values."
+  loop: "{{ incus_projects }}"
+  loop_control:
+    label: "{{ incus_project_to_validate.name | default('<unnamed>') }}"
+    loop_var: incus_project_to_validate
+  changed_when: false
+  when: incus_enabled | bool
+
+- name: Validate Incus profile definitions
+  ansible.builtin.assert:
+    that:
+      - incus_profile_to_validate.name | default('') is string
+      - incus_profile_to_validate.name | default('') | trim | length > 0
+      - incus_profile_to_validate.project | default('') is string
+      - incus_profile_to_validate.project | default('') | trim | length > 0
+      - incus_profile_to_validate.description | default('') is string
+      - incus_profile_to_validate.config | default({}) is mapping
+      - incus_profile_to_validate.devices | default({}) is mapping
+      - >-
+        incus_profile_to_validate.config | default({}) | dict2items
+        | selectattr('value', 'string') | list | length
+        == incus_profile_to_validate.config | default({}) | length
+      - >-
+        incus_profiles | selectattr('name', 'equalto', incus_profile_to_validate.name)
+        | selectattr('project', 'equalto', incus_profile_to_validate.project)
+        | list | length == 1
+    fail_msg: >-
+      Each Incus profile requires a unique project/name pair, a description,
+      string configuration values, and a devices mapping.
+  loop: "{{ incus_profiles }}"
+  loop_control:
+    label: >-
+      {{ incus_profile_to_validate.project | default('<no-project>') }}/
+      {{ incus_profile_to_validate.name | default('<unnamed>') }}
+    loop_var: incus_profile_to_validate
+  changed_when: false
+  when: incus_enabled | bool
+
+- name: Validate Incus profile device definitions
+  ansible.builtin.include_tasks: assert_profile_devices.yml
+  loop: "{{ incus_profiles }}"
+  loop_control:
+    label: >-
+      {{ incus_profile_to_validate.project | default('<no-project>') }}/
+      {{ incus_profile_to_validate.name | default('<unnamed>') }}
+    loop_var: incus_profile_to_validate
   when: incus_enabled | bool

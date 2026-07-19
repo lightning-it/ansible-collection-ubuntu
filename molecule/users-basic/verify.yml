@@ -1,5 +1,5 @@
 ---
-- name: Verify users syntax coverage
+- name: Verify users role execution
   hosts: localhost
   connection: local
   gather_facts: false
@@ -9,8 +9,87 @@
         path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/users-syntax-coverage"
       register: users_molecule_coverage_marker
 
-    - name: Assert lit.ubuntu.users coverage stub ran
+    - name: Read Molecule user supplementary groups
+      ansible.builtin.command:
+        argv:
+          - id
+          - -nG
+          - lit-molecule-user
+      register: users_molecule_groups
+      changed_when: false
+
+    - name: Read Molecule user authorized keys
+      ansible.builtin.slurp:
+        src: /home/lit-molecule-user/.ssh/authorized_keys
+      register: users_molecule_authorized_keys
+
+    - name: Assert lit.ubuntu.users reconciled exact access
       ansible.builtin.assert:
         that:
           - users_molecule_coverage_marker.stat.exists
+          - users_molecule_coverage_marker.stat.size == 14
+          - >-
+            (users_molecule_groups.stdout.split() | sort)
+            == (['lit-molecule-group', 'lit-molecule-user'] | sort)
+          - >-
+            (users_molecule_authorized_keys.content | b64decode | trim)
+            == (users_molecule_desired_key | trim)
+          - "'stale@molecule.invalid' not in (users_molecule_authorized_keys.content | b64decode)"
         quiet: true
+      vars:
+        users_molecule_desired_key: >-
+          ssh-ed25519
+          AAAAC3NzaC1lZDI1NTE5AAAAIEjzifs06betrcygee7kUrE1IMhU4p0M3P5ZsaMVsEbo
+          desired@molecule.invalid
+
+    - name: Verify whitespace-only SSH keys fail closed
+      block:
+        - name: Exercise users validation with a whitespace-only SSH key
+          ansible.builtin.include_role:
+            name: lit.ubuntu.users
+            tasks_from: assert.yml
+          vars:
+            users_accounts:
+              - name: invalid-whitespace-key
+                ssh_keys:
+                  - "   "
+            users_accounts_extra: []
+            users_manage_groups: false
+
+        - name: Fail when a whitespace-only SSH key passes validation
+          ansible.builtin.fail:
+            msg: "A whitespace-only SSH key unexpectedly passed validation."
+      rescue:
+        - name: Confirm whitespace-only SSH keys use the safe validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'must be a list of non-empty, single-line strings'
+                in (ansible_failed_result | string)
+
+    - name: Verify multiline SSH keys fail closed
+      block:
+        - name: Exercise users validation with a multiline SSH key
+          ansible.builtin.include_role:
+            name: lit.ubuntu.users
+            tasks_from: assert.yml
+          vars:
+            users_accounts:
+              - name: invalid-multiline-key
+                ssh_keys:
+                  - |-
+                    ssh-ed25519 AAAA-invalid-first-line
+                    ssh-ed25519 AAAA-injected-second-line
+            users_accounts_extra: []
+            users_manage_groups: false
+
+        - name: Fail when a multiline SSH key passes validation
+          ansible.builtin.fail:
+            msg: "A multiline SSH key unexpectedly passed validation."
+      rescue:
+        - name: Confirm multiline SSH keys use the safe validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'must be a list of non-empty, single-line strings'
+                in (ansible_failed_result | string)

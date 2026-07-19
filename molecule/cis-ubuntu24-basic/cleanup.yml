@@ -1,0 +1,49 @@
+---
+- name: Clean up the Ubuntu 24 CIS integration fixture
+  hosts: localhost
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Inspect the AIDE cron service mask
+      ansible.builtin.stat:
+        path: /etc/systemd/system/dailyaidecheck.service
+        follow: false
+      register: cis_ubuntu24_aide_service_mask
+      tags: always
+
+    - name: Remove only the wrapper-owned AIDE cron service mask
+      when:
+        - cis_ubuntu24_aide_service_mask.stat.islnk | default(false)
+        - >-
+          cis_ubuntu24_aide_service_mask.stat.lnk_source
+          | default('')
+          == '/dev/null'
+      ansible.builtin.file:
+        path: /etc/systemd/system/dailyaidecheck.service
+        state: absent
+      tags: always
+
+    - name: Remove the Ubuntu 24 CIS integration test artifacts
+      ansible.builtin.file:
+        path: "{{ cis_ubuntu24_cleanup_path }}"
+        state: absent
+      loop:
+        - /tmp/lit-ubuntu-cis-audit-log
+        - /tmp/lit-ubuntu-cis-network.conf
+        - /tmp/lit-ubuntu-cis-network-limited.conf
+        - /tmp/lit-ubuntu-cis-network-disabled.conf
+        - /tmp/lit-ubuntu-cis-molecule-result.json
+        - /tmp/lit-ubuntu-cis-molecule-excluded
+      loop_control:
+        loop_var: cis_ubuntu24_cleanup_path
+        label: "{{ cis_ubuntu24_cleanup_path }}"
+      tags: always
+
+    - name: Remove the generated upstream role fixture
+      ansible.builtin.file:
+        path: >-
+          {{
+            lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY')
+          }}/roles/ansible-lockdown.ubuntu24_cis
+        state: absent
+      tags: always

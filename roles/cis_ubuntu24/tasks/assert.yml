@@ -1,0 +1,181 @@
+---
+- name: Validate the Ubuntu 24 CIS execution profile and dependency pins
+  ansible.builtin.assert:
+    that:
+      - cis_ubuntu24_execution_mode in ['remediate', 'audit']
+      - cis_ubuntu24_audit_log_directory is string
+      - cis_ubuntu24_audit_log_directory is match('^/')
+      - cis_ubuntu24_network_sysctl_file is string
+      - cis_ubuntu24_network_sysctl_file is match('^/')
+      - >-
+        cis_ubuntu24_profile_tag
+        in [
+          'level1-server',
+          'level1-workstation',
+          'level2-server',
+          'level2-workstation'
+        ]
+      - >-
+        (
+          cis_ubuntu24_execution_mode == 'remediate'
+          and
+          (ansible_run_tags | sort) == ([cis_ubuntu24_profile_tag] | sort)
+        )
+        or
+        (
+          cis_ubuntu24_execution_mode == 'audit'
+          and
+          (ansible_run_tags | sort) == (['setup_audit'] | sort)
+        )
+      - >-
+        (ansible_skip_tags | length == 0)
+        or
+        (
+          molecule_yml is defined
+          and
+          (
+            ansible_skip_tags
+            | difference(
+                [
+                  'molecule-notest',
+                  'notest',
+                  'molecule-idempotence-notest'
+                ]
+              )
+            | length
+          ) == 0
+        )
+      - >-
+        (
+          cis_ubuntu24_profile_tag is match('^level1-')
+          and
+          ubtu24cis_level_1 | default(false) | bool
+          and
+          not (ubtu24cis_level_2 | default(false) | bool)
+        )
+        or
+        (
+          cis_ubuntu24_profile_tag is match('^level2-')
+          and
+          ubtu24cis_level_1 | default(false) | bool
+          and
+          ubtu24cis_level_2 | default(false) | bool
+        )
+      - >-
+        cis_ubuntu24_execution_mode != 'audit'
+        or
+        (
+          setup_audit | default(false) | bool
+          and
+          run_audit | default(false) | bool
+          and
+          audit_only | default(false) | bool
+          and
+          fetch_audit_output | default(false) | bool
+          and
+          (audit_format | default('json')) == 'json'
+          and
+          (audit_content | default('git')) == 'git'
+        )
+      - >-
+        cis_ubuntu24_execution_mode != 'remediate'
+        or
+        (
+          not (setup_audit | default(false) | bool)
+          and
+          not (run_audit | default(false) | bool)
+          and
+          not (audit_only | default(false) | bool)
+        )
+      - >-
+        cis_ubuntu24_remediation_dependency.repository
+        == 'https://github.com/ansible-lockdown/UBUNTU24-CIS'
+      - cis_ubuntu24_remediation_dependency.version == '1.6.0'
+      - >-
+        cis_ubuntu24_remediation_dependency.commit
+        == 'c893ca6836fb32b1ea067d4a63c341e39693074b'
+      - cis_ubuntu24_remediation_dependency.license == 'MIT'
+      - >-
+        cis_ubuntu24_audit_dependency.repository
+        == 'https://github.com/ansible-lockdown/UBUNTU24-CIS-Audit.git'
+      - cis_ubuntu24_audit_dependency.benchmark == 'v1.0.0'
+      - >-
+        cis_ubuntu24_audit_dependency.commit
+        == '87efcc6d409d1a998a7cb809c5ce5a6afedf84c7'
+      - >-
+        cis_ubuntu24_audit_dependency.archive_sha256
+        == '9320558d3bf195625399edfd57e6185cf70cce6d5505fa3c9f9924a369af7850'
+      - cis_ubuntu24_audit_dependency.license == 'MIT'
+    fail_msg: >-
+      Run remediation with exactly the inventory-declared native upstream
+      profile tag, or audit mode with exactly setup_audit, and no skip tags.
+      Profile booleans, execution flags, and immutable dependency pins must
+      match the wrapper contract.
+
+- name: Validate the Ubuntu 24 CIS exception registry schema
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.control_ids | default([]) is sequence
+      - item.control_ids | default([]) is not string
+      - item.control_ids | default([]) | length > 0
+      - item.scope | default('') is string
+      - item.scope | default('') | length > 0
+      - item.reason | default('') is string
+      - item.reason | default('') | length > 0
+      - item.compensating_control | default('') is string
+      - item.compensating_control | default('') | length > 0
+      - item.variables | default([]) is sequence
+      - item.variables | default([]) is not string
+      - item.variables | default([]) | length > 0
+      - >-
+        item.audit_visibility | default('')
+        in ['intentional_exception', 'manual_evidence', 'not_applicable']
+  loop: "{{ cis_ubuntu24_exceptions }}"
+  loop_control:
+    label: >-
+      {{
+        item.control_ids
+        | default(['<missing control_ids>'])
+        | join(',')
+      }}
+
+- name: Validate Ubuntu 24 CIS exception variables against effective inventory
+  ansible.builtin.assert:
+    that:
+      - item.1 is mapping
+      - item.1.name | default('') is string
+      - item.1.name | default('') | length > 0
+      - item.1.value is defined
+      - >-
+        lookup(
+          'ansible.builtin.vars',
+          item.1.name | default(''),
+          default=cis_ubuntu24_missing_exception_value
+        )
+        != cis_ubuntu24_missing_exception_value
+      - >-
+        lookup(
+          'ansible.builtin.vars',
+          item.1.name | default(''),
+          default=cis_ubuntu24_missing_exception_value
+        )
+        ==
+        (
+          item.1.value
+          | default(cis_ubuntu24_missing_exception_value)
+        )
+    fail_msg: >-
+      Each exception variable entry requires a non-empty name and a value, and
+      its documented value must match effective inventory. Invalid entry:
+      {{ item.1.name | default('<missing name>') }}.
+  vars:
+    cis_ubuntu24_missing_exception_value: >-
+      __lit_ubuntu_cis_missing_exception_variable__
+  loop: >-
+    {{
+      cis_ubuntu24_exceptions
+      | subelements('variables', skip_missing=False)
+    }}
+  loop_control:
+    label: "{{ item.1.name | default('<missing name>') }}"
