@@ -184,7 +184,12 @@
       ansible.builtin.systemd_service:
         name: "{{ github_runner_instance_service_name_after.content | b64decode | trim }}"
         state: "{{ github_runner_instance.service_state | default(github_runner_service_state) }}"
-        enabled: "{{ github_runner_instance.service_state | default(github_runner_service_state) != 'stopped' }}"
+        enabled: >-
+          {{
+            github_runner_instance.service_state | default(github_runner_service_state) == 'started'
+            if github_runner_instance.service_state | default(github_runner_service_state) in ['started', 'stopped']
+            else omit
+          }}
       when:
         - github_runner_manage_service | bool
         - github_runner_register | bool
