@@ -76,7 +76,11 @@
   loop: "{{ github_runner_instances }}"
   loop_control:
     label: "{{ item.name | default('invalid') }}"
-  no_log: true
+  no_log: >-
+    {{
+      item.registration_token | default('', true) | length > 0
+      or item.remove_token | default('', true) | length > 0
+    }}
   changed_when: false
   when: github_runner_enabled | bool
 
