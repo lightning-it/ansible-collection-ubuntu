@@ -38,10 +38,10 @@
       - incus_root_idmap_count | int >= 10000000
       - incus_root_subuid_path is string
       - incus_root_subuid_path | trim | length > 0
-      - incus_root_subuid_path is regex('^/')
+      - incus_root_subuid_path is match('^/')
       - incus_root_subgid_path is string
       - incus_root_subgid_path | trim | length > 0
-      - incus_root_subgid_path is regex('^/')
+      - incus_root_subgid_path is match('^/')
     fail_msg: "Incus root subordinate ID variables are invalid."
   changed_when: false
   when:
