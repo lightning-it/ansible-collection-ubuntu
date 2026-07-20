@@ -1,8 +1,11 @@
 ---
 - name: Restart Incus after subordinate ID changes
   ansible.builtin.systemd_service:
-    name: incus.service
+    name: "{{ item }}"
     state: restarted
+  loop: "{{ incus_services }}"
   listen: Restart Incus after subordinate ID changes
-  when: incus_services | length > 0
+  when:
+    - not ansible_check_mode
+    - incus_services | length > 0
 ...

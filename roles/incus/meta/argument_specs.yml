@@ -36,7 +36,7 @@ argument_specs:
         default: 1000000
       incus_root_idmap_count:
         type: int
-        default: 1000000000
+        default: 10000000
       incus_root_subuid_path:
         type: path
         default: /etc/subuid

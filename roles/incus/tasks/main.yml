@@ -23,10 +23,6 @@
   notify: Restart Incus after subordinate ID changes
   when: incus_manage_root_idmap | bool
 
-- name: Apply subordinate ID changes before Incus operations
-  ansible.builtin.meta: flush_handlers
-  when: incus_manage_root_idmap | bool
-
 - name: Ensure Incus packages are installed
   ansible.builtin.apt:
     name: "{{ incus_packages }}"
@@ -74,6 +70,12 @@
     enabled: true
   loop: "{{ incus_services }}"
   when: not ansible_check_mode or incus_cli_available | bool
+
+- name: Apply subordinate ID changes before Incus operations
+  ansible.builtin.meta: flush_handlers
+  when:
+    - incus_manage_root_idmap | bool
+    - not ansible_check_mode
 
 - name: Initialize Incus storage discovery state
   ansible.builtin.set_fact:

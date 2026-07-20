@@ -16,7 +16,7 @@ incus_preseed: {}
 incus_manage_root_idmap: true
 incus_root_idmap_owner: root
 incus_root_idmap_start: 1000000
-incus_root_idmap_count: 1000000000
+incus_root_idmap_count: 10000000
 incus_root_subuid_path: /etc/subuid
 incus_root_subgid_path: /etc/subgid
 

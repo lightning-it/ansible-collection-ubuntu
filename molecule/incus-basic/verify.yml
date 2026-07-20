@@ -84,8 +84,8 @@
           - incus_profile_state_decoded.0.config == expected_incus_profile_config
           - incus_profile_state_decoded.0.devices.root.type == 'disk'
           - incus_preseed_state_decoded.config | default({}) | length == 0
-          - (incus_subuid_state.content | b64decode | trim) == 'root:1000000:1000000000'
-          - (incus_subgid_state.content | b64decode | trim) == 'root:1000000:1000000000'
+          - (incus_subuid_state.content | b64decode | trim) == 'root:1000000:10000000'
+          - (incus_subgid_state.content | b64decode | trim) == 'root:1000000:10000000'
           - incus_mutations.stdout_lines == expected_incus_mutations
         fail_msg: "Incus fake state did not match the declaration or the role mutated it more than once."
       vars:
