@@ -24,8 +24,9 @@ None.
   `/usr/bin/podman`)
 - `podman_validate_executable`: validate a direct `podman --version` invocation
   after optional profile repair (default: `false`)
-- `podman_system_socket_enabled`: reconcile the root `podman.socket` to the
-  requested enabled/running or disabled/stopped state (default: `false`)
+- `podman_system_socket_enabled`: desired root `podman.socket` state when
+  management is active; `true` also activates management for backward
+  compatibility (default: `false`)
 - `podman_system_socket_manage`: set to `true` to reconcile the root
   `podman.socket`; leave `false` to preserve its existing state (default:
   `false`). Setting `podman_system_socket_enabled: true` also implies
