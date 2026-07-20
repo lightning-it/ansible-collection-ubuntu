@@ -68,6 +68,7 @@
                 test "${image}" = "local:rhel10-ci"
               fi
               touch "${state_dir}/${instance}.exists"
+              printf '%s\n' "${args[*]}" > "${state_dir}/${instance}.init-args"
               printf 'Stopped\n' > "${state_dir}/${instance}.status"
               ;;
             config)
@@ -145,6 +146,7 @@
             wait_for_ip: false
             wait_for_ssh: false
             reconfigure: true
+            profiles: []
             devices:
               agent-iso:
                 type: disk
