@@ -8,9 +8,26 @@
     podman_packages: []
     podman_registries_conf_dir: >-
       {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/containers
+    podman_apparmor_profile_reload: true
+    podman_apparmor_profile_path: >-
+      {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/podman.apparmor
+    podman_apparmor_parser_path: /bin/true
+    podman_executable_path: /bin/true
+    podman_validate_executable: true
+    podman_system_socket_manage: false
     podman_system_socket_enabled: false
     podman_user_socket_enabled: false
   tasks:
+    - name: Seed a restricted Podman AppArmor profile
+      ansible.builtin.copy:
+        dest: "{{ podman_apparmor_profile_path }}"
+        content: |
+          #include <tunables/global>
+          profile podman flags=(attach_disconnected) /usr/bin/podman {
+          }
+        mode: "0644"
+        force: false
+
     - name: Execute lit.ubuntu.podman with non-mutating inputs
       ansible.builtin.import_role:
         name: lit.ubuntu.podman

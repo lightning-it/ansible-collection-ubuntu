@@ -5,7 +5,14 @@ podman_packages:
 
 podman_registries_conf_dir: /etc/containers
 
+podman_apparmor_profile_reload: false
+podman_apparmor_profile_path: /etc/apparmor.d/podman
+podman_apparmor_parser_path: /usr/sbin/apparmor_parser
+podman_executable_path: /usr/bin/podman
+podman_validate_executable: false
+
 podman_system_socket_enabled: false
+podman_system_socket_manage: false
 podman_system_socket_service_name: podman.socket
 
 podman_user_socket_enabled: false

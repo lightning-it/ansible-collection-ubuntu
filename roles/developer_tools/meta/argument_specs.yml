@@ -77,6 +77,9 @@ argument_specs:
         type: list
         elements: dict
         default: []
+      developer_tools_node_options:
+        type: str
+        default: ""
       developer_tools_markdownlint_cli2_enabled:
         type: bool
         default: false

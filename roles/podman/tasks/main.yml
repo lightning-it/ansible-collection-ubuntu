@@ -1,4 +1,8 @@
 ---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
 - name: Install podman toolchain
   ansible.builtin.package:
     name: "{{ podman_packages }}"
@@ -11,12 +15,46 @@
     state: directory
     mode: "0755"
 
-- name: Ensure system Podman API socket is enabled
+- name: Restore and reload the package-compatible Podman AppArmor profile
+  when: podman_apparmor_profile_reload | bool
+  block:
+    - name: Restore the unconfined Podman AppArmor attachment profile
+      ansible.builtin.lineinfile:
+        path: "{{ podman_apparmor_profile_path }}"
+        regexp: '^profile\s+podman(?:\s+flags=\([^)]*\))?\s+/usr/bin/podman(?:\s+flags=\([^)]*\))?\s*\{$'
+        line: 'profile podman /usr/bin/podman flags=(unconfined) {'
+        state: present
+      register: podman_apparmor_profile
+
+    - name: Reload the Podman AppArmor profile
+      ansible.builtin.command:
+        argv:
+          - "{{ podman_apparmor_parser_path }}"
+          - --replace
+          - "{{ podman_apparmor_profile_path }}"
+      when:
+        - podman_apparmor_profile.changed
+        - not ansible_check_mode
+      changed_when: true
+
+- name: Validate the direct Podman executable
+  ansible.builtin.command:
+    argv:
+      - "{{ podman_executable_path }}"
+      - --version
+  when:
+    - podman_validate_executable | bool
+    - >-
+      not ansible_check_mode or
+      not (podman_apparmor_profile | default({'changed': false})).changed
+  changed_when: false
+
+- name: Reconcile the system Podman API socket
   ansible.builtin.systemd_service:
     name: "{{ podman_system_socket_service_name }}"
-    enabled: true
-    state: started
-  when: podman_system_socket_enabled | bool
+    enabled: "{{ podman_system_socket_enabled | bool }}"
+    state: "{{ (podman_system_socket_enabled | bool) | ternary('started', 'stopped') }}"
+  when: podman_system_socket_manage | bool or podman_system_socket_enabled | bool
 
 - name: Configure rootless Podman API sockets
   ansible.builtin.include_tasks: user_socket.yml

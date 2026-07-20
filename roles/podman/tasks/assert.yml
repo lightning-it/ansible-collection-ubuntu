@@ -1,0 +1,42 @@
+---
+- name: Inspect Podman AppArmor repair inputs
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop:
+    - "{{ podman_apparmor_profile_path }}"
+    - "{{ podman_apparmor_parser_path }}"
+  register: podman_apparmor_inputs
+  when: podman_apparmor_profile_reload | bool
+
+- name: Validate Podman AppArmor repair inputs
+  ansible.builtin.assert:
+    that:
+      - podman_apparmor_inputs.results[0].stat.isreg | default(false)
+      - podman_apparmor_inputs.results[1].stat.isreg | default(false)
+      - podman_apparmor_inputs.results[1].stat.executable | default(false)
+    fail_msg: >-
+      Podman AppArmor repair requires an existing profile file and an
+      executable AppArmor parser.
+  when: podman_apparmor_profile_reload | bool
+
+- name: Read the Podman AppArmor profile before repair
+  ansible.builtin.slurp:
+    src: "{{ podman_apparmor_profile_path }}"
+  register: podman_apparmor_profile_source
+  when: podman_apparmor_profile_reload | bool
+
+- name: Require a recognized Podman AppArmor profile header
+  ansible.builtin.assert:
+    that:
+      - >-
+        (podman_apparmor_profile_source.content | b64decode)
+        is search(
+          '(?m)^profile\\s+podman(?:\\s+flags=\\([^)]*\\))?'
+          ~ '\\s+/usr/bin/podman(?:\\s+flags=\\([^)]*\\))?\\s*\\{$',
+          multiline=True
+        )
+    fail_msg: >-
+      Refusing to modify the Podman AppArmor profile because its header is not
+      recognized.
+  when: podman_apparmor_profile_reload | bool

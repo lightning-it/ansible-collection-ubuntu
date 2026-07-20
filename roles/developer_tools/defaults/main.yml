@@ -33,6 +33,7 @@ developer_tools_npm_fetch_timeout_ms: 60000
 developer_tools_npm_fetch_retries: 2
 developer_tools_npm_fetch_retry_min_timeout_ms: 1000
 developer_tools_npm_fetch_retry_max_timeout_ms: 5000
+developer_tools_node_options: ""
 
 developer_tools_markdownlint_cli2_enabled: false
 developer_tools_markdownlint_cli2_install_mode: global
