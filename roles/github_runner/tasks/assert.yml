@@ -33,7 +33,7 @@
       - item is mapping
       - item.name | default('') | trim | length > 0
       - item.dir | default('') | trim | length > 0
-      - item.dir | default('') | regex_search('^/')
+      - item.dir | default('', true) is match('^/')
       - item.dir | default('') | trim != '/'
       - not (item.dir | default('') | regex_search('//'))
       - not (item.dir | default('') | regex_search('(^|/)\.\.?(/|$)'))
@@ -52,8 +52,8 @@
         or item.state | default('present') == 'absent'
       - >-
         item.external_service_unit_path | default('') | length == 0
-        or item.external_service_unit_path
-        | regex_search('^/etc/systemd/system/[A-Za-z0-9_.@-]+\.service$')
+        or item.external_service_unit_path | default('', true)
+        is match('^/etc/systemd/system/[A-Za-z0-9_.@-]+\.service$')
       - >-
         item.external_service_unit_path | default('') | length == 0
         or item.external_service_unit_path | basename
@@ -76,6 +76,11 @@
   loop: "{{ github_runner_instances }}"
   loop_control:
     label: "{{ item.name | default('invalid') }}"
+  no_log: >-
+    {{
+      item.registration_token | default('', true) | length > 0
+      or item.remove_token | default('', true) | length > 0
+    }}
   changed_when: false
   when: github_runner_enabled | bool
 
