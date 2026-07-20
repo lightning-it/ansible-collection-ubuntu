@@ -25,6 +25,24 @@ argument_specs:
       incus_preseed:
         type: dict
         default: {}
+      incus_manage_root_idmap:
+        type: bool
+        default: true
+      incus_root_idmap_owner:
+        type: str
+        default: root
+      incus_root_idmap_start:
+        type: int
+        default: 1000000
+      incus_root_idmap_count:
+        type: int
+        default: 10000000
+      incus_root_subuid_path:
+        type: path
+        default: /etc/subuid
+      incus_root_subgid_path:
+        type: path
+        default: /etc/subgid
       incus_projects:
         type: list
         elements: dict

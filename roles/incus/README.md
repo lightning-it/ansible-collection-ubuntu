@@ -15,6 +15,12 @@ See `defaults/main.yml` for the full interface. Key variables:
 
 - `incus_packages` (list): Packages installed for Incus and QEMU support.
 - `incus_initialize` (bool, default: `true`): Run `incus admin init --minimal` when Incus is not initialized.
+- `incus_manage_root_idmap` (bool, default: `true`): Reconcile the root
+  SubUID/SubGID allocation consumed by the Incus daemon before instance work.
+- `incus_root_idmap_start` and `incus_root_idmap_count`: Inventory-overridable
+  subordinate-ID range; the count must contain at least 10 million IDs.
+- `incus_root_subuid_path` and `incus_root_subgid_path`: Overrideable paths,
+  primarily for isolated validation scenarios.
 - `incus_preseed` (mapping, default: `{}`): Optional preseed passed to `incus admin init --preseed` instead of the
   minimal initializer. It is used only when storage discovery succeeds and no storage pool exists.
 - `incus_projects` (list, default: `[]`): Projects to create and project configuration keys to reconcile.

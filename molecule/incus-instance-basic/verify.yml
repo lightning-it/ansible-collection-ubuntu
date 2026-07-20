@@ -29,6 +29,11 @@
         path: "{{ incus_instance_molecule_root }}/state/molecule-empty-agent.device.agent-iso"
       register: incus_instance_molecule_empty_iso
 
+    - name: Read fake empty Incus VM initialization arguments
+      ansible.builtin.slurp:
+        src: "{{ incus_instance_molecule_root }}/state/molecule-empty-agent.init-args"
+      register: incus_instance_molecule_empty_init_args
+
     - name: Read fake Incus instance status
       ansible.builtin.slurp:
         src: "{{ incus_instance_molecule_root }}/state/molecule-rhel10.status"
@@ -52,6 +57,7 @@
           - incus_instance_molecule_exists.stat.exists
           - incus_instance_molecule_empty_exists.stat.exists
           - incus_instance_molecule_empty_iso.stat.exists
+          - "'--no-profiles' in (incus_instance_molecule_empty_init_args.content | b64decode)"
           - (incus_instance_molecule_status.content | b64decode | trim) == 'Running'
           - "'molecule-rhel10.example.com' in (incus_instance_molecule_user_data.content | b64decode)"
           - >-
