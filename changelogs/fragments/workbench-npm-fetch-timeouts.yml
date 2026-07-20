@@ -1,6 +1,0 @@
----
-bugfixes:
-  - >-
-    developer_tools - Bound npm registry fetch timeouts and retries so global
-    Workbench CLI installation cannot hang indefinitely on transient network
-    failures.

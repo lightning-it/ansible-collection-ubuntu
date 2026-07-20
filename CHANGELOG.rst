@@ -4,6 +4,39 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.9.0
+======
+
+Minor Changes
+-------------
+
+- Harden the cis_ubuntu24 integration with separate fail-closed remediation and audit modes, exact native-profile validation, an inventory exception schema, immutable remediation and audit dependency metadata, and idempotent handling of the package AIDE service when the cron scheduler is selected. Preserve a traversable audit log directory when inventory disables the pinned upstream role's defective recursive file-mode remediation, and persist the network sysctls whose pinned audit persistence checks are malformed.
+- Reconcile the root Incus SubUID/SubGID allocation before daemon operations.
+- collection_tooling - Synchronize the centrally managed Renovate policy and guarded automation workflows.
+- developer_tools - Add isolated pinned Python tooling, pinned global npm packages, private workspace directories, and SHA-256-verified standalone release binaries for reproducible development hosts.
+- github_runner - add a backward-compatible, data-driven multi-instance interface with isolated installation and work directories, per-instance registration lifecycle with distinct registration and removal tokens, and independent systemd service management. Organization runner groups and declarative cleanup of externally managed legacy services are supported for controlled migrations.
+- incus - Add fail-closed JSON discovery, optional preseed initialization, and declarative project and profile reconciliation for Incus hosts.
+- podman - Exercise the role in its basic Molecule scenario with isolated, non-mutating inputs instead of a syntax-only marker stub.
+- users - Add opt-in exact supplementary-group and exclusive authorized-key reconciliation for security-sensitive developer accounts.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- Raise collection minimum ``requires_ansible`` from ``>=2.16.1`` to ``>=2.18``. Consumers running ansible-core below 2.18 must upgrade before using this collection release.
+
+Bugfixes
+--------
+
+- Guard external GitHub runner service metadata when the optional unit-file check is skipped.
+- Make GitHub runner instance validation compatible with strict Ansible boolean conditionals and redact token-bearing instance data on failures.
+- Pass ``--no-profiles`` when an instance explicitly declares an empty profile list.
+- developer_tools - Bound npm registry fetch timeouts and retries so global Workbench CLI installation cannot hang indefinitely on transient network failures.
+- developer_tools - Install Python virtual-environment support before creating the isolated toolchain on Ubuntu hosts.
+- developer_tools - Require an exact Packer archive checksum and prevent the OpenShift client archive from reporting changes on every run.
+- incus - Prevent initialization, project, and profile mutations during Ansible check mode.
+- incus - Treat the recognized uninitialized-daemon response as empty storage state while failing closed for unrelated discovery errors.
+- users - Reject malformed SSH key declarations before authorized-key reconciliation.
+
 v1.8.0
 ======
 

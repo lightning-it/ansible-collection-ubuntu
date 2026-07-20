@@ -1,5 +1,0 @@
----
-minor_changes:
-  - >-
-    collection_tooling - Synchronize the centrally managed Renovate policy and
-    guarded automation workflows.
