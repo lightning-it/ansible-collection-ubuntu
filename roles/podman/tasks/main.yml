@@ -21,7 +21,7 @@
     - name: Restore the unconfined Podman AppArmor attachment profile
       ansible.builtin.lineinfile:
         path: "{{ podman_apparmor_profile_path }}"
-        regexp: '^profile\s+podman(?:\s+flags=\([^)]*\))?\s+/usr/bin/podman(?:\s+flags=\([^)]*\))?\s+\{$'
+        regexp: '^profile\s+podman(?:\s+flags=\([^)]*\))?\s+/usr/bin/podman(?:\s+flags=\([^)]*\))?\s*\{$'
         line: 'profile podman /usr/bin/podman flags=(unconfined) {'
         state: present
       register: podman_apparmor_profile
@@ -48,6 +48,7 @@
       not ansible_check_mode or
       not (podman_apparmor_profile | default({'changed': false})).changed
   changed_when: false
+  check_mode: false
 
 - name: Reconcile the system Podman API socket
   ansible.builtin.systemd_service:

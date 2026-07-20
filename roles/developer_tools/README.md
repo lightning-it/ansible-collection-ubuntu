@@ -183,7 +183,7 @@ developer_tools_ssh_private_keys_vault_secret_id: ""
   external repositories such as NodeSource must be configured separately and explicitly before overriding package names.
 - `developer_tools_npm_packages_present` installs only explicitly versioned global npm packages. Authentication remains
   user-scoped and must not be supplied through this list.
-- `developer_tools_node_options` supplies optional Node.js runtime options to bounded npm/npx operations, for example
+- `developer_tools_node_options` supplies an optional Node.js `NODE_OPTIONS` string to npm/npx operations, for example
   `--dns-result-order=ipv4first` when a host has no working IPv6 egress (default: empty).
 - `developer_tools_python_venv_enabled` creates one isolated, pinned Python toolchain and exposes only the listed
   command entry points through stable symlinks. This avoids `--break-system-packages` on Ubuntu 24.

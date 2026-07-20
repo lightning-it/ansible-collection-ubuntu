@@ -6,5 +6,5 @@ bugfixes:
     before validating the direct Podman executable; also reconcile the system
     Podman socket to its explicitly configured state.
   - >-
-    Allow opt-in Node.js runtime options for bounded npm and npx operations so
+    Allow opt-in Node.js runtime options for npm and npx operations so
     hosts without working IPv6 egress can explicitly prefer IPv4 DNS results.
