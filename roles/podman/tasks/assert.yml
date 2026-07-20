@@ -31,9 +31,10 @@
     that:
       - >-
         (podman_apparmor_profile_source.content | b64decode)
-        is regex(
+        is search(
           '(?m)^profile\\s+podman(?:\\s+flags=\\([^)]*\\))?'
-          ~ '\\s+/usr/bin/podman(?:\\s+flags=\\([^)]*\\))?\\s*\\{$'
+          ~ '\\s+/usr/bin/podman(?:\\s+flags=\\([^)]*\\))?\\s*\\{$',
+          multiline=True
         )
     fail_msg: >-
       Refusing to modify the Podman AppArmor profile because its header is not
