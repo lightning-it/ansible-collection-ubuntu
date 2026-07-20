@@ -32,10 +32,13 @@
   ansible.builtin.assert:
     that:
       - incus_root_idmap_owner | trim | length > 0
+      - "':' not in incus_root_idmap_owner"
       - incus_root_idmap_start | int >= 65536
       - incus_root_idmap_count | int >= 10000000
       - incus_root_subuid_path | trim | length > 0
+      - incus_root_subuid_path is regex('^/')
       - incus_root_subgid_path | trim | length > 0
+      - incus_root_subgid_path is regex('^/')
     fail_msg: "Incus root subordinate ID variables are invalid."
   changed_when: false
   when:
