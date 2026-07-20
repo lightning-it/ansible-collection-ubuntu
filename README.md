@@ -21,13 +21,13 @@ Publishing targets: `github-release, ansible-galaxy`.
 
 ## Supported and Tested Platforms
 
-| Platform / Product | Status | Validation |
-|---|---:|---|
-| ubuntu-latest | Supported | Molecule / Incus |
-| ubuntu-lts | Supported | Molecule / Incus |
-| ansible-core | Tested where applicable | Molecule / Incus |
-| molecule | Tested where applicable | Molecule / Incus |
-| incus | Tested where applicable | Molecule / Incus |
+| Platform / Product |                  Status | Validation       |
+| ------------------ | ----------------------: | ---------------- |
+| ubuntu-latest      |               Supported | Molecule / Incus |
+| ubuntu-lts         |               Supported | Molecule / Incus |
+| ansible-core       | Tested where applicable | Molecule / Incus |
+| molecule           | Tested where applicable | Molecule / Incus |
+| incus              | Tested where applicable | Molecule / Incus |
 
 <!-- END LIT_SHARED_RELEASE_MODEL -->
 
