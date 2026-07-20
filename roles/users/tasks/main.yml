@@ -29,13 +29,33 @@
       {%- endif -%}
   changed_when: false
 
-- name: Combine base and extra user definitions
+- name: Normalize users_accounts_global to a list
+  ansible.builtin.set_fact:
+    users_accounts_global_effective: >-
+      {%- set ua = users_accounts_global | default([]) -%}
+      {%- if ua is mapping -%}
+        {{ ua | dict2items | map(attribute='value') | list }}
+      {%- elif ua is sequence and (ua is not string) -%}
+        {{ ua }}
+      {%- else -%}
+        []
+      {%- endif -%}
+  changed_when: false
+
+- name: Merge user definitions with global policy taking precedence
   ansible.builtin.set_fact:
     users_accounts_effective: >-
-      {{
+      {%- set merged = {} -%}
+      {%- set definitions =
         (users_accounts_base_effective | default([]))
         + (users_accounts_extra_effective | default([]))
-      }}
+        + (users_accounts_global_effective | default([]))
+      -%}
+      {%- for account in definitions -%}
+        {%- set effective = merged.get(account.name, {}) | combine(account, recursive=True) -%}
+        {%- set _ = merged.update({account.name: effective}) -%}
+      {%- endfor -%}
+      {{ merged.values() | list }}
   changed_when: false
 
 - name: Build group list from user definitions
