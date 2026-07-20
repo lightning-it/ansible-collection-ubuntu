@@ -136,7 +136,7 @@ releases:
         - developer_tools - Add isolated pinned Python tooling, pinned global npm
           packages, private workspace directories, and SHA-256-verified standalone
           release binaries for reproducible development hosts.
-        - github_runner - add a backward-compatible, data-driven multi-instance interface
+        - github_runner - Add a backward-compatible, data-driven multi-instance interface
           with isolated installation and work directories, per-instance registration
           lifecycle with distinct registration and removal tokens, and independent
           systemd service management. Organization runner groups and declarative cleanup

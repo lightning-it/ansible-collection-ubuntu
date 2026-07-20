@@ -14,7 +14,7 @@ Minor Changes
 - Reconcile the root Incus SubUID/SubGID allocation before daemon operations.
 - collection_tooling - Synchronize the centrally managed Renovate policy and guarded automation workflows.
 - developer_tools - Add isolated pinned Python tooling, pinned global npm packages, private workspace directories, and SHA-256-verified standalone release binaries for reproducible development hosts.
-- github_runner - add a backward-compatible, data-driven multi-instance interface with isolated installation and work directories, per-instance registration lifecycle with distinct registration and removal tokens, and independent systemd service management. Organization runner groups and declarative cleanup of externally managed legacy services are supported for controlled migrations.
+- github_runner - Add a backward-compatible, data-driven multi-instance interface with isolated installation and work directories, per-instance registration lifecycle with distinct registration and removal tokens, and independent systemd service management. Organization runner groups and declarative cleanup of externally managed legacy services are supported for controlled migrations.
 - incus - Add fail-closed JSON discovery, optional preseed initialization, and declarative project and profile reconciliation for Incus hosts.
 - podman - Exercise the role in its basic Molecule scenario with isolated, non-mutating inputs instead of a syntax-only marker stub.
 - users - Add opt-in exact supplementary-group and exclusive authorized-key reconciliation for security-sensitive developer accounts.
