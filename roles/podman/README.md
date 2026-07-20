@@ -13,8 +13,19 @@ None.
   (default: `["podman", "buildah"]`)
 - `podman_registries_conf_dir`: directory ensured present for registry
   configuration files (default: `/etc/containers`)
-- `podman_system_socket_enabled`: enable the root `podman.socket`
+- `podman_apparmor_profile_reload`: restore Ubuntu's package-compatible
+  unconfined Podman attachment declaration and reload only that profile
   (default: `false`)
+- `podman_apparmor_profile_path`: Podman AppArmor profile path (default:
+  `/etc/apparmor.d/podman`)
+- `podman_apparmor_parser_path`: AppArmor parser path used for a targeted
+  `--replace` reload (default: `/usr/sbin/apparmor_parser`)
+- `podman_executable_path`: Podman executable used by validation (default:
+  `/usr/bin/podman`)
+- `podman_validate_executable`: validate a direct `podman --version` invocation
+  after optional profile repair (default: `false`)
+- `podman_system_socket_enabled`: reconcile the root `podman.socket` to the
+  requested enabled/running or disabled/stopped state (default: `false`)
 - `podman_user_socket_enabled`: enable rootless user `podman.socket`
   instances (default: `false`)
 - `podman_user_socket_users`: users that should get a rootless Podman API
