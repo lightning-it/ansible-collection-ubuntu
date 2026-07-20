@@ -8,6 +8,8 @@
     ansible_python_interpreter: /usr/bin/python3
     incus_packages: []
     incus_services: []
+    incus_root_subuid_path: /tmp/incus-molecule-subuid
+    incus_root_subgid_path: /tmp/incus-molecule-subgid
     incus_preseed:
       storage_pools:
         - name: default
@@ -34,6 +36,7 @@
           apt-get update && apt-get -y install python3
         fi
       changed_when: false
+      check_mode: false
 
     - name: Install fake Incus CLI
       ansible.builtin.copy:

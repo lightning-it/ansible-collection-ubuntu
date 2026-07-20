@@ -9,6 +9,7 @@
       - incus_update_apt_cache is boolean
       - incus_initialize is boolean
       - incus_preseed is mapping
+      - incus_manage_root_idmap is boolean
       - incus_projects is sequence
       - incus_projects is not string
       - incus_profiles is sequence
@@ -26,6 +27,26 @@
     fail_msg: "Incus role variables are invalid."
   changed_when: false
   when: incus_enabled | bool
+
+- name: Validate Incus root subordinate ID inputs
+  ansible.builtin.assert:
+    that:
+      - incus_root_idmap_owner is string
+      - incus_root_idmap_owner | trim | length > 0
+      - incus_root_idmap_owner is match('^[^\\s:]+$')
+      - incus_root_idmap_start | int >= 65536
+      - incus_root_idmap_count | int >= 10000000
+      - incus_root_subuid_path is string
+      - incus_root_subuid_path | trim | length > 0
+      - incus_root_subuid_path is match('^/')
+      - incus_root_subgid_path is string
+      - incus_root_subgid_path | trim | length > 0
+      - incus_root_subgid_path is match('^/')
+    fail_msg: "Incus root subordinate ID variables are invalid."
+  changed_when: false
+  when:
+    - incus_enabled | bool
+    - incus_manage_root_idmap | bool
 
 - name: Validate Incus project definitions
   ansible.builtin.assert:

@@ -48,6 +48,10 @@ Each `incus_instance_items` entry supports:
 - `cloud_init_enabled`, `cloud_init_user_data`, `cloud_init_network_config`.
 - `wait_for_ip`, `wait_for_ssh`, `wait_timeout`, `wait_delay`.
 
+When `profiles` is omitted, Incus applies its normal default-profile behavior.
+When an item explicitly sets `profiles: []`, the role passes `--no-profiles` so
+an empty VM does not inherit unintended root-disk or network devices.
+
 ## Dependencies
 
 None.

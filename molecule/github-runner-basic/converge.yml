@@ -6,7 +6,34 @@
   vars:
     ansible_user: root
     ansible_python_interpreter: /usr/bin/python3
-    github_runner_enabled: false
+    github_runner_enabled: true
+    github_runner_register: false
+    github_runner_manage_service: false
+    github_runner_update_apt_cache: false
+    github_runner_archive_url: file:///tmp/github-runner-fixture.tar.gz
+    github_runner_archive_path: /tmp/actions-runner-test.tar.gz
+    github_runner_instances:
+      - name: incus-runner-01
+        dir: /opt/actions-runner-01
+        work_dir: _work-01
+        labels: [self-hosted, linux, x64, incus]
+        runner_group: Protected Incus
+      - name: incus-runner-02
+        dir: /opt/actions-runner-02
+        work_dir: _work-02
+        labels: [self-hosted, linux, x64, incus]
+      - name: incus-runner-03
+        dir: /opt/actions-runner-03
+        work_dir: _work-03
+        labels: [self-hosted, linux, x64, incus]
+      - name: incus-runner-04
+        dir: /opt/actions-runner-04
+        work_dir: _work-04
+        labels: [self-hosted, linux, x64, incus]
+      - name: incus-runner-05
+        dir: /opt/actions-runner-05
+        work_dir: _work-05
+        labels: [self-hosted, linux, x64, incus]
 
   pre_tasks:
     - name: Ensure python3 is present
@@ -15,6 +42,53 @@
           apt-get update && apt-get -y install python3
         fi
       changed_when: false
+
+    - name: Validate five isolated runner definitions
+      ansible.builtin.include_role:
+        name: lit.ubuntu.github_runner
+        tasks_from: assert.yml
+      vars:
+        github_runner_enabled: true
+        github_runner_url: https://github.com/example/example
+        github_runner_instances:
+          - name: incus-runner-01
+            dir: /opt/actions-runner-01
+            work_dir: _work-01
+            labels: [self-hosted, linux, x64, incus]
+            runner_group: Protected Incus
+          - name: incus-runner-02
+            dir: /opt/actions-runner-02
+            work_dir: _work-02
+            labels: [self-hosted, linux, x64, incus]
+          - name: incus-runner-03
+            dir: /opt/actions-runner-03
+            work_dir: _work-03
+            labels: [self-hosted, linux, x64, incus]
+          - name: incus-runner-04
+            dir: /opt/actions-runner-04
+            work_dir: _work-04
+            labels: [self-hosted, linux, x64, incus]
+          - name: incus-runner-05
+            dir: /opt/actions-runner-05
+            work_dir: _work-05
+            labels: [self-hosted, linux, x64, incus]
+
+    - name: Create runner archive fixture directory
+      ansible.builtin.file:
+        path: /tmp/github-runner-fixture
+        state: directory
+        mode: "0755"
+
+    - name: Create runner archive fixture content
+      ansible.builtin.copy:
+        dest: /tmp/github-runner-fixture/run.sh
+        content: "#!/bin/sh\nexit 0\n"
+        mode: "0755"
+
+    - name: Build runner archive fixture
+      ansible.builtin.command:
+        argv: [tar, -czf, /tmp/github-runner-fixture.tar.gz, -C, /tmp/github-runner-fixture, .]
+        creates: /tmp/github-runner-fixture.tar.gz
 
   roles:
     - role: lit.ubuntu.github_runner

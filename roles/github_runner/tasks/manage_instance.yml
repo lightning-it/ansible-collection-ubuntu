@@ -1,0 +1,280 @@
+---
+- name: Check runner files for {{ github_runner_instance.name }}
+  ansible.builtin.stat:
+    path: "{{ github_runner_instance.dir }}/{{ item }}"
+  loop: [.runner, .service, .runner-version]
+  register: github_runner_instance_files
+  changed_when: false
+
+- name: Set runner file state for {{ github_runner_instance.name }}
+  ansible.builtin.set_fact:
+    github_runner_instance_config_exists: "{{ github_runner_instance_files.results[0].stat.exists }}"
+    github_runner_instance_service_exists: "{{ github_runner_instance_files.results[1].stat.exists }}"
+    github_runner_instance_version_exists: "{{ github_runner_instance_files.results[2].stat.exists }}"
+  changed_when: false
+
+- name: Read service name for {{ github_runner_instance.name }}
+  ansible.builtin.slurp:
+    src: "{{ github_runner_instance.dir }}/.service"
+  register: github_runner_instance_service_name
+  changed_when: false
+  when: github_runner_instance_service_exists | bool
+
+- name: Check external service unit for {{ github_runner_instance.name }}
+  ansible.builtin.stat:
+    path: "{{ github_runner_instance.external_service_unit_path }}"
+  register: github_runner_instance_external_service_unit_file
+  changed_when: false
+  when: github_runner_instance.external_service_unit_path | default('') | trim | length > 0
+
+- name: Stop external service before removing {{ github_runner_instance.name }}
+  ansible.builtin.systemd_service:
+    name: "{{ github_runner_instance.external_service_name }}"
+    state: stopped
+    enabled: false
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_instance.state | default('present') == 'absent'
+    - github_runner_instance.external_service_name | default('') | trim | length > 0
+    - github_runner_instance_external_service_unit_file is defined
+    - github_runner_instance_external_service_unit_file.stat is defined
+    - github_runner_instance_external_service_unit_file.stat.exists | default(false)
+    - >-
+      github_runner_instance_external_service_unit_file.stat.isreg | default(false)
+      or github_runner_instance_external_service_unit_file.stat.islnk | default(false)
+
+- name: Stop service before changing {{ github_runner_instance.name }}
+  ansible.builtin.systemd_service:
+    name: "{{ github_runner_instance_service_name.content | b64decode | trim }}"
+    state: stopped
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_instance_service_exists | bool
+    - >-
+      github_runner_instance.replace | default(false) | bool
+      or github_runner_instance.state | default('present') == 'absent'
+
+- name: Uninstall service for {{ github_runner_instance.name }}
+  ansible.builtin.command:
+    argv: [./svc.sh, uninstall]
+    chdir: "{{ github_runner_instance.dir }}"
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - github_runner_manage_service | bool
+    - github_runner_instance_service_exists | bool
+    - >-
+      github_runner_instance.replace | default(false) | bool
+      or github_runner_instance.state | default('present') == 'absent'
+
+- name: Remove uninstalled service marker for {{ github_runner_instance.name }}
+  ansible.builtin.file:
+    path: "{{ github_runner_instance.dir }}/.service"
+    state: absent
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_instance_service_exists | bool
+    - >-
+      github_runner_instance.replace | default(false) | bool
+      or github_runner_instance.state | default('present') == 'absent'
+
+- name: Require registration token for registration change
+  ansible.builtin.assert:
+    that: github_runner_instance.registration_token | default('') | trim | length > 0
+    fail_msg: "A short-lived registration token is required to register or replace {{ github_runner_instance.name }}."
+  no_log: true
+  when:
+    - github_runner_register | bool
+    - github_runner_instance.state | default('present') == 'present'
+    - (not github_runner_instance_config_exists | bool) or github_runner_instance.replace | default(false) | bool
+
+- name: Require remove token for registration removal
+  ansible.builtin.assert:
+    that: github_runner_instance.remove_token | default('') | trim | length > 0
+    fail_msg: "A short-lived remove token is required to replace or remove {{ github_runner_instance.name }}."
+  no_log: true
+  when:
+    - github_runner_register | bool
+    - github_runner_instance_config_exists | bool
+    - >-
+      github_runner_instance.replace | default(false) | bool
+      or github_runner_instance.state | default('present') == 'absent'
+
+- name: Remove registration for {{ github_runner_instance.name }}
+  ansible.builtin.command:
+    argv:
+      - sudo
+      - -n
+      - -u
+      - "{{ github_runner_user }}"
+      - ./config.sh
+      - remove
+      - --token
+      - "{{ github_runner_instance.remove_token }}"
+    chdir: "{{ github_runner_instance.dir }}"
+  no_log: true
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - github_runner_register | bool
+    - github_runner_instance_config_exists | bool
+    - >-
+      github_runner_instance.replace | default(false) | bool
+      or github_runner_instance.state | default('present') == 'absent'
+
+- name: Remove external service unit for {{ github_runner_instance.name }}
+  ansible.builtin.file:
+    path: "{{ github_runner_instance.external_service_unit_path }}"
+    state: absent
+  register: github_runner_instance_external_service_unit
+  when:
+    - github_runner_manage_service | bool
+    - github_runner_instance.state | default('present') == 'absent'
+    - github_runner_instance.external_service_unit_path | default('') | trim | length > 0
+    - github_runner_instance_external_service_unit_file is defined
+    - github_runner_instance_external_service_unit_file.stat is defined
+    - github_runner_instance_external_service_unit_file.stat.exists | default(false)
+    - >-
+      github_runner_instance_external_service_unit_file.stat.isreg | default(false)
+      or github_runner_instance_external_service_unit_file.stat.islnk | default(false)
+
+- name: Reload systemd after removing external service for {{ github_runner_instance.name }}
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - github_runner_instance_external_service_unit is defined
+    - github_runner_instance_external_service_unit.changed | default(false)
+
+- name: Remove installation for {{ github_runner_instance.name }}
+  ansible.builtin.file:
+    path: "{{ github_runner_instance.dir }}"
+    state: absent
+  when: github_runner_instance.state | default('present') == 'absent'
+
+- name: Manage present runner {{ github_runner_instance.name }}
+  when: github_runner_instance.state | default('present') == 'present'
+  block:
+    - name: Ensure installation directory for {{ github_runner_instance.name }}
+      ansible.builtin.file:
+        path: "{{ github_runner_instance.dir }}"
+        state: directory
+        owner: "{{ github_runner_user }}"
+        group: "{{ github_runner_group }}"
+        mode: "0755"
+
+    - name: Read installed version for {{ github_runner_instance.name }}
+      ansible.builtin.slurp:
+        src: "{{ github_runner_instance.dir }}/.runner-version"
+      register: github_runner_instance_version
+      changed_when: false
+      when: github_runner_instance_version_exists | bool
+
+    - name: Extract runner archive for {{ github_runner_instance.name }}
+      ansible.builtin.unarchive:
+        src: "{{ github_runner_archive_path }}"
+        dest: "{{ github_runner_instance.dir }}"
+        remote_src: true
+        owner: "{{ github_runner_user }}"
+        group: "{{ github_runner_group }}"
+      when: >-
+        (not github_runner_instance_version_exists | bool)
+        or ((github_runner_instance_version.content | default('') | b64decode | trim) != github_runner_version)
+
+    - name: Record version for {{ github_runner_instance.name }}
+      ansible.builtin.copy:
+        dest: "{{ github_runner_instance.dir }}/.runner-version"
+        content: "{{ github_runner_version }}\n"
+        owner: "{{ github_runner_user }}"
+        group: "{{ github_runner_group }}"
+        mode: "0644"
+
+    - name: Ensure installation ownership for {{ github_runner_instance.name }}
+      ansible.builtin.file:
+        path: "{{ github_runner_instance.dir }}"
+        state: directory
+        owner: "{{ github_runner_user }}"
+        group: "{{ github_runner_group }}"
+        recurse: true
+
+    - name: Build registration command for {{ github_runner_instance.name }}
+      ansible.builtin.set_fact:
+        github_runner_instance_config_command: >-
+          {{
+            [
+              'sudo', '-n', '-u', github_runner_user, './config.sh',
+              '--url', github_runner_url,
+              '--token', github_runner_instance.registration_token,
+              '--name', github_runner_instance.name,
+              '--labels', github_runner_instance.labels | join(','),
+              '--work', github_runner_instance.work_dir
+            ]
+            + (
+              ['--runnergroup', github_runner_instance.runner_group]
+              if github_runner_instance.runner_group | default('') | trim | length > 0
+              else []
+            )
+            + ['--unattended', '--replace']
+          }}
+      no_log: true
+      changed_when: false
+      when:
+        - not ansible_check_mode
+        - github_runner_register | bool
+        - (not github_runner_instance_config_exists | bool) or github_runner_instance.replace | default(false) | bool
+
+    - name: Configure registration for {{ github_runner_instance.name }}
+      ansible.builtin.command:
+        argv: "{{ github_runner_instance_config_command }}"
+        chdir: "{{ github_runner_instance.dir }}"
+      no_log: true
+      changed_when: true
+      when:
+        - not ansible_check_mode
+        - github_runner_register | bool
+        - (not github_runner_instance_config_exists | bool) or github_runner_instance.replace | default(false) | bool
+
+    - name: Check registration after configuration for {{ github_runner_instance.name }}
+      ansible.builtin.stat:
+        path: "{{ github_runner_instance.dir }}/.runner"
+      register: github_runner_instance_config_after
+      changed_when: false
+
+    - name: Install service for {{ github_runner_instance.name }}
+      ansible.builtin.command:
+        argv: [./svc.sh, install, "{{ github_runner_service_user }}"]
+        chdir: "{{ github_runner_instance.dir }}"
+        creates: "{{ github_runner_instance.dir }}/.service"
+      when:
+        - not ansible_check_mode
+        - github_runner_manage_service | bool
+        - github_runner_register | bool
+        - github_runner_instance_config_after.stat.exists
+
+    - name: Read managed service name for {{ github_runner_instance.name }}
+      ansible.builtin.slurp:
+        src: "{{ github_runner_instance.dir }}/.service"
+      register: github_runner_instance_service_name_after
+      changed_when: false
+      when:
+        - github_runner_manage_service | bool
+        - github_runner_register | bool
+        - github_runner_instance_config_after.stat.exists
+
+    - name: Manage service for {{ github_runner_instance.name }}
+      ansible.builtin.systemd_service:
+        name: "{{ github_runner_instance_service_name_after.content | b64decode | trim }}"
+        state: "{{ github_runner_instance.service_state | default(github_runner_service_state) }}"
+        enabled: >-
+          {{
+            github_runner_instance.service_state | default(github_runner_service_state) == 'started'
+            if github_runner_instance.service_state | default(github_runner_service_state) in ['started', 'stopped']
+            else omit
+          }}
+      when:
+        - github_runner_manage_service | bool
+        - github_runner_register | bool
+        - github_runner_instance_service_name_after is defined
+        - not (github_runner_instance_service_name_after.skipped | default(false))
+        - github_runner_instance_service_name_after.content is defined
+        - github_runner_instance_service_name_after.content | b64decode | trim | length > 0

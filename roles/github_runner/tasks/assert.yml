@@ -20,6 +20,76 @@
       - not github_runner_register | bool or github_runner_url | trim | length > 0
       - github_runner_service_user | trim | length > 0
       - github_runner_service_state in ['started', 'stopped', 'restarted', 'reloaded']
+      - github_runner_instances is sequence
+      - github_runner_instances is not string
+      - github_runner_instances | length > 0
     fail_msg: "GitHub runner role variables are invalid."
+  changed_when: false
+  when: github_runner_enabled | bool
+
+- name: Validate GitHub runner instance inputs
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.name | default('') | trim | length > 0
+      - item.dir | default('') | trim | length > 0
+      - item.dir | default('', true) is match('^/')
+      - item.dir | default('') | trim != '/'
+      - not (item.dir | default('') | regex_search('//'))
+      - not (item.dir | default('') | regex_search('(^|/)\.\.?(/|$)'))
+      - item.work_dir | default('') | trim | length > 0
+      - item.labels | default([]) is sequence
+      - item.labels | default([]) is not string
+      - item.runner_group | default('') is string
+      - item.external_service_name | default('') is string
+      - item.external_service_unit_path | default('') is string
+      - not (item.external_service_name | default('') | regex_search('/'))
+      - >-
+        (item.external_service_name | default('') | trim | length > 0)
+        == (item.external_service_unit_path | default('') | trim | length > 0)
+      - >-
+        item.external_service_name | default('') | trim | length == 0
+        or item.state | default('present') == 'absent'
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or item.external_service_unit_path | default('', true)
+        is match('^/etc/systemd/system/[A-Za-z0-9_.@-]+\.service$')
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or item.external_service_unit_path | basename
+        == item.external_service_name | default('')
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or item.external_service_unit_path | trim != '/'
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or not (item.external_service_unit_path | regex_search('//'))
+      - >-
+        item.external_service_unit_path | default('') | length == 0
+        or not (item.external_service_unit_path | regex_search('(^|/)\.\.?(/|$)'))
+      - item.state | default('present') in ['present', 'absent']
+      - item.service_state | default(github_runner_service_state) in ['started', 'stopped', 'restarted', 'reloaded']
+      - not (item.work_dir | default('') | regex_search('^/'))
+      - item.work_dir | default('') | split('/') | reject('in', ['', '.', '..']) | list | length
+        == item.work_dir | default('') | split('/') | length
+    fail_msg: "Each github_runner_instances entry must define a valid isolated runner."
+  loop: "{{ github_runner_instances }}"
+  loop_control:
+    label: "{{ item.name | default('invalid') }}"
+  no_log: >-
+    {{
+      item.registration_token | default('', true) | length > 0
+      or item.remove_token | default('', true) | length > 0
+    }}
+  changed_when: false
+  when: github_runner_enabled | bool
+
+- name: Validate GitHub runner instance isolation
+  ansible.builtin.assert:
+    that:
+      - github_runner_instances | map(attribute='name') | unique | length == github_runner_instances | length
+      - github_runner_instances | map(attribute='dir') | unique | length == github_runner_instances | length
+      - github_runner_instances | map(attribute='work_dir') | unique | length == github_runner_instances | length
+    fail_msg: "Runner names, installation directories, and work_dir values must be unique."
   changed_when: false
   when: github_runner_enabled | bool

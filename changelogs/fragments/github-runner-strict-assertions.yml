@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - >-
+    Make GitHub runner instance validation compatible with strict Ansible
+    boolean conditionals and redact token-bearing instance data on failures.
