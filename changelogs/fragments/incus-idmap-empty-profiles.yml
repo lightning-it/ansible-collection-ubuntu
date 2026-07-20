@@ -1,5 +1,0 @@
----
-minor_changes:
-  - Reconcile the root Incus SubUID/SubGID allocation before daemon operations.
-bugfixes:
-  - Pass ``--no-profiles`` when an instance explicitly declares an empty profile list.
