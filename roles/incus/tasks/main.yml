@@ -7,6 +7,26 @@
   ansible.builtin.meta: end_host
   when: not (incus_enabled | bool)
 
+- name: Reconcile Incus root subordinate ID allocation
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    regexp: "^{{ incus_root_idmap_owner | regex_escape }}:"
+    line: >-
+      {{ incus_root_idmap_owner }}:{{ incus_root_idmap_start | int }}:{{ incus_root_idmap_count | int }}
+    owner: root
+    group: root
+    mode: "0644"
+    create: true
+  loop:
+    - "{{ incus_root_subuid_path }}"
+    - "{{ incus_root_subgid_path }}"
+  notify: Restart Incus after subordinate ID changes
+  when: incus_manage_root_idmap | bool
+
+- name: Apply subordinate ID changes before Incus operations
+  ansible.builtin.meta: flush_handlers
+  when: incus_manage_root_idmap | bool
+
 - name: Ensure Incus packages are installed
   ansible.builtin.apt:
     name: "{{ incus_packages }}"

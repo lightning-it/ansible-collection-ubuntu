@@ -9,6 +9,7 @@
       {{ incus_instance_item.reconfigure | default(incus_instance_default_reconfigure) | bool }}
     incus_instance_project: "{{ incus_instance_item.project | default(incus_instance_default_project) | trim }}"
     incus_instance_profiles: "{{ incus_instance_item.profiles | default(incus_instance_default_profiles) }}"
+    incus_instance_profiles_explicit: "{{ 'profiles' in incus_instance_item }}"
     incus_instance_config: "{{ incus_instance_default_config | combine(incus_instance_item.config | default({})) }}"
     incus_instance_devices: "{{ incus_instance_default_devices | combine(incus_instance_item.devices | default({})) }}"
     incus_instance_limits: "{{ incus_instance_default_limits | combine(incus_instance_item.limits | default({})) }}"
@@ -87,7 +88,11 @@
           else ['init', incus_instance_selected_image, incus_instance_name]
         )
         + (['--vm'] if incus_instance_type == 'vm' else [])
-        + (incus_instance_profiles | map('regex_replace', '^(.*)$', '--profile=\1') | list)
+        + (
+          ['--no-profiles']
+          if incus_instance_profiles_explicit | bool and incus_instance_profiles | length == 0
+          else (incus_instance_profiles | map('regex_replace', '^(.*)$', '--profile=\1') | list)
+        )
       }}
   become: "{{ incus_instance_command_user | trim | length > 0 }}"
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"

@@ -8,6 +8,8 @@
     ansible_python_interpreter: /usr/bin/python3
     incus_packages: []
     incus_services: []
+    incus_root_subuid_path: /tmp/incus-molecule-subuid
+    incus_root_subgid_path: /tmp/incus-molecule-subgid
     incus_preseed:
       storage_pools:
         - name: default
