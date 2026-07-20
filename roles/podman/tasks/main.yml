@@ -44,7 +44,9 @@
       - --version
   when:
     - podman_validate_executable | bool
-    - not ansible_check_mode or not (podman_apparmor_profile.changed | default(false))
+    - >-
+      not ansible_check_mode or
+      not (podman_apparmor_profile | default({'changed': false})).changed
   changed_when: false
 
 - name: Reconcile the system Podman API socket
