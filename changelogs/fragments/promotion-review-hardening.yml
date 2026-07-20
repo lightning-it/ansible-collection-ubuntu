@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Guard external GitHub runner service metadata when the optional unit-file check is skipped.
