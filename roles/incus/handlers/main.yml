@@ -8,4 +8,3 @@
   when:
     - not ansible_check_mode
     - incus_services | length > 0
-...
