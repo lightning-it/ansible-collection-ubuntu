@@ -20,7 +20,7 @@ env:
   COPILOT_REVIEWER_LOGIN: copilot-pull-request-reviewer
   NO_FILES_REVIEW_MARKER: was not able to review any files
   UNABLE_REVIEW_MARKER: unable to review this pull request
-  QUOTA_EXHAUSTED_MARKER: quota exhausted
+  QUOTA_EXHAUSTED_MARKER: quota
 
 concurrency:
   group: copilot-review-${{ github.event.pull_request.number }}
