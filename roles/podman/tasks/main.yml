@@ -49,6 +49,7 @@
     name: "{{ podman_system_socket_service_name }}"
     enabled: "{{ podman_system_socket_enabled | bool }}"
     state: "{{ (podman_system_socket_enabled | bool) | ternary('started', 'stopped') }}"
+  when: podman_system_socket_manage | bool
 
 - name: Configure rootless Podman API sockets
   ansible.builtin.include_tasks: user_socket.yml

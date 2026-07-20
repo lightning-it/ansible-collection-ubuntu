@@ -14,6 +14,7 @@
     podman_apparmor_parser_path: /bin/true
     podman_executable_path: /bin/true
     podman_validate_executable: true
+    podman_system_socket_manage: false
     podman_system_socket_enabled: false
     podman_user_socket_enabled: false
   tasks:

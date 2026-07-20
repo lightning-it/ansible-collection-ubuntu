@@ -30,6 +30,9 @@ argument_specs:
       podman_system_socket_enabled:
         type: bool
         default: false
+      podman_system_socket_manage:
+        type: bool
+        default: true
       podman_system_socket_service_name:
         type: str
         default: podman.socket

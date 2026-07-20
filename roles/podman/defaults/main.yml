@@ -12,6 +12,7 @@ podman_executable_path: /usr/bin/podman
 podman_validate_executable: false
 
 podman_system_socket_enabled: false
+podman_system_socket_manage: true
 podman_system_socket_service_name: podman.socket
 
 podman_user_socket_enabled: false
