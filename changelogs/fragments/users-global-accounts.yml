@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - >-
+    Add users_accounts_global as a final user-definition layer whose values take
+    precedence over base and extra definitions for the same account.

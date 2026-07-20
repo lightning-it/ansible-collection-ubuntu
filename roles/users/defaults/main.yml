@@ -11,5 +11,9 @@ users_accounts: []
 # service account without replacing the shared baseline user list.
 users_accounts_extra: []
 
+# Global user definitions merged after both base and extra definitions. Use this
+# for organization-wide account policy that takes precedence over those lists.
+users_accounts_global: []
+
 # Whether to ensure groups referenced in users exist before assignment.
 users_manage_groups: true
