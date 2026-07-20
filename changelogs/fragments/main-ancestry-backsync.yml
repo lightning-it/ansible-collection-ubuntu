@@ -1,3 +1,3 @@
 ---
 trivial:
-  - Restore main-branch ancestry in develop before the next promotion.
+  - Restore main-branch ancestry in develop after the runner-role promotion and before the next promotion.
