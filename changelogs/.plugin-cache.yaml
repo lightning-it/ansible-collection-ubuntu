@@ -29,6 +29,10 @@ objects:
       description: Install a GUI stack (GNOME or XFCE) on Ubuntu.
       name: gui
       version_added: null
+    incus:
+      description: Install and configure Incus on Ubuntu.
+      name: incus
+      version_added: null
     podman:
       description: Install Podman tooling and optionally manage API sockets.
       name: podman
@@ -73,4 +77,4 @@ plugins:
   strategy: {}
   test: {}
   vars: {}
-version: 1.8.0
+version: 1.9.0
