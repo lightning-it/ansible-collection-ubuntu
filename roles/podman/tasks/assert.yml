@@ -1,0 +1,21 @@
+---
+- name: Inspect Podman AppArmor repair inputs
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: true
+  loop:
+    - "{{ podman_apparmor_profile_path }}"
+    - "{{ podman_apparmor_parser_path }}"
+  register: podman_apparmor_inputs
+  when: podman_apparmor_profile_reload | bool
+
+- name: Validate Podman AppArmor repair inputs
+  ansible.builtin.assert:
+    that:
+      - podman_apparmor_inputs.results[0].stat.isreg | default(false)
+      - podman_apparmor_inputs.results[1].stat.isreg | default(false)
+      - podman_apparmor_inputs.results[1].stat.executable | default(false)
+    fail_msg: >-
+      Podman AppArmor repair requires an existing profile file and an
+      executable AppArmor parser.
+  when: podman_apparmor_profile_reload | bool

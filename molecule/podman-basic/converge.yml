@@ -23,7 +23,7 @@
         dest: "{{ podman_apparmor_profile_path }}"
         content: |
           #include <tunables/global>
-          profile podman /usr/bin/podman {
+          profile podman flags=(attach_disconnected) /usr/bin/podman {
           }
         mode: "0644"
         force: false

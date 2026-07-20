@@ -26,8 +26,9 @@ None.
   after optional profile repair (default: `false`)
 - `podman_system_socket_enabled`: reconcile the root `podman.socket` to the
   requested enabled/running or disabled/stopped state (default: `false`)
-- `podman_system_socket_manage`: manage the root `podman.socket`; disable only
-  where no systemd service manager is available (default: `true`)
+- `podman_system_socket_manage`: set to `true` to reconcile the root
+  `podman.socket`; leave `false` to preserve its existing state (default:
+  `false`)
 - `podman_user_socket_enabled`: enable rootless user `podman.socket`
   instances (default: `false`)
 - `podman_user_socket_users`: users that should get a rootless Podman API

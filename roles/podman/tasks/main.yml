@@ -1,4 +1,8 @@
 ---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
 - name: Install podman toolchain
   ansible.builtin.package:
     name: "{{ podman_packages }}"
@@ -17,7 +21,7 @@
     - name: Restore the unconfined Podman AppArmor attachment profile
       ansible.builtin.lineinfile:
         path: "{{ podman_apparmor_profile_path }}"
-        regexp: '^profile podman /usr/bin/podman(?: flags=\([^)]*\))? \{$'
+        regexp: '^profile\s+podman(?:\s+flags=\([^)]*\))?\s+/usr/bin/podman(?:\s+flags=\([^)]*\))?\s+\{$'
         line: 'profile podman /usr/bin/podman flags=(unconfined) {'
         state: present
       register: podman_apparmor_profile
@@ -38,7 +42,6 @@
     argv:
       - "{{ podman_executable_path }}"
       - --version
-  register: podman_executable_validation
   when:
     - podman_validate_executable | bool
     - not ansible_check_mode or not (podman_apparmor_profile.changed | default(false))
