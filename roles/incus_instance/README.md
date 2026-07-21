@@ -29,7 +29,8 @@ See `defaults/main.yml` for the full interface. Key variables:
 - `incus_instance_default_state` (string, default: `running`): Default target state.
 - `incus_instance_default_empty` (boolean, default: `false`): Create instances with `incus init --empty`.
 - `incus_instance_default_reconfigure` (boolean, default: `false`): Reapply config, limits, and devices to
-  existing instances.
+  existing instances. Values are compared before changes are applied, so repeated
+  reconciliation is idempotent.
 - `incus_instance_default_ssh_user` (string, default: `cloud-user`): Cloud-init login user.
 - `incus_instance_default_ssh_public_keys` (list, default: `[]`): Public SSH keys injected with cloud-init.
 - `incus_instance_inventory_path` (string, default: `""`): Optional controller-side inventory output file.
@@ -51,6 +52,12 @@ Each `incus_instance_items` entry supports:
 When `profiles` is omitted, Incus applies its normal default-profile behavior.
 When an item explicitly sets `profiles: []`, the role passes `--no-profiles` so
 an empty VM does not inherit unintended root-disk or network devices.
+
+Generated cloud-init disables SSH password authentication. Therefore, at least
+one public key is required through `ssh_public_keys` (or the role-level default).
+The role fails before creating an inaccessible guest when no key is supplied.
+An explicit `cloud_init_user_data` remains supported for installations that
+manage initial access themselves.
 
 ## Dependencies
 

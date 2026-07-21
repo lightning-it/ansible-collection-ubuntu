@@ -19,35 +19,77 @@
         - [sh, -lc, "systemctl enable --now sshd || systemctl enable --now ssh || true"]
   when: incus_instance_cloud_init_enabled | bool
 
-- name: Apply Incus cloud-init user-data
-  ansible.builtin.command:
-    argv: "{{ incus_instance_base_argv + ['config', 'set', incus_instance_name, 'cloud-init.user-data', '-'] }}"
-    stdin: >-
+- name: Render generated Incus cloud-init user-data
+  ansible.builtin.set_fact:
+    incus_instance_generated_user_data_rendered: |
+      #cloud-config
+      {{ incus_instance_generated_user_data | to_nice_yaml }}
+  no_log: true
+  when: incus_instance_cloud_init_enabled | bool
+
+- name: Resolve desired Incus cloud-init data
+  ansible.builtin.set_fact:
+    incus_instance_desired_user_data: >-
       {{
         incus_instance_item.cloud_init_user_data
         | default(
-          '#cloud-config' ~ "\n"
-          ~ (incus_instance_generated_user_data | to_nice_yaml),
+          incus_instance_generated_user_data_rendered,
           true
         )
       }}
+    incus_instance_desired_network_config: >-
+      {{
+        incus_instance_item.cloud_init_network_config
+        | default(incus_instance_default_network_config, true)
+      }}
+  no_log: true
+  when: incus_instance_cloud_init_enabled | bool
+
+- name: Read current Incus cloud-init user-data
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['config', 'get', incus_instance_name, 'cloud-init.user-data'] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_current_user_data
+  changed_when: false
+  no_log: true
+  when: incus_instance_cloud_init_enabled | bool
+
+- name: Apply Incus cloud-init user-data
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['config', 'set', incus_instance_name, 'cloud-init.user-data', '-'] }}"
+    stdin: "{{ incus_instance_desired_user_data }}"
   become: "{{ incus_instance_command_user | trim | length > 0 }}"
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
   changed_when: true
+  no_log: true
+  when:
+    - incus_instance_cloud_init_enabled | bool
+    - (incus_instance_current_user_data.stdout | trim) != (incus_instance_desired_user_data | trim)
+
+- name: Read current Incus cloud-init network-config
+  ansible.builtin.command:
+    argv: "{{ incus_instance_base_argv + ['config', 'get', incus_instance_name, 'cloud-init.network-config'] }}"
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_current_network_config
+  changed_when: false
+  no_log: true
   when: incus_instance_cloud_init_enabled | bool
 
 - name: Apply Incus cloud-init network-config
   ansible.builtin.command:
     argv: "{{ incus_instance_base_argv + ['config', 'set', incus_instance_name, 'cloud-init.network-config', '-'] }}"
-    stdin: >-
-      {{
-        incus_instance_item.cloud_init_network_config
-        | default(incus_instance_default_network_config, true)
-      }}
+    stdin: "{{ incus_instance_desired_network_config }}"
   become: "{{ incus_instance_command_user | trim | length > 0 }}"
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
   changed_when: true
-  when: incus_instance_cloud_init_enabled | bool
+  no_log: true
+  when:
+    - incus_instance_cloud_init_enabled | bool
+    - >-
+      (incus_instance_current_network_config.stdout | trim)
+      != (incus_instance_desired_network_config | trim)
 
 - name: Add Incus cloud-init config device
   ansible.builtin.command:
@@ -65,26 +107,58 @@
     - "'already exists' not in (incus_instance_cloud_init_device.stderr | default(''))"
   when: incus_instance_cloud_init_enabled | bool
 
-- name: Apply Incus instance config values
+- name: Read current Incus instance config values
   ansible.builtin.command:
-    argv: "{{ incus_instance_base_argv + ['config', 'set', incus_instance_name, item.key, item.value | string] }}"
+    argv: "{{ incus_instance_base_argv + ['config', 'get', incus_instance_name, item.key] }}"
   become: "{{ incus_instance_command_user | trim | length > 0 }}"
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
-  changed_when: true
+  register: incus_instance_current_config_values
+  changed_when: false
   loop: "{{ incus_instance_config | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
 
-- name: Apply Incus instance limit values
+- name: Apply changed Incus instance config values
   ansible.builtin.command:
     argv: >-
-      {{ incus_instance_base_argv + ['config', 'set', incus_instance_name, 'limits.' ~ item.key, item.value | string] }}
+      {{
+        incus_instance_base_argv
+        + ['config', 'set', incus_instance_name, item.item.key, item.item.value | string]
+      }}
   become: "{{ incus_instance_command_user | trim | length > 0 }}"
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
   changed_when: true
+  loop: "{{ incus_instance_current_config_values.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: (item.stdout | trim) != (item.item.value | string | trim)
+
+- name: Read current Incus instance limit values
+  ansible.builtin.command:
+    argv: >-
+      {{ incus_instance_base_argv + ['config', 'get', incus_instance_name, 'limits.' ~ item.key] }}
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  register: incus_instance_current_limit_values
+  changed_when: false
   loop: "{{ incus_instance_limits | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
+
+- name: Apply changed Incus instance limit values
+  ansible.builtin.command:
+    argv: >-
+      {{
+        incus_instance_base_argv
+        + ['config', 'set', incus_instance_name, 'limits.' ~ item.item.key, item.item.value | string]
+      }}
+  become: "{{ incus_instance_command_user | trim | length > 0 }}"
+  become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
+  changed_when: true
+  loop: "{{ incus_instance_current_limit_values.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: (item.stdout | trim) != (item.item.value | string | trim)
 
 - name: Add Incus instance devices
   ansible.builtin.include_tasks: device.yml

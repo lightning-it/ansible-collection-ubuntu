@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - >-
+    Make incus_instance reconciliation idempotent for cloud-init, config, and
+    limit values, reject generated key-only cloud-init without an SSH key, and
+    pass configured profiles correctly when creating an instance.

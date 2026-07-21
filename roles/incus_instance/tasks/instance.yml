@@ -91,7 +91,7 @@
         + (
           ['--no-profiles']
           if incus_instance_profiles_explicit | bool and incus_instance_profiles | length == 0
-          else (incus_instance_profiles | map('regex_replace', '^(.*)$', '--profile=\\1') | list)
+          else (incus_instance_profiles | map('regex_replace', '^', '--profile=') | list)
         )
       }}
   become: "{{ incus_instance_command_user | trim | length > 0 }}"

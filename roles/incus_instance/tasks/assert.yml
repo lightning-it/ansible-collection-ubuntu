@@ -103,3 +103,29 @@
     loop_var: incus_instance_device_item
     label: "{{ incus_instance_device_item.key | default('incus-device') }}"
   when: incus_instance_enabled | bool
+
+- name: Require an SSH key for generated key-only cloud-init access
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (incus_instance_item.cloud_init_enabled | default(incus_instance_default_cloud_init_enabled) | bool)
+        or (incus_instance_item.cloud_init_user_data | default('', true) | trim | length > 0)
+        or (incus_instance_default_cloud_init_ssh_pwauth | bool)
+        or (
+          incus_instance_item.ssh_public_keys
+          | default(incus_instance_default_ssh_public_keys)
+          | length > 0
+        )
+    fail_msg: >-
+      Generated cloud-init disables password authentication, so each managed
+      instance needs at least one ssh_public_keys entry. Alternatively provide
+      explicit cloud_init_user_data or deliberately enable SSH password access.
+    quiet: true
+  changed_when: false
+  loop: "{{ incus_instance_items }}"
+  loop_control:
+    loop_var: incus_instance_item
+    label: "{{ incus_instance_item.name | default('incus-instance') }}"
+  when:
+    - incus_instance_enabled | bool
+    - (incus_instance_item.state | default(incus_instance_default_state)) != 'absent'
