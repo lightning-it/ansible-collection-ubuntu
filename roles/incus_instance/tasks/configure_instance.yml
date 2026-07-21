@@ -114,6 +114,7 @@
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
   register: incus_instance_current_config_values
   changed_when: false
+  no_log: true
   loop: "{{ incus_instance_config | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
@@ -128,6 +129,7 @@
   become: "{{ incus_instance_command_user | trim | length > 0 }}"
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
   changed_when: true
+  no_log: true
   loop: "{{ incus_instance_current_config_values.results }}"
   loop_control:
     label: "{{ item.item.key }}"
@@ -141,6 +143,7 @@
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
   register: incus_instance_current_limit_values
   changed_when: false
+  no_log: true
   loop: "{{ incus_instance_limits | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
@@ -155,6 +158,7 @@
   become: "{{ incus_instance_command_user | trim | length > 0 }}"
   become_user: "{{ incus_instance_command_user if incus_instance_command_user | trim | length > 0 else omit }}"
   changed_when: true
+  no_log: true
   loop: "{{ incus_instance_current_limit_values.results }}"
   loop_control:
     label: "{{ item.item.key }}"
