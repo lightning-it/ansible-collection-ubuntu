@@ -75,7 +75,7 @@ repos:
           --security-opt label=disable
           --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m
           -v "$PWD/renovate.json:/repo/renovate.json:ro" -w /repo
-          docker.io/renovate/renovate:43.272.7@sha256:97419c862f9c6d8e90cc7ea154549d62af050822b60b67c2d9551a722baa85eb
+          docker.io/renovate/renovate:43.272.9@sha256:0837222aafdd2f5405cb9a538816f292e7933091aa70f6edc992c72dddd463de
           renovate-config-validator --strict --no-global /repo/renovate.json'
 
       # -------------------------------------------------------------------
