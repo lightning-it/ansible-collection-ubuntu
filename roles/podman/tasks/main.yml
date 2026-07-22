@@ -70,10 +70,10 @@
     path: "{{ item.profile_path }}"
     regexp: >-
       {{
-        '^profile\\s+' ~ item.name
-        ~ '(?:\\s+flags=\\([^)]*\\))?\\s+'
+        '^profile[ ]+' ~ (item.name | regex_escape)
+        ~ '(?:[ ]+flags=[(][^)]+[)])?[ ]+'
         ~ (item.executable | regex_escape)
-        ~ '(?:\\s+flags=\\([^)]*\\))?\\s*\\{$'
+        ~ '(?:[ ]+flags=[(][^)]+[)])?[ ]*[{]$'
       }}
     line: "profile {{ item.name }} {{ item.executable }} flags=(unconfined) {"
     state: present
