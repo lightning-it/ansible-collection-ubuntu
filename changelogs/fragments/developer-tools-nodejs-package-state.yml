@@ -26,6 +26,9 @@ bugfixes:
     Keep generated key-only Incus SSH accounts unlocked while password
     authentication remains disabled, allowing OpenSSH public-key login.
   - >-
+    Remove the generated guest account's unusable shadow lock after cloud-init
+    creation so OpenSSH accepts its authorized key on images that retain it.
+  - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
   - >-

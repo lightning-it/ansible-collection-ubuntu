@@ -26,6 +26,9 @@
           sudo: "{{ incus_instance_item.cloud_init_sudo | default(incus_instance_default_cloud_init_sudo) }}"
           ssh_authorized_keys: "{{ incus_instance_ssh_public_keys }}"
       runcmd:
+        - - passwd
+          - --delete
+          - "{{ incus_instance_ssh_user }}"
         - - sh
           - -lc
           - >-
