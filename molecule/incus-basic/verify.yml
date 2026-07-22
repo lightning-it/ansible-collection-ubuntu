@@ -94,7 +94,6 @@
         expected_incus_profile_config:
           limits.cpu: "2"
         expected_incus_mutations:
-          - storage create default dir
           - admin init --preseed
           - project create workbench
           - project set workbench features.images=false

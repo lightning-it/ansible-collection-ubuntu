@@ -32,7 +32,9 @@
           - "{{ podman_apparmor_parser_path }}"
           - --replace
           - "{{ podman_apparmor_profile_path }}"
-      when: not ansible_check_mode
+      when:
+        - not ansible_check_mode
+        - podman_apparmor_profile.changed
       changed_when: false
 
 - name: Restore and reload the package-compatible Buildah AppArmor profile
@@ -44,6 +46,7 @@
         regexp: '^profile\s+buildah(?:\s+flags=\([^)]*\))?\s+/usr/bin/buildah(?:\s+flags=\([^)]*\))?\s*\{$'
         line: 'profile buildah /usr/bin/buildah flags=(unconfined) {'
         state: present
+      register: podman_buildah_apparmor_profile
 
     - name: Reload the Buildah AppArmor profile
       ansible.builtin.command:
@@ -51,7 +54,9 @@
           - "{{ podman_apparmor_parser_path }}"
           - --replace
           - "{{ podman_buildah_apparmor_profile_path }}"
-      when: not ansible_check_mode
+      when:
+        - not ansible_check_mode
+        - podman_buildah_apparmor_profile.changed
       changed_when: false
 
 - name: Remove invalid trailing helper AppArmor profile headers
@@ -64,6 +69,7 @@
   loop: "{{ podman_helper_apparmor_profiles }}"
   loop_control:
     label: "{{ item.name }}"
+  register: podman_helper_apparmor_trailing_headers
 
 - name: Restore unconfined helper AppArmor attachment profiles
   ansible.builtin.lineinfile:
@@ -80,6 +86,7 @@
   loop: "{{ podman_helper_apparmor_profiles }}"
   loop_control:
     label: "{{ item.name }}"
+  register: podman_helper_apparmor_headers
 
 - name: Reload helper AppArmor attachment profiles
   ansible.builtin.command:
@@ -88,9 +95,14 @@
       - --replace
       - "{{ item.profile_path }}"
   loop: "{{ podman_helper_apparmor_profiles }}"
+  when:
+    - not ansible_check_mode
+    - >-
+      podman_helper_apparmor_trailing_headers.results[index].changed
+      or podman_helper_apparmor_headers.results[index].changed
   loop_control:
+    index_var: index
     label: "{{ item.name }}"
-  when: not ansible_check_mode
   changed_when: false
 
 - name: Validate the direct Podman executable

@@ -7,7 +7,10 @@
     - "{{ podman_apparmor_profile_path }}"
     - "{{ podman_apparmor_parser_path }}"
   register: podman_apparmor_inputs
-  when: podman_apparmor_profile_reload | bool
+  when: >-
+    podman_apparmor_profile_reload | bool
+    or podman_buildah_apparmor_profile_reload | bool
+    or podman_helper_apparmor_profiles | length > 0
 
 - name: Inspect Buildah AppArmor repair inputs
   ansible.builtin.stat:
@@ -106,8 +109,8 @@
       - >-
         (podman_helper_apparmor_profile_sources.results[index].content | b64decode)
         is search(
-          '(?m)^profile\\s+' ~ item.name
-          ~ '(?:\\s+flags=\\([^)]*\\))?\\s+' ~ item.executable
+          '(?m)^profile\\s+' ~ (item.name | regex_escape)
+          ~ '(?:\\s+flags=\\([^)]*\\))?\\s+' ~ (item.executable | regex_escape)
           ~ '(?:\\s+flags=\\([^)]*\\))?\\s*\\{$',
           multiline=True
         )

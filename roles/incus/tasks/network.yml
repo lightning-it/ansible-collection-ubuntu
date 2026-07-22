@@ -15,12 +15,11 @@
 
 - name: Create missing Incus network
   ansible.builtin.command:
-    argv: >-
-      {%- set command = ['incus', 'network', 'create', incus_network.name] -%}
-      {%- for option in incus_network.config | default({}) | dict2items -%}
-        {%- set _ = command.append(option.key ~ '=' ~ (option.value | string)) -%}
-      {%- endfor -%}
-      {{ command }}
+    cmd: >-
+      incus network create {{ incus_network.name | quote }}
+      {%- for option in incus_network.config | default({}) | dict2items %}
+      {{ (option.key ~ '=' ~ (option.value | string)) | quote }}
+      {%- endfor %}
   when:
     - not ansible_check_mode
     - incus_network_current | length == 0
@@ -34,7 +33,7 @@
       - set
       - "{{ incus_network.name }}"
       - "{{ item.key }}"
-      - "{{ item.value }}"
+      - "{{ item.value | string }}"
   loop: "{{ incus_network.config | default({}) | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
@@ -45,5 +44,5 @@
       incus_network_current.config | default({}) | dict2items
       | selectattr('key', 'equalto', item.key)
       | map(attribute='value') | first | default(none)
-      != item.value
+      | string != item.value | string
   changed_when: true
