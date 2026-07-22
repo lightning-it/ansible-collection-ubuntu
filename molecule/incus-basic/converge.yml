@@ -14,6 +14,11 @@
       storage_pools:
         - name: default
           driver: dir
+      networks:
+        - name: incusbr0
+          config:
+            ipv4.address: 10.221.0.1/24
+            ipv4.nat: "true"
     incus_projects:
       - name: workbench
         config:
@@ -45,6 +50,12 @@
         owner: root
         group: root
         mode: "0755"
+      when: not ansible_check_mode
+
+    - name: Seed an initialized Incus daemon with one storage pool
+      ansible.builtin.command:
+        argv: [incus, storage, create, default, dir]
+        creates: /var/lib/incus-fake/storage-seeded
       when: not ansible_check_mode
 
   roles:

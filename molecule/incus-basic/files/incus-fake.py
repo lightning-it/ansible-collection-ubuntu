@@ -10,7 +10,9 @@ STATE_DIR = Path("/var/lib/incus-fake")
 STORAGE_FILE = STATE_DIR / "storage.json"
 PROJECT_FILE = STATE_DIR / "projects.json"
 PROFILE_FILE = STATE_DIR / "profiles.json"
+NETWORK_FILE = STATE_DIR / "networks.json"
 MUTATION_FILE = STATE_DIR / "mutations.log"
+STORAGE_SEEDED_FILE = STATE_DIR / "storage-seeded"
 
 
 def read_json(path, default):
@@ -42,6 +44,8 @@ def initialize_state():
         write_json(PROJECT_FILE, [{"config": {}, "description": "Default project", "name": "default"}])
     if not PROFILE_FILE.exists():
         write_json(PROFILE_FILE, [])
+    if not NETWORK_FILE.exists():
+        write_json(NETWORK_FILE, [])
     MUTATION_FILE.touch(exist_ok=True)
 
 
@@ -54,6 +58,7 @@ def handle_storage(arguments):
         pools = read_json(STORAGE_FILE, [])
         pools.append({"driver": driver, "name": name})
         write_json(STORAGE_FILE, pools)
+        STORAGE_SEEDED_FILE.touch()
         mutate(f"storage create {name} {driver}")
         return True
     return False
@@ -99,6 +104,28 @@ def handle_project(arguments):
     return False
 
 
+def handle_network(arguments):
+    networks = read_json(NETWORK_FILE, [])
+    if arguments[:2] == ["network", "list"]:
+        print(json.dumps(networks))
+        return True
+    if arguments[:2] == ["network", "create"]:
+        name = arguments[2]
+        config = dict(option.split("=", 1) for option in arguments[3:])
+        networks.append({"config": config, "name": name})
+        write_json(NETWORK_FILE, networks)
+        mutate(f"network create {name}")
+        return True
+    if arguments[:2] == ["network", "set"]:
+        name, key, value = arguments[2:5]
+        network = next(item for item in networks if item["name"] == name)
+        network["config"][key] = value
+        write_json(NETWORK_FILE, networks)
+        mutate(f"network set {name} {key}={value}")
+        return True
+    return False
+
+
 def handle_profile(arguments):
     project = option_value(arguments, "--project", "default")
     profiles = read_json(PROFILE_FILE, [])
@@ -125,7 +152,7 @@ def handle_profile(arguments):
 def main():
     initialize_state()
     arguments = sys.argv[1:]
-    for handler in (handle_storage, handle_admin, handle_project, handle_profile):
+    for handler in (handle_storage, handle_admin, handle_project, handle_network, handle_profile):
         if handler(arguments):
             return 0
     print(f"Unsupported fake Incus invocation: {' '.join(arguments)}", file=sys.stderr)
