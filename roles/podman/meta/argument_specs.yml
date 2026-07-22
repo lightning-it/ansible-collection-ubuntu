@@ -18,6 +18,12 @@ argument_specs:
       podman_apparmor_profile_path:
         type: path
         default: /etc/apparmor.d/podman
+      podman_buildah_apparmor_profile_reload:
+        type: bool
+        default: false
+      podman_buildah_apparmor_profile_path:
+        type: path
+        default: /etc/apparmor.d/buildah
       podman_apparmor_parser_path:
         type: path
         default: /usr/sbin/apparmor_parser

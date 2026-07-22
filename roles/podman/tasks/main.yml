@@ -35,6 +35,25 @@
       when: not ansible_check_mode
       changed_when: false
 
+- name: Restore and reload the package-compatible Buildah AppArmor profile
+  when: podman_buildah_apparmor_profile_reload | bool
+  block:
+    - name: Restore the unconfined Buildah AppArmor attachment profile
+      ansible.builtin.lineinfile:
+        path: "{{ podman_buildah_apparmor_profile_path }}"
+        regexp: '^profile\s+buildah(?:\s+flags=\([^)]*\))?\s+/usr/bin/buildah(?:\s+flags=\([^)]*\))?\s*\{$'
+        line: 'profile buildah /usr/bin/buildah flags=(unconfined) {'
+        state: present
+
+    - name: Reload the Buildah AppArmor profile
+      ansible.builtin.command:
+        argv:
+          - "{{ podman_apparmor_parser_path }}"
+          - --replace
+          - "{{ podman_buildah_apparmor_profile_path }}"
+      when: not ansible_check_mode
+      changed_when: false
+
 - name: Validate the direct Podman executable
   ansible.builtin.command:
     argv:

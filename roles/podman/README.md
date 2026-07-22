@@ -18,6 +18,10 @@ None.
   (default: `false`)
 - `podman_apparmor_profile_path`: Podman AppArmor profile path (default:
   `/etc/apparmor.d/podman`)
+- `podman_buildah_apparmor_profile_reload`: restore and reload the
+  package-compatible unconfined Buildah attachment profile (default: `false`)
+- `podman_buildah_apparmor_profile_path`: Buildah AppArmor profile path
+  (default: `/etc/apparmor.d/buildah`)
 - `podman_apparmor_parser_path`: AppArmor parser path used for a targeted
   `--replace` reload (default: `/usr/sbin/apparmor_parser`)
 - `podman_executable_path`: Podman executable used by validation (default:
