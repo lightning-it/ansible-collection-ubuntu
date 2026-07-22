@@ -38,6 +38,7 @@
     state: directory
     mode: "a+rX"
     recurse: true
+    follow: false
   when:
     - not ansible_check_mode
     - developer_tools_python_venv_install.changed | default(false)
