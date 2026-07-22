@@ -46,10 +46,17 @@ def initialize_state():
 
 
 def handle_storage(arguments):
-    if arguments[:2] != ["storage", "list"]:
-        return False
-    print(json.dumps(read_json(STORAGE_FILE, [])))
-    return True
+    if arguments[:2] == ["storage", "list"]:
+        print(json.dumps(read_json(STORAGE_FILE, [])))
+        return True
+    if arguments[:2] == ["storage", "create"]:
+        name, driver = arguments[2:4]
+        pools = read_json(STORAGE_FILE, [])
+        pools.append({"driver": driver, "name": name})
+        write_json(STORAGE_FILE, pools)
+        mutate(f"storage create {name} {driver}")
+        return True
+    return False
 
 
 def handle_admin(arguments):
