@@ -19,6 +19,11 @@
         src: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/podman.apparmor"
       register: podman_molecule_apparmor_profile
 
+    - name: Read the isolated Buildah AppArmor profile
+      ansible.builtin.slurp:
+        src: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/buildah.apparmor"
+      register: podman_molecule_buildah_apparmor_profile
+
     - name: Assert lit.ubuntu.podman executed safely
       ansible.builtin.assert:
         that:
@@ -28,4 +33,7 @@
           - >-
             'profile podman /usr/bin/podman flags=(unconfined) {'
             in (podman_molecule_apparmor_profile.content | b64decode).splitlines()
+          - >-
+            'profile buildah /usr/bin/buildah flags=(unconfined) {'
+            in (podman_molecule_buildah_apparmor_profile.content | b64decode).splitlines()
         quiet: true

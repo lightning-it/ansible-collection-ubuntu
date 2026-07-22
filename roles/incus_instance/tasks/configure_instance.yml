@@ -7,16 +7,40 @@
       manage_etc_hosts: "{{ incus_instance_default_cloud_init_manage_etc_hosts | bool }}"
       ssh_pwauth: "{{ incus_instance_default_cloud_init_ssh_pwauth | bool }}"
       disable_root: "{{ incus_instance_default_cloud_init_disable_root | bool }}"
+      packages: >-
+        {{
+          incus_instance_item.cloud_init_packages
+          | default(incus_instance_default_cloud_init_packages)
+        }}
       users:
         - default
         - name: "{{ incus_instance_ssh_user }}"
           shell: /bin/bash
-          lock_passwd: true
+          lock_passwd: >-
+            {{
+              incus_instance_item.cloud_init_lock_passwd
+              | default(incus_instance_default_cloud_init_lock_passwd)
+              | bool
+            }}
           groups: "{{ incus_instance_item.cloud_init_groups | default(incus_instance_default_cloud_init_groups) }}"
           sudo: "{{ incus_instance_item.cloud_init_sudo | default(incus_instance_default_cloud_init_sudo) }}"
           ssh_authorized_keys: "{{ incus_instance_ssh_public_keys }}"
-      runcmd:
-        - [sh, -lc, "systemctl enable --now sshd || systemctl enable --now ssh || true"]
+      runcmd: >-
+        {{
+          (
+            incus_instance_item.cloud_init_lock_passwd
+            | default(incus_instance_default_cloud_init_lock_passwd)
+            | bool
+          )
+          | ternary([], [['passwd', '--delete', incus_instance_ssh_user]])
+          + [[
+            'sh', '-lc',
+            'systemctl enable --now ssh.socket'
+            ~ ' || systemctl enable --now sshd'
+            ~ ' || systemctl enable --now ssh'
+            ~ ' || true'
+          ]]
+        }}
   when: incus_instance_cloud_init_enabled | bool
 
 - name: Render generated Incus cloud-init user-data

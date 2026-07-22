@@ -21,8 +21,10 @@ See `defaults/main.yml` for the full interface. Key variables:
   subordinate-ID range; the count must contain at least 10 million IDs.
 - `incus_root_subuid_path` and `incus_root_subgid_path`: Overrideable paths,
   primarily for isolated validation scenarios.
-- `incus_preseed` (mapping, default: `{}`): Optional preseed passed to `incus admin init --preseed` instead of the
-  minimal initializer. It is used only when storage discovery succeeds and no storage pool exists.
+- `incus_preseed` (mapping, default: `{}`): Optional desired Incus bootstrap state. When no storage pool exists, the
+  complete mapping is passed to `incus admin init --preseed` instead of the minimal initializer. On an already
+  initialized host, missing entries from `storage_pools` are created and entries from `networks` are created or
+  reconciled, including their configuration.
 - `incus_projects` (list, default: `[]`): Projects to create and project configuration keys to reconcile.
 - `incus_profiles` (list, default: `[]`): Project-scoped profiles whose description, configuration, and devices are
   reconciled exactly.

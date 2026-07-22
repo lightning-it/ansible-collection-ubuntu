@@ -11,6 +11,9 @@
     podman_apparmor_profile_reload: true
     podman_apparmor_profile_path: >-
       {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/podman.apparmor
+    podman_buildah_apparmor_profile_reload: true
+    podman_buildah_apparmor_profile_path: >-
+      {{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/buildah.apparmor
     podman_apparmor_parser_path: /bin/true
     podman_executable_path: /bin/true
     podman_validate_executable: true
@@ -24,6 +27,16 @@
         content: |
           #include <tunables/global>
           profile podman flags=(attach_disconnected) /usr/bin/podman {
+          }
+        mode: "0644"
+        force: false
+
+    - name: Seed a restricted Buildah AppArmor profile
+      ansible.builtin.copy:
+        dest: "{{ podman_buildah_apparmor_profile_path }}"
+        content: |
+          #include <tunables/global>
+          profile buildah flags=(attach_disconnected) /usr/bin/buildah {
           }
         mode: "0644"
         force: false

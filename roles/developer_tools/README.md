@@ -36,6 +36,7 @@ developer_tools_python_venv_link_dir: /usr/local/bin
 
 developer_tools_nodejs_enabled: false
 developer_tools_nodejs_package_source: os
+developer_tools_nodejs_package_state: present
 developer_tools_nodejs_packages_present:
   - nodejs
   - npm

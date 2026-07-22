@@ -26,10 +26,22 @@
     state: present
     virtualenv: "{{ developer_tools_python_venv_path }}"
     virtualenv_command: "{{ developer_tools_python_venv_python }} -m venv"
+  register: developer_tools_python_venv_install
   when:
     - >-
       not ansible_check_mode
       or developer_tools_python_venv_state.stat.isdir | default(false)
+
+- name: Make the isolated Python toolchain globally readable and traversable
+  ansible.builtin.file:
+    path: "{{ developer_tools_python_venv_path }}"
+    state: directory
+    mode: "a+rX"
+    recurse: true
+    follow: false
+  when:
+    - not ansible_check_mode
+    - developer_tools_python_venv_install.changed | default(false)
 
 - name: Ensure isolated Python command link directory exists
   ansible.builtin.file:
