@@ -1,13 +1,13 @@
 ---
-- name: Prechecks
-  ansible.builtin.import_tasks: assert.yml
-  tags: always
-
 - name: Install podman toolchain
   ansible.builtin.package:
     name: "{{ podman_packages }}"
     state: present
   when: podman_packages | length > 0
+
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
 
 - name: Ensure registries.conf directory exists
   ansible.builtin.file:
@@ -63,7 +63,7 @@
   ansible.builtin.replace:
     path: "{{ item.profile_path }}"
     regexp: >-
-      (?m)^profile {{ item.name }} {{ item.executable | regex_escape }}
+      (?m)^profile {{ item.name | regex_escape }} {{ item.executable | regex_escape }}
       flags=\(unconfined\) \{\s*\Z
     replace: ""
   loop: "{{ podman_helper_apparmor_profiles }}"
