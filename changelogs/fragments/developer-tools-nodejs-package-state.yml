@@ -8,6 +8,9 @@ bugfixes:
     Reconcile missing Incus storage pools from the preseed even when another
     pool already initialized the daemon.
   - >-
+    Reconcile declared Incus preseed networks when the daemon was already
+    initialized with different bridge settings.
+  - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
   - >-

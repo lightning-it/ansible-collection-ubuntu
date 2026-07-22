@@ -153,6 +153,36 @@
       not in (incus_storage_pools_current | map(attribute='name') | list)
   changed_when: true
 
+- name: Discover managed Incus networks
+  ansible.builtin.command:
+    argv: [incus, network, list, --format, json]
+  register: incus_network_list
+  changed_when: false
+  check_mode: false
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+    - incus_preseed.networks | default([]) | length > 0
+
+- name: Decode managed Incus networks
+  ansible.builtin.set_fact:
+    incus_networks_current: "{{ incus_network_list.stdout | from_json }}"
+  changed_when: false
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+    - incus_preseed.networks | default([]) | length > 0
+
+- name: Reconcile preseed Incus networks
+  ansible.builtin.include_tasks: network.yml
+  loop: "{{ incus_preseed.networks | default([]) }}"
+  loop_control:
+    label: "{{ incus_network.name }}"
+    loop_var: incus_network
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+
 - name: Initialize Incus from the supplied preseed
   ansible.builtin.command:
     argv:

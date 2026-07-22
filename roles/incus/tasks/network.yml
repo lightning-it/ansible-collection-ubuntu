@@ -1,0 +1,49 @@
+---
+- name: Resolve current Incus network state
+  ansible.builtin.set_fact:
+    incus_network_current: >-
+      {{
+        (
+          incus_networks_current
+          | selectattr('name', 'equalto', incus_network.name)
+          | list
+          | first
+        )
+        | default({})
+      }}
+  changed_when: false
+
+- name: Create missing Incus network
+  ansible.builtin.command:
+    argv: >-
+      {%- set command = ['incus', 'network', 'create', incus_network.name] -%}
+      {%- for option in incus_network.config | default({}) | dict2items -%}
+        {%- set _ = command.append(option.key ~ '=' ~ (option.value | string)) -%}
+      {%- endfor -%}
+      {{ command }}
+  when:
+    - not ansible_check_mode
+    - incus_network_current | length == 0
+  changed_when: true
+
+- name: Reconcile existing Incus network configuration
+  ansible.builtin.command:
+    argv:
+      - incus
+      - network
+      - set
+      - "{{ incus_network.name }}"
+      - "{{ item.key }}"
+      - "{{ item.value }}"
+  loop: "{{ incus_network.config | default({}) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - not ansible_check_mode
+    - incus_network_current | length > 0
+    - >-
+      incus_network_current.config | default({}) | dict2items
+      | selectattr('key', 'equalto', item.key)
+      | map(attribute='value') | first | default(none)
+      != item.value
+  changed_when: true
