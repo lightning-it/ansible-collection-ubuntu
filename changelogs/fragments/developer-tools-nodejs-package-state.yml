@@ -5,6 +5,9 @@ minor_changes:
     packages by setting developer_tools_nodejs_package_state to latest.
 bugfixes:
   - >-
+    Reconcile missing Incus storage pools from the preseed even when another
+    pool already initialized the daemon.
+  - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
   - >-
