@@ -45,9 +45,6 @@
 - name: Validate helper AppArmor repair inputs
   ansible.builtin.assert:
     that:
-      - item.name is match('^[a-z0-9][a-z0-9._-]*$')
-      - item.executable is match('^/[^\n]+$')
-      - item.profile_path is match('^/[^\n]+$')
       - podman_helper_apparmor_inputs.results[index].stat.isreg | default(false)
     fail_msg: >-
       Helper AppArmor repair requires safe names, absolute paths, and an

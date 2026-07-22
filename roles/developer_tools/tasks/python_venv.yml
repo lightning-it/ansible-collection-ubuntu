@@ -26,6 +26,7 @@
     state: present
     virtualenv: "{{ developer_tools_python_venv_path }}"
     virtualenv_command: "{{ developer_tools_python_venv_python }} -m venv"
+  register: developer_tools_python_venv_install
   when:
     - >-
       not ansible_check_mode
@@ -37,7 +38,9 @@
     state: directory
     mode: "a+rX"
     recurse: true
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - developer_tools_python_venv_install.changed | default(false)
 
 - name: Ensure isolated Python command link directory exists
   ansible.builtin.file:

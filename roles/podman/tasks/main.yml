@@ -1,11 +1,24 @@
 ---
+- name: Prechecks
+  ansible.builtin.assert:
+    that:
+      - item.name is match('^[a-z0-9][a-z0-9._-]*$')
+      - item.executable is match('^/[^\n]+$')
+      - item.profile_path is match('^/[^\n]+$')
+    fail_msg: "Helper AppArmor inputs require safe names and absolute paths."
+    quiet: true
+  loop: "{{ podman_helper_apparmor_profiles }}"
+  loop_control:
+    label: "{{ item.name | default('invalid') }}"
+  tags: always
+
 - name: Install podman toolchain
   ansible.builtin.package:
     name: "{{ podman_packages }}"
     state: present
   when: podman_packages | length > 0
 
-- name: Prechecks
+- name: Validate package-provided AppArmor profiles after installation
   ansible.builtin.import_tasks: assert.yml
   tags: always
 
