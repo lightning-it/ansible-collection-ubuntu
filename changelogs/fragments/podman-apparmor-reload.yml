@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - >-
+    Reload the declared Podman AppArmor profile on every real role run so an
+    already-correct file cannot leave stale restrictive kernel policy active.

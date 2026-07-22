@@ -32,10 +32,8 @@
           - "{{ podman_apparmor_parser_path }}"
           - --replace
           - "{{ podman_apparmor_profile_path }}"
-      when:
-        - podman_apparmor_profile.changed
-        - not ansible_check_mode
-      changed_when: true
+      when: not ansible_check_mode
+      changed_when: false
 
 - name: Validate the direct Podman executable
   ansible.builtin.command:
