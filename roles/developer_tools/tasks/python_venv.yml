@@ -31,7 +31,7 @@
       not ansible_check_mode
       or developer_tools_python_venv_state.stat.isdir | default(false)
 
-- name: Make the isolated Python toolchain available to developer users
+- name: Make the isolated Python toolchain globally readable and traversable
   ansible.builtin.file:
     path: "{{ developer_tools_python_venv_path }}"
     state: directory

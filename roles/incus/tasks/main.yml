@@ -135,6 +135,10 @@
       - incus_storage_pool.name | default('') | length > 0
       - incus_storage_pool.driver | default('') | length > 0
       - incus_storage_pool.config | default({}) is mapping
+      - >-
+        incus_storage_pool.config | default({}) | dict2items
+        | selectattr('value', 'string') | list | length
+        == incus_storage_pool.config | default({}) | length
     fail_msg: "Each Incus storage pool requires name, driver, and mapping config values."
     quiet: true
   loop: "{{ incus_preseed.storage_pools | default([]) }}"
@@ -193,6 +197,10 @@
       - incus_network is mapping
       - incus_network.name | default('') | length > 0
       - incus_network.config | default({}) is mapping
+      - >-
+        incus_network.config | default({}) | dict2items
+        | selectattr('value', 'string') | list | length
+        == incus_network.config | default({}) | length
     fail_msg: "Each Incus network requires a name and mapping config values."
     quiet: true
   loop: "{{ incus_preseed.networks | default([]) }}"
