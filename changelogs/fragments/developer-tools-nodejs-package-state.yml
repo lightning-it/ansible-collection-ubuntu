@@ -17,6 +17,9 @@ bugfixes:
     Enable Ubuntu's socket-activated SSH listener in generated Incus cloud-init
     data while retaining service fallbacks for other guest images.
   - >-
+    Install the configurable openssh-server default in generated Incus
+    cloud-init data so minimal cloud images expose the declared SSH contract.
+  - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
   - >-

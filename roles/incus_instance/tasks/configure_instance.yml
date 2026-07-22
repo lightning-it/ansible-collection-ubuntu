@@ -7,6 +7,11 @@
       manage_etc_hosts: "{{ incus_instance_default_cloud_init_manage_etc_hosts | bool }}"
       ssh_pwauth: "{{ incus_instance_default_cloud_init_ssh_pwauth | bool }}"
       disable_root: "{{ incus_instance_default_cloud_init_disable_root | bool }}"
+      packages: >-
+        {{
+          incus_instance_item.cloud_init_packages
+          | default(incus_instance_default_cloud_init_packages)
+        }}
       users:
         - default
         - name: "{{ incus_instance_ssh_user }}"

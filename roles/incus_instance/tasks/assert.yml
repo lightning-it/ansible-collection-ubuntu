@@ -29,6 +29,8 @@
       - incus_instance_default_cloud_init_ssh_pwauth is boolean
       - incus_instance_default_cloud_init_groups is sequence
       - incus_instance_default_cloud_init_groups is not string
+      - incus_instance_default_cloud_init_packages is sequence
+      - incus_instance_default_cloud_init_packages is not string
       - incus_instance_default_cloud_init_sudo is string
       - incus_instance_default_network_config is string
       - incus_instance_inventory_path is string
@@ -70,6 +72,8 @@
       - incus_instance_item.ssh_public_keys | default(incus_instance_default_ssh_public_keys) is sequence
       - incus_instance_item.ssh_public_keys | default(incus_instance_default_ssh_public_keys) is not string
       - incus_instance_item.cloud_init_enabled | default(incus_instance_default_cloud_init_enabled) is boolean
+      - incus_instance_item.cloud_init_packages | default(incus_instance_default_cloud_init_packages) is sequence
+      - incus_instance_item.cloud_init_packages | default(incus_instance_default_cloud_init_packages) is not string
       - incus_instance_item.wait_for_ip | default(incus_instance_default_wait_for_ip) is boolean
       - incus_instance_item.wait_for_ssh | default(incus_instance_default_wait_for_ssh) is boolean
     fail_msg: >-

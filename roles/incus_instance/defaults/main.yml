@@ -26,6 +26,8 @@ incus_instance_default_cloud_init_disable_root: true
 incus_instance_default_cloud_init_ssh_pwauth: false
 incus_instance_default_cloud_init_groups:
   - wheel
+incus_instance_default_cloud_init_packages:
+  - openssh-server
 incus_instance_default_cloud_init_sudo: "ALL=(ALL) NOPASSWD:ALL"
 incus_instance_default_network_config: |
   version: 2
