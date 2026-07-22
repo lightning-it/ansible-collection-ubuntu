@@ -18,6 +18,7 @@
         not developer_tools_python_venv_enabled | bool
         or developer_tools_python_venv_packages | length > 0
       - developer_tools_nodejs_package_source in ['os']
+      - developer_tools_nodejs_package_state in ['present', 'latest']
       - developer_tools_nodejs_packages_present is sequence
       - developer_tools_nodejs_packages_present is not string
       - developer_tools_node_executable | trim | length > 0

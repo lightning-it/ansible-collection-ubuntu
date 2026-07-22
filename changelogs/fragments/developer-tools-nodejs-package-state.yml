@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - >-
+    Allow the developer_tools role to upgrade operating-system Node.js
+    packages by setting developer_tools_nodejs_package_state to latest.

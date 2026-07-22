@@ -11,7 +11,7 @@
 - name: Ensure Node.js, npm, and npx packages are installed
   ansible.builtin.package:
     name: "{{ developer_tools_nodejs_packages_present }}"
-    state: present
+    state: "{{ developer_tools_nodejs_package_state }}"
   when: (developer_tools_nodejs_packages_present | default([], true) | length) > 0
 
 - name: Check npm availability during check mode
