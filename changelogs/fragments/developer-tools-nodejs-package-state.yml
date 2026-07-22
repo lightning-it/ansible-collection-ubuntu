@@ -20,6 +20,9 @@ bugfixes:
     Install the configurable openssh-server default in generated Incus
     cloud-init data so minimal cloud images expose the declared SSH contract.
   - >-
+    Make the shared isolated Python toolchain readable and traversable by
+    declared developer users even when controller umask defaults are restrictive.
+  - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
   - >-

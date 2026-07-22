@@ -31,6 +31,14 @@
       not ansible_check_mode
       or developer_tools_python_venv_state.stat.isdir | default(false)
 
+- name: Make the isolated Python toolchain available to developer users
+  ansible.builtin.file:
+    path: "{{ developer_tools_python_venv_path }}"
+    state: directory
+    mode: "a+rX"
+    recurse: true
+  when: not ansible_check_mode
+
 - name: Ensure isolated Python command link directory exists
   ansible.builtin.file:
     path: "{{ developer_tools_python_venv_link_dir }}"
