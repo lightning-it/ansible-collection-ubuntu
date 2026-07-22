@@ -16,7 +16,12 @@
         - default
         - name: "{{ incus_instance_ssh_user }}"
           shell: /bin/bash
-          lock_passwd: true
+          lock_passwd: >-
+            {{
+              incus_instance_item.cloud_init_lock_passwd
+              | default(incus_instance_default_cloud_init_lock_passwd)
+              | bool
+            }}
           groups: "{{ incus_instance_item.cloud_init_groups | default(incus_instance_default_cloud_init_groups) }}"
           sudo: "{{ incus_instance_item.cloud_init_sudo | default(incus_instance_default_cloud_init_sudo) }}"
           ssh_authorized_keys: "{{ incus_instance_ssh_public_keys }}"

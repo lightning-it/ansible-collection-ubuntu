@@ -24,6 +24,7 @@ incus_instance_default_cloud_init_enabled: true
 incus_instance_default_cloud_init_manage_etc_hosts: true
 incus_instance_default_cloud_init_disable_root: true
 incus_instance_default_cloud_init_ssh_pwauth: false
+incus_instance_default_cloud_init_lock_passwd: false
 incus_instance_default_cloud_init_groups:
   - wheel
 incus_instance_default_cloud_init_packages:

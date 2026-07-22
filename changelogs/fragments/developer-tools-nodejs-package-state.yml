@@ -23,6 +23,9 @@ bugfixes:
     Make the shared isolated Python toolchain readable and traversable by
     declared developer users even when controller umask defaults are restrictive.
   - >-
+    Keep generated key-only Incus SSH accounts unlocked while password
+    authentication remains disabled, allowing OpenSSH public-key login.
+  - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
   - >-
