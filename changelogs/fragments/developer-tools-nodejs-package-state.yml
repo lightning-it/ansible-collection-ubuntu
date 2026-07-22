@@ -11,6 +11,9 @@ bugfixes:
     Reconcile declared Incus preseed networks when the daemon was already
     initialized with different bridge settings.
   - >-
+    Match generated Incus cloud-init networking to both container and virtual
+    machine Ethernet interface names instead of assuming an incus0 device.
+  - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
   - >-

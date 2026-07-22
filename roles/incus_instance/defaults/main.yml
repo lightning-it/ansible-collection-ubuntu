@@ -30,7 +30,9 @@ incus_instance_default_cloud_init_sudo: "ALL=(ALL) NOPASSWD:ALL"
 incus_instance_default_network_config: |
   version: 2
   ethernets:
-    incus0:
+    default:
+      match:
+        name: "e*"
       dhcp4: true
       dhcp6: true
       accept-ra: true
