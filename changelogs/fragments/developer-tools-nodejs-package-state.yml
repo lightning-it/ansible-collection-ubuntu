@@ -7,3 +7,6 @@ bugfixes:
   - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
+  - >-
+    Allow the Podman role to restore and reload explicitly declared helper
+    attachment profiles needed by the rootless container toolchain.

@@ -22,6 +22,8 @@ None.
   package-compatible unconfined Buildah attachment profile (default: `false`)
 - `podman_buildah_apparmor_profile_path`: Buildah AppArmor profile path
   (default: `/etc/apparmor.d/buildah`)
+- `podman_helper_apparmor_profiles`: optional package-compatible helper
+  attachment profiles to restore and reload as unconfined (default: `[]`)
 - `podman_apparmor_parser_path`: AppArmor parser path used for a targeted
   `--replace` reload (default: `/usr/sbin/apparmor_parser`)
 - `podman_executable_path`: Podman executable used by validation (default:

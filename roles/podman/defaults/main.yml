@@ -9,6 +9,7 @@ podman_apparmor_profile_reload: false
 podman_apparmor_profile_path: /etc/apparmor.d/podman
 podman_buildah_apparmor_profile_reload: false
 podman_buildah_apparmor_profile_path: /etc/apparmor.d/buildah
+podman_helper_apparmor_profiles: []
 podman_apparmor_parser_path: /usr/sbin/apparmor_parser
 podman_executable_path: /usr/bin/podman
 podman_validate_executable: false

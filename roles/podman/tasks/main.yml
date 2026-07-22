@@ -54,6 +54,31 @@
       when: not ansible_check_mode
       changed_when: false
 
+- name: Restore unconfined helper AppArmor attachment profiles
+  ansible.builtin.lineinfile:
+    path: "{{ item.profile_path }}"
+    regexp: >-
+      ^profile\s+{{ item.name }}(?:\s+flags=\([^)]*\))?\s+
+      {{ item.executable | regex_escape }}
+      (?:\s+flags=\([^)]*\))?\s*\{$
+    line: "profile {{ item.name }} {{ item.executable }} flags=(unconfined) {"
+    state: present
+  loop: "{{ podman_helper_apparmor_profiles }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Reload helper AppArmor attachment profiles
+  ansible.builtin.command:
+    argv:
+      - "{{ podman_apparmor_parser_path }}"
+      - --replace
+      - "{{ item.profile_path }}"
+  loop: "{{ podman_helper_apparmor_profiles }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: not ansible_check_mode
+  changed_when: false
+
 - name: Validate the direct Podman executable
   ansible.builtin.command:
     argv:

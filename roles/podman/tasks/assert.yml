@@ -30,6 +30,30 @@
       executable AppArmor parser.
   when: podman_buildah_apparmor_profile_reload | bool
 
+- name: Inspect helper AppArmor repair inputs
+  ansible.builtin.stat:
+    path: "{{ item.profile_path }}"
+    follow: true
+  loop: "{{ podman_helper_apparmor_profiles }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: podman_helper_apparmor_inputs
+
+- name: Validate helper AppArmor repair inputs
+  ansible.builtin.assert:
+    that:
+      - item.name is match('^[a-z0-9][a-z0-9._-]*$')
+      - item.executable is match('^/[^\n]+$')
+      - item.profile_path is match('^/[^\n]+$')
+      - podman_helper_apparmor_inputs.results[index].stat.isreg | default(false)
+    fail_msg: >-
+      Helper AppArmor repair requires safe names, absolute paths, and an
+      existing profile file.
+  loop: "{{ podman_helper_apparmor_profiles }}"
+  loop_control:
+    index_var: index
+    label: "{{ item.name }}"
+
 - name: Validate Podman AppArmor repair inputs
   ansible.builtin.assert:
     that:
@@ -67,6 +91,33 @@
       Refusing to modify the Buildah AppArmor profile because its header is
       not recognized.
   when: podman_buildah_apparmor_profile_reload | bool
+
+- name: Read helper AppArmor profiles before repair
+  ansible.builtin.slurp:
+    src: "{{ item.profile_path }}"
+  loop: "{{ podman_helper_apparmor_profiles }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: podman_helper_apparmor_profile_sources
+
+- name: Require recognized helper AppArmor profile headers
+  ansible.builtin.assert:
+    that:
+      - >-
+        (podman_helper_apparmor_profile_sources.results[index].content | b64decode)
+        is search(
+          '(?m)^profile\\s+' ~ item.name
+          ~ '(?:\\s+flags=\\([^)]*\\))?\\s+' ~ item.executable
+          ~ '(?:\\s+flags=\\([^)]*\\))?\\s*\\{$',
+          multiline=True
+        )
+    fail_msg: >-
+      Refusing to modify helper AppArmor profile {{ item.name }} because its
+      header is not recognized.
+  loop: "{{ podman_helper_apparmor_profiles }}"
+  loop_control:
+    index_var: index
+    label: "{{ item.name }}"
 
 - name: Require a recognized Podman AppArmor profile header
   ansible.builtin.assert:
