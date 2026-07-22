@@ -16,7 +16,13 @@
           sudo: "{{ incus_instance_item.cloud_init_sudo | default(incus_instance_default_cloud_init_sudo) }}"
           ssh_authorized_keys: "{{ incus_instance_ssh_public_keys }}"
       runcmd:
-        - [sh, -lc, "systemctl enable --now sshd || systemctl enable --now ssh || true"]
+        - - sh
+          - -lc
+          - >-
+            systemctl enable --now ssh.socket
+            || systemctl enable --now sshd
+            || systemctl enable --now ssh
+            || true
   when: incus_instance_cloud_init_enabled | bool
 
 - name: Render generated Incus cloud-init user-data

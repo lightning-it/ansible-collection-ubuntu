@@ -14,6 +14,9 @@ bugfixes:
     Match generated Incus cloud-init networking to both container and virtual
     machine Ethernet interface names instead of assuming an incus0 device.
   - >-
+    Enable Ubuntu's socket-activated SSH listener in generated Incus cloud-init
+    data while retaining service fallbacks for other guest images.
+  - >-
     Allow the Podman role to restore and reload Ubuntu's package-compatible
     unconfined Buildah AppArmor attachment profile independently.
   - >-
