@@ -54,13 +54,27 @@
       when: not ansible_check_mode
       changed_when: false
 
+- name: Remove invalid trailing helper AppArmor profile headers
+  ansible.builtin.replace:
+    path: "{{ item.profile_path }}"
+    regexp: >-
+      (?m)^profile {{ item.name }} {{ item.executable | regex_escape }}
+      flags=\(unconfined\) \{\s*\Z
+    replace: ""
+  loop: "{{ podman_helper_apparmor_profiles }}"
+  loop_control:
+    label: "{{ item.name }}"
+
 - name: Restore unconfined helper AppArmor attachment profiles
   ansible.builtin.lineinfile:
     path: "{{ item.profile_path }}"
     regexp: >-
-      ^profile\s+{{ item.name }}(?:\s+flags=\([^)]*\))?\s+
-      {{ item.executable | regex_escape }}
-      (?:\s+flags=\([^)]*\))?\s*\{$
+      {{
+        '^profile\\s+' ~ item.name
+        ~ '(?:\\s+flags=\\([^)]*\\))?\\s+'
+        ~ (item.executable | regex_escape)
+        ~ '(?:\\s+flags=\\([^)]*\\))?\\s*\\{$'
+      }}
     line: "profile {{ item.name }} {{ item.executable }} flags=(unconfined) {"
     state: present
   loop: "{{ podman_helper_apparmor_profiles }}"
