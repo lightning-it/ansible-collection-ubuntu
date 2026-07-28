@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - >-
+    Delegate the live LUKS and Tang Heavy scenario to the pinned
+    ``modulix-validation`` workflow with an immutable candidate, mandatory
+    post-assertion marker, centralized cleanup, and normalized evidence.
