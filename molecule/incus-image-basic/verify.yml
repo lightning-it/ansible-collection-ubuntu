@@ -20,3 +20,6 @@
         that:
           - incus_image_molecule_alias.stat.exists
         quiet: true
+
+- name: Record successful Incus image verification
+  ansible.builtin.import_playbook: ../protected_shared/record-success.yml

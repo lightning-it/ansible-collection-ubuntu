@@ -47,6 +47,20 @@ bash scripts/wunder-devtools-ee.sh true
 
 Heavy Incus tests require an Ubuntu host or runner with Incus available, suitable images, and repository-specific scenario configuration. Heavy tests must use sanitized inputs and must not rely on private inventory values.
 
+## Heavy execution ownership
+
+The live LUKS and Tang scenario and every scenario marked `protected-incus`,
+including their assertions, remain in this repository.
+Heavy execution is owned exclusively by the commit-pinned reusable workflow in
+`lightning-it/modulix-validation`, in accordance with the accepted
+[Modulix test execution ownership ADR](https://wiki.cloud.l-it.io/wiki/spaces/LIT/pages/2886566105).
+
+The caller provides the exact collection archive and source SHA plus
+machine-readable privileged Docker and protected local cells. Central orchestration
+owns the pinned Molecule/Docker toolchain, concurrency, finalization, and
+normalized evidence. The scenario writes a post-assertion marker, so a skipped
+fixture or incomplete verification cannot satisfy the required Heavy result.
+
 ## Interpreting GitHub Actions
 
 The GitHub Actions matrix is the primary dashboard. Job names should expose the repository class, OS/runtime, and profile, for example `ansible / rhel9 / molecule-heavy-incus` or `container / ubuntu / build-smoke`.
