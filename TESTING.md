@@ -54,6 +54,8 @@ including their assertions, remain in this repository.
 Heavy execution is owned exclusively by the commit-pinned reusable workflow in
 `lightning-it/modulix-validation`, in accordance with the accepted
 [Modulix test execution ownership ADR](https://wiki.cloud.l-it.io/wiki/spaces/LIT/pages/2886566105).
+The workflow pin must resolve to protected long-lived branch history so it
+remains available after rollout branches are deleted.
 
 The caller provides the exact collection archive and source SHA plus
 machine-readable privileged Docker and protected local cells. Central orchestration
