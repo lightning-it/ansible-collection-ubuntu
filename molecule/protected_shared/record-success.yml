@@ -2,10 +2,15 @@
 - name: Record successful meaningful Heavy verification
   hosts: localhost
   gather_facts: false
+  pre_tasks:
+    - name: Require centrally provided Heavy success marker
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'MOLECULE_TEST_SUCCESS_MARKER') | length > 0
+        fail_msg: MOLECULE_TEST_SUCCESS_MARKER must be provided by central orchestration.
   tasks:
     - name: Write the central success marker
       ansible.builtin.copy:
         dest: "{{ lookup('env', 'MOLECULE_TEST_SUCCESS_MARKER') }}"
         mode: "0600"
         content: "{{ lookup('env', 'MOLECULE_SCENARIO_NAME') }} verified\n"
-      when: lookup('env', 'MOLECULE_TEST_SUCCESS_MARKER') | length > 0
