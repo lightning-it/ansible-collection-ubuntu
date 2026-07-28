@@ -31,4 +31,5 @@
             netplan_rendered_yaml.network.vlans['ens33.4001'].addresses
             == ['10.10.30.100/24']
 
-- import_playbook: ../protected_shared/record-success.yml
+- name: Record successful Netplan verification
+  ansible.builtin.import_playbook: ../protected_shared/record-success.yml

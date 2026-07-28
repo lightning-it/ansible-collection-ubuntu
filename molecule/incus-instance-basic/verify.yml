@@ -76,4 +76,5 @@
           - "'cloud-user' in (incus_instance_molecule_inventory_file.content | b64decode)"
         quiet: true
 
-- import_playbook: ../protected_shared/record-success.yml
+- name: Record successful Incus instance verification
+  ansible.builtin.import_playbook: ../protected_shared/record-success.yml
