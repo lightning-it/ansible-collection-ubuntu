@@ -75,3 +75,5 @@
           - "'10.10.10.50' in (incus_instance_molecule_inventory_file.content | b64decode)"
           - "'cloud-user' in (incus_instance_molecule_inventory_file.content | b64decode)"
         quiet: true
+
+- import_playbook: ../protected_shared/record-success.yml

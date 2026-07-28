@@ -139,7 +139,7 @@ jobs:
       (github.event_name == 'push' &&
        (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'))
     needs: build-candidate
-    uses: lightning-it/modulix-validation/.github/workflows/collection-molecule-profile.yml@be07fb16359519968c1ae0b27a32477403e61476
+    uses: lightning-it/modulix-validation/.github/workflows/collection-molecule-profile.yml@bd19ea27da9b948b1a83c609804fe65e326ffc9e
     with:
       profile: heavy
       matrix-json: >-
@@ -149,7 +149,19 @@ jobs:
            "target":"ubuntu-24.04-docker",
            "infrastructure":"local",
            "roles":["luks_unlock"],
-           "success_marker":"assertions/luks-unlock-tang.passed"}
+           "success_marker":"assertions/luks-unlock-tang.passed"},
+          {"runner":"ubuntu-latest",
+           "scenario":"incus-image-basic","target":"ubuntu-24.04-docker",
+           "infrastructure":"local","roles":["incus_image"],
+           "success_marker":"assertions/incus-image.passed"},
+          {"runner":"ubuntu-latest",
+           "scenario":"incus-instance-basic","target":"ubuntu-24.04-docker",
+           "infrastructure":"local","roles":["incus_instance"],
+           "success_marker":"assertions/incus-instance.passed"},
+          {"runner":"ubuntu-latest",
+           "scenario":"netplan-basic","target":"ubuntu-24.04-local",
+           "infrastructure":"local","roles":["netplan"],
+           "success_marker":"assertions/netplan.passed"}
         ]}
       candidate-artifact: ubuntu-candidate-${{ github.sha }}
       source-sha: ${{ github.sha }}

@@ -1,0 +1,11 @@
+---
+- name: Record successful meaningful Heavy verification
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Write the central success marker
+      ansible.builtin.copy:
+        dest: "{{ lookup('env', 'MOLECULE_TEST_SUCCESS_MARKER') }}"
+        mode: "0600"
+        content: "{{ lookup('env', 'MOLECULE_SCENARIO_NAME') }} verified\n"
+      when: lookup('env', 'MOLECULE_TEST_SUCCESS_MARKER') | length > 0
