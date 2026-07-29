@@ -14,6 +14,10 @@
       AAAAC3NzaC1lZDI1NTE5AAAAIEjzifs06betrcygee7kUrE1IMhU4p0M3P5ZsaMVsEbo
       desired@molecule.invalid
     users_accounts:
+      - name: lit-molecule-global-user
+        state: present
+        passwordless_sudo: false
+        sudoers_name: 90-lit-molecule-global-user
       - name: lit-molecule-user
         state: present
         groups:
@@ -25,7 +29,27 @@
         ssh_keys:
           - "{{ users_molecule_desired_key }}"
         ssh_keys_exclusive: true
+    users_accounts_global:
+      - name: lit-molecule-global-user
+        state: present
+        create_home: true
+        password_lock: true
+        passwordless_sudo: true
+        sudoers_name: 90-lit-molecule-global-user
   pre_tasks:
+    - name: Install sudo for sudoers validation in the minimal test image
+      ansible.builtin.package:
+        name: sudo
+        state: present
+
+    - name: Create sudoers include directory for the minimal test image
+      ansible.builtin.file:
+        path: /etc/sudoers.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0750"
+
     - name: Create Molecule supplementary group
       ansible.builtin.group:
         name: lit-molecule-group

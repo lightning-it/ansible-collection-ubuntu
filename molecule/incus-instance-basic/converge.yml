@@ -72,10 +72,22 @@
               printf 'Stopped\n' > "${state_dir}/${instance}.status"
               ;;
             config)
+              if [ "${args[1]:-}" = "get" ]; then
+                instance="${args[2]:-}"
+                key="${args[3]:-}"
+                if [ -f "${state_dir}/${instance}.${key}" ]; then
+                  cat "${state_dir}/${instance}.${key}"
+                fi
+                exit 0
+              fi
               if [ "${args[1]:-}" = "set" ]; then
                 instance="${args[2]:-}"
                 key="${args[3]:-}"
-                cat > "${state_dir}/${instance}.${key}"
+                if [ "${args[4]:-}" = "-" ]; then
+                  cat > "${state_dir}/${instance}.${key}"
+                else
+                  printf '%s\n' "${args[4]:-}" > "${state_dir}/${instance}.${key}"
+                fi
                 exit 0
               fi
               if [ "${args[1]:-}" = "device" ] && [ "${args[2]:-}" = "add" ]; then
@@ -135,6 +147,9 @@
             type: vm
             state: running
             fqdn: molecule-rhel10.example.com
+            reconfigure: true
+            profiles:
+              - rhel9-aap
             limits:
               cpu: "2"
               memory: 4GiB

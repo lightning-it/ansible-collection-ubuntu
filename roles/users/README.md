@@ -43,6 +43,11 @@ Additional user definitions appended to `users_accounts`. This is useful for
 environment-specific service accounts, for example a shared deploy user, without
 replacing the global baseline users.
 
+### `users_accounts_global`
+
+Global user definitions merged after both other lists. Values in this layer take
+precedence for accounts with the same name. Default: `[]`.
+
 ## Dependencies
 
 None.

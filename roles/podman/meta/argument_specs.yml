@@ -12,7 +12,45 @@ argument_specs:
       podman_registries_conf_dir:
         type: str
         default: /etc/containers
+      podman_apparmor_profile_reload:
+        type: bool
+        default: false
+      podman_apparmor_profile_path:
+        type: path
+        default: /etc/apparmor.d/podman
+      podman_buildah_apparmor_profile_reload:
+        type: bool
+        default: false
+      podman_buildah_apparmor_profile_path:
+        type: path
+        default: /etc/apparmor.d/buildah
+      podman_helper_apparmor_profiles:
+        type: list
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+          executable:
+            type: path
+            required: true
+          profile_path:
+            type: path
+            required: true
+        default: []
+      podman_apparmor_parser_path:
+        type: path
+        default: /usr/sbin/apparmor_parser
+      podman_executable_path:
+        type: path
+        default: /usr/bin/podman
+      podman_validate_executable:
+        type: bool
+        default: false
       podman_system_socket_enabled:
+        type: bool
+        default: false
+      podman_system_socket_manage:
         type: bool
         default: false
       podman_system_socket_service_name:

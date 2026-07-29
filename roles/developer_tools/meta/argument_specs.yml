@@ -51,6 +51,12 @@ argument_specs:
         choices:
           - os
         default: os
+      developer_tools_nodejs_package_state:
+        type: str
+        choices:
+          - present
+          - latest
+        default: present
       developer_tools_nodejs_packages_present:
         type: list
         elements: str
@@ -77,6 +83,9 @@ argument_specs:
         type: list
         elements: dict
         default: []
+      developer_tools_node_options:
+        type: str
+        default: ""
       developer_tools_markdownlint_cli2_enabled:
         type: bool
         default: false

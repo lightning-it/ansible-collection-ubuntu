@@ -14,10 +14,26 @@
         path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/containers"
       register: podman_molecule_containers_dir
 
+    - name: Read the isolated Podman AppArmor profile
+      ansible.builtin.slurp:
+        src: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/podman.apparmor"
+      register: podman_molecule_apparmor_profile
+
+    - name: Read the isolated Buildah AppArmor profile
+      ansible.builtin.slurp:
+        src: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/buildah.apparmor"
+      register: podman_molecule_buildah_apparmor_profile
+
     - name: Assert lit.ubuntu.podman executed safely
       ansible.builtin.assert:
         that:
           - podman_molecule_coverage_marker.stat.exists
           - podman_molecule_coverage_marker.stat.size == 14
           - podman_molecule_containers_dir.stat.isdir
+          - >-
+            'profile podman /usr/bin/podman flags=(unconfined) {'
+            in (podman_molecule_apparmor_profile.content | b64decode).splitlines()
+          - >-
+            'profile buildah /usr/bin/buildah flags=(unconfined) {'
+            in (podman_molecule_buildah_apparmor_profile.content | b64decode).splitlines()
         quiet: true

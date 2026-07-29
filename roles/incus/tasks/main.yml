@@ -128,6 +128,104 @@
     - incus_initialize | bool
     - incus_cli_available | bool
 
+- name: Validate preseed Incus storage pools
+  ansible.builtin.assert:
+    that:
+      - incus_storage_pool is mapping
+      - incus_storage_pool.name | default('') | length > 0
+      - incus_storage_pool.driver | default('') | length > 0
+      - incus_storage_pool.config | default({}) is mapping
+      - >-
+        incus_storage_pool.config | default({}) | dict2items
+        | selectattr('value', 'mapping') | list | length == 0
+      - >-
+        incus_storage_pool.config | default({}) | dict2items
+        | rejectattr('value', 'string')
+        | selectattr('value', 'sequence') | list | length == 0
+    fail_msg: "Each Incus storage pool requires name, driver, and mapping config values."
+    quiet: true
+  loop: "{{ incus_preseed.storage_pools | default([]) }}"
+  loop_control:
+    label: "{{ incus_storage_pool.name | default('invalid') }}"
+    loop_var: incus_storage_pool
+  when: incus_initialize | bool
+
+- name: Reconcile missing preseed Incus storage pools
+  ansible.builtin.command:
+    cmd: >-
+      incus storage create {{ incus_storage_pool.name | quote }}
+      {{ incus_storage_pool.driver | quote }}
+      {%- for option in incus_storage_pool.config | default({}) | dict2items %}
+      {{ (option.key ~ '=' ~ (option.value | string)) | quote }}
+      {%- endfor %}
+  loop: "{{ incus_preseed.storage_pools | default([]) }}"
+  loop_control:
+    label: "{{ incus_storage_pool.name }}"
+    loop_var: incus_storage_pool
+  when:
+    - not ansible_check_mode
+    - incus_initialize | bool
+    - incus_cli_available | bool
+    - incus_storage_pools_current | length > 0
+    - >-
+      incus_storage_pool.name
+      not in (incus_storage_pools_current | map(attribute='name') | list)
+  changed_when: true
+
+- name: Discover managed Incus networks
+  ansible.builtin.command:
+    argv: [incus, network, list, --format, json]
+  register: incus_network_list
+  changed_when: false
+  check_mode: false
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+    - incus_preseed.networks | default([]) | length > 0
+    - incus_storage_pools_current | length > 0
+
+- name: Decode managed Incus networks
+  ansible.builtin.set_fact:
+    incus_networks_current: "{{ incus_network_list.stdout | from_json }}"
+  changed_when: false
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+    - incus_preseed.networks | default([]) | length > 0
+    - incus_storage_pools_current | length > 0
+
+- name: Validate preseed Incus networks
+  ansible.builtin.assert:
+    that:
+      - incus_network is mapping
+      - incus_network.name | default('') | length > 0
+      - incus_network.config | default({}) is mapping
+      - >-
+        incus_network.config | default({}) | dict2items
+        | selectattr('value', 'mapping') | list | length == 0
+      - >-
+        incus_network.config | default({}) | dict2items
+        | rejectattr('value', 'string')
+        | selectattr('value', 'sequence') | list | length == 0
+    fail_msg: "Each Incus network requires a name and mapping config values."
+    quiet: true
+  loop: "{{ incus_preseed.networks | default([]) }}"
+  loop_control:
+    label: "{{ incus_network.name | default('invalid') }}"
+    loop_var: incus_network
+  when: incus_initialize | bool
+
+- name: Reconcile preseed Incus networks
+  ansible.builtin.include_tasks: network.yml
+  loop: "{{ incus_preseed.networks | default([]) }}"
+  loop_control:
+    label: "{{ incus_network.name }}"
+    loop_var: incus_network
+  when:
+    - incus_initialize | bool
+    - incus_cli_available | bool
+    - incus_storage_pools_current | length > 0
+
 - name: Initialize Incus from the supplied preseed
   ansible.builtin.command:
     argv:

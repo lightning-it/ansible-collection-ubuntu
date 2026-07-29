@@ -11,7 +11,7 @@
 - name: Ensure Node.js, npm, and npx packages are installed
   ansible.builtin.package:
     name: "{{ developer_tools_nodejs_packages_present }}"
-    state: present
+    state: "{{ developer_tools_nodejs_package_state }}"
   when: (developer_tools_nodejs_packages_present | default([], true) | length) > 0
 
 - name: Check npm availability during check mode
@@ -33,6 +33,7 @@
     executable: "{{ developer_tools_npm_executable }}"
     state: present
   environment:
+    NODE_OPTIONS: "{{ developer_tools_node_options if developer_tools_node_options | length > 0 else omit }}"
     npm_config_fetch_timeout: "{{ developer_tools_npm_fetch_timeout_ms | string }}"
     npm_config_fetch_retries: "{{ developer_tools_npm_fetch_retries | string }}"
     npm_config_fetch_retry_mintimeout: "{{ developer_tools_npm_fetch_retry_min_timeout_ms | string }}"
@@ -68,6 +69,7 @@
     executable: "{{ developer_tools_npm_executable }}"
     state: present
   environment:
+    NODE_OPTIONS: "{{ developer_tools_node_options if developer_tools_node_options | length > 0 else omit }}"
     npm_config_fetch_timeout: "{{ developer_tools_npm_fetch_timeout_ms | string }}"
     npm_config_fetch_retries: "{{ developer_tools_npm_fetch_retries | string }}"
     npm_config_fetch_retry_mintimeout: "{{ developer_tools_npm_fetch_retry_min_timeout_ms | string }}"
@@ -153,6 +155,7 @@
       - "{{ developer_tools_markdownlint_cli2_npx_package_spec }}"
       - --version
   environment:
+    NODE_OPTIONS: "{{ developer_tools_node_options if developer_tools_node_options | length > 0 else omit }}"
     npm_config_fetch_timeout: "{{ developer_tools_npm_fetch_timeout_ms | string }}"
     npm_config_fetch_retries: "{{ developer_tools_npm_fetch_retries | string }}"
     npm_config_fetch_retry_mintimeout: "{{ developer_tools_npm_fetch_retry_min_timeout_ms | string }}"

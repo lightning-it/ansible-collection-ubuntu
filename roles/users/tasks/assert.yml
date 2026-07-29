@@ -5,8 +5,9 @@
       - users_manage_groups is boolean
       - users_accounts is mapping or (users_accounts is sequence and users_accounts is not string)
       - users_accounts_extra is mapping or (users_accounts_extra is sequence and users_accounts_extra is not string)
+      - users_accounts_global is mapping or (users_accounts_global is sequence and users_accounts_global is not string)
     fail_msg: >-
-      users_manage_groups must be a boolean, and users_accounts and users_accounts_extra
+      users_manage_groups must be a boolean, and users_accounts, users_accounts_extra, and users_accounts_global
       must each be a list or mapping of user definitions.
     quiet: true
   changed_when: false
@@ -25,6 +26,12 @@
           users_accounts_extra | dict2items | map(attribute='value') | list
           if users_accounts_extra is mapping
           else users_accounts_extra
+        )
+        +
+        (
+          users_accounts_global | dict2items | map(attribute='value') | list
+          if users_accounts_global is mapping
+          else users_accounts_global
         )
       }}
   block:
