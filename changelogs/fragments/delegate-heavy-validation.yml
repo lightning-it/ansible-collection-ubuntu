@@ -1,7 +1,0 @@
----
-minor_changes:
-  - >-
-    Delegate the live LUKS and Tang scenario plus every ``protected-incus``
-    scenario to the pinned ``modulix-validation`` workflow with an immutable
-    candidate, mandatory post-assertion markers, centralized cleanup, and
-    normalized evidence.
