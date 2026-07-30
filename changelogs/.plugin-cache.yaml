@@ -30,7 +30,7 @@ objects:
       name: gui
       version_added: null
     incus:
-      description: Install and configure Incus on Ubuntu.
+      description: Install and configure Incus on Ubuntu
       name: incus
       version_added: null
     podman:
@@ -77,4 +77,4 @@ plugins:
   strategy: {}
   test: {}
   vars: {}
-version: 1.9.0
+version: 1.10.0
