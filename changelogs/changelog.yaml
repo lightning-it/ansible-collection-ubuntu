@@ -10,59 +10,6 @@ releases:
     fragments:
       - repair-develop.yml
     release_date: '2026-06-22'
-  1.10.0:
-    changes:
-      bugfixes:
-        - Add an opt-in Podman AppArmor profile repair and targeted reload so Ubuntu
-          hosts can restore the package-compatible unconfined attachment profile before
-          validating the direct Podman executable; also reconcile the system Podman
-          socket to its explicitly configured state.
-        - Allow opt-in Node.js runtime options for npm and npx operations so hosts
-          without working IPv6 egress can explicitly prefer IPv4 DNS results.
-        - Allow the Podman role to restore and reload Ubuntu's package-compatible
-          unconfined Buildah AppArmor attachment profile independently.
-        - Allow the Podman role to restore and reload explicitly declared helper attachment
-          profiles needed by the rootless container toolchain.
-        - Enable Ubuntu's socket-activated SSH listener in generated Incus cloud-init
-          data while retaining service fallbacks for other guest images.
-        - Install the configurable openssh-server default in generated Incus cloud-init
-          data so minimal cloud images expose the declared SSH contract.
-        - Keep generated key-only Incus SSH accounts unlocked while password authentication
-          remains disabled, allowing OpenSSH public-key login.
-        - Make the shared isolated Python toolchain readable and traversable by declared
-          developer users even when controller umask defaults are restrictive.
-        - Match generated Incus cloud-init networking to both container and virtual
-          machine Ethernet interface names instead of assuming an incus0 device.
-        - Reconcile declared Incus preseed networks when the daemon was already initialized
-          with different bridge settings.
-        - Reconcile missing Incus storage pools from the preseed even when another
-          pool already initialized the daemon.
-        - Reload the declared Podman AppArmor profile on every real role run so an
-          already-correct file cannot leave stale restrictive kernel policy active.
-        - Remove the generated guest account's unusable shadow lock after cloud-init
-          creation so OpenSSH accepts its authorized key on images that retain it.
-      minor_changes:
-        - Add users_accounts_global as a final user-definition layer whose values
-          take precedence over base and extra definitions for the same account.
-        - Allow the developer_tools role to upgrade operating-system Node.js packages
-          by setting developer_tools_nodejs_package_state to latest.
-        - Delegate the live LUKS and Tang scenario plus every ``protected-incus``
-          scenario to the pinned ``modulix-validation`` workflow with an immutable
-          candidate, mandatory post-assertion markers, centralized cleanup, and normalized
-          evidence.
-        - Make incus_instance reconciliation idempotent for cloud-init, config, and
-          limit values, reject generated key-only cloud-init without an SSH key, and
-          pass configured profiles correctly when creating an instance.
-    fragments:
-      - adr-assurance.yml
-      - delegate-heavy-validation.yml
-      - developer-tools-nodejs-package-state.yml
-      - incus-instance-idempotent-cloud-init.yml
-      - podman-apparmor-profile.yml
-      - podman-apparmor-reload.yml
-      - shared-assets-sync.yml
-      - users-global-accounts.yml
-    release_date: '2026-07-29'
   1.2.0:
     changes:
       bugfixes:
@@ -213,3 +160,56 @@ releases:
       - workbench-developer-toolchain.yml
       - workbench-npm-fetch-timeouts.yml
     release_date: '2026-07-20'
+  1.10.0:
+    changes:
+      bugfixes:
+        - Add an opt-in Podman AppArmor profile repair and targeted reload so Ubuntu
+          hosts can restore the package-compatible unconfined attachment profile before
+          validating the direct Podman executable; also reconcile the system Podman
+          socket to its explicitly configured state.
+        - Allow opt-in Node.js runtime options for npm and npx operations so hosts
+          without working IPv6 egress can explicitly prefer IPv4 DNS results.
+        - Allow the Podman role to restore and reload Ubuntu's package-compatible
+          unconfined Buildah AppArmor attachment profile independently.
+        - Allow the Podman role to restore and reload explicitly declared helper attachment
+          profiles needed by the rootless container toolchain.
+        - Enable Ubuntu's socket-activated SSH listener in generated Incus cloud-init
+          data while retaining service fallbacks for other guest images.
+        - Install the configurable openssh-server default in generated Incus cloud-init
+          data so minimal cloud images expose the declared SSH contract.
+        - Keep generated key-only Incus SSH accounts unlocked while password authentication
+          remains disabled, allowing OpenSSH public-key login.
+        - Make the shared isolated Python toolchain readable and traversable by declared
+          developer users even when controller umask defaults are restrictive.
+        - Match generated Incus cloud-init networking to both container and virtual
+          machine Ethernet interface names instead of assuming an incus0 device.
+        - Reconcile declared Incus preseed networks when the daemon was already initialized
+          with different bridge settings.
+        - Reconcile missing Incus storage pools from the preseed even when another
+          pool already initialized the daemon.
+        - Reload the declared Podman AppArmor profile on every real role run so an
+          already-correct file cannot leave stale restrictive kernel policy active.
+        - Remove the generated guest account's unusable shadow lock after cloud-init
+          creation so OpenSSH accepts its authorized key on images that retain it.
+      minor_changes:
+        - Add users_accounts_global as a final user-definition layer whose values
+          take precedence over base and extra definitions for the same account.
+        - Allow the developer_tools role to upgrade operating-system Node.js packages
+          by setting developer_tools_nodejs_package_state to latest.
+        - Delegate the live LUKS and Tang scenario plus every ``protected-incus``
+          scenario to the pinned ``modulix-validation`` workflow with an immutable
+          candidate, mandatory post-assertion markers, centralized cleanup, and normalized
+          evidence.
+        - Make incus_instance reconciliation idempotent for cloud-init, config, and
+          limit values, reject generated key-only cloud-init without an SSH key, and
+          pass configured profiles correctly when creating an instance.
+    fragments:
+      - adr-assurance.yml
+      - delegate-heavy-validation.yml
+      - developer-tools-nodejs-package-state.yml
+      - incus-instance-idempotent-cloud-init.yml
+      - podman-apparmor-profile.yml
+      - podman-apparmor-reload.yml
+      - shared-assets-sync.yml
+      - users-global-accounts.yml
+    release_date: '2026-07-29'
