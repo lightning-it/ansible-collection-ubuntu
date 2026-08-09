@@ -1,6 +1,25 @@
 ---
 - name: Run global check-mode firewall validation in the standard verifier path
-  ansible.builtin.import_playbook: check-mode.yml
+  hosts: host-firewall.example.test
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Execute the dedicated firewall playbook under real global check mode
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python | dirname }}/ansible-playbook"
+          - --check
+          - --inventory
+          - "{{ ansible_inventory_sources | first }}"
+          - "{{ playbook_dir }}/check-mode.yml"
+      register: host_firewall_global_check
+      changed_when: false
+
+    - name: Validate the global check-mode subprocess
+      ansible.builtin.assert:
+        that:
+          - host_firewall_global_check.rc == 0
+          - "'failed=0' in host_firewall_global_check.stdout"
 
 - name: Verify host firewall safety contracts
   hosts: host-firewall.example.test
@@ -226,6 +245,39 @@
           ansible.builtin.assert:
             that:
               - ansible_failed_result is failed
+
+    - name: Restore canonical inputs after isolated negative tests
+      ansible.builtin.set_fact:
+        host_firewall_expected_public_ipv4: 192.0.2.10
+        host_firewall_expected_management_ipv4: 10.0.30.10
+        host_firewall_expected_public_ipv6: ""
+        host_firewall_expected_management_ipv6: ""
+        host_firewall_observed_ipv4_addresses: [192.0.2.10, 10.0.30.10]
+        host_firewall_observed_ipv6_addresses: []
+        host_firewall_control_source_address: 198.51.100.20
+        host_firewall_management_access:
+          bootstrap_ssh:
+            port: 22
+            modes: [bootstrap]
+            sources_ipv4: [198.51.100.21/32]
+            sources_ipv6: []
+          openssh:
+            port: 1905
+            modes: [bootstrap, hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: []
+          dropbear:
+            port: 2222
+            modes: [bootstrap, hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: []
+        host_firewall_tang_access:
+          port: 80
+          sources_ipv4:
+            - 192.0.2.21/32
+            - 192.0.2.22/32
+            - 192.0.2.23/32
+          sources_ipv6: []
 
     - name: Confirm exact authorization contract still fails without trusted signature verifier
       block:
