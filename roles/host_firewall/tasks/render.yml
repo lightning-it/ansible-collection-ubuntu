@@ -1,0 +1,24 @@
+---
+- name: Render host firewall policy in controller memory
+  ansible.builtin.set_fact:
+    host_firewall_candidate_content: "{{ lookup('ansible.builtin.template', 'host-firewall.nft.j2') }}"
+
+- name: Calculate host firewall candidate checksum
+  ansible.builtin.set_fact:
+    host_firewall_candidate_sha256: "{{ host_firewall_candidate_content | hash('sha256') }}"
+    host_firewall_plan:
+      action: "{{ host_firewall_action }}"
+      candidate_sha256: "{{ host_firewall_candidate_content | hash('sha256') }}"
+      policy_fingerprint: "{{ host_firewall_policy_fingerprint }}"
+      mode: "{{ host_firewall_mode }}"
+      target: "{{ host_firewall_expected_inventory_hostname }}"
+      input_policy: drop
+      forward_policy: drop
+      output_policy: accept
+      ipv6_forwarding: denied
+      new_container_forwarding: denied
+      persistent_change: "{{ host_firewall_action == 'confirm' and not ansible_check_mode }}"
+
+- name: Report immutable host firewall plan
+  ansible.builtin.debug:
+    var: host_firewall_plan

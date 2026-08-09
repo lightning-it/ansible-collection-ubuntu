@@ -1,0 +1,22 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: default
+platforms:
+  - name: host-firewall.example.test
+provisioner:
+  name: ansible
+  playbooks:
+    prepare: prepare.yml
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    hosts:
+      all:
+        hosts:
+          host-firewall.example.test:
+            ansible_connection: local
+            ansible_python_interpreter: "{{ ansible_playbook_python }}"
+verifier:
+  name: ansible

@@ -1,0 +1,10 @@
+[Unit]
+Description=Rollback unconfirmed lit host firewall transaction after timeout
+
+[Timer]
+OnActiveSec={{ host_firewall_watchdog_timeout_seconds }}s
+AccuracySec=1s
+Unit={{ host_firewall_rollback_service_name }}
+
+[Install]
+WantedBy=timers.target

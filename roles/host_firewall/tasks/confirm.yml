@@ -1,0 +1,141 @@
+---
+- name: Inspect pending host firewall transaction files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ host_firewall_pending_config_path }}"
+    - "{{ host_firewall_pending_metadata_path }}"
+    - "{{ host_firewall_runtime_backup_path }}"
+    - "{{ host_firewall_persistent_state_path }}"
+  register: host_firewall_pending_file_stats
+  changed_when: false
+
+- name: Require a complete pending host firewall transaction
+  ansible.builtin.assert:
+    that:
+      - host_firewall_pending_file_stats.results | map(attribute='stat.exists') | min
+    fail_msg: "Confirmation is impossible because one or more rollback-protected transaction files are missing."
+
+- name: Read pending host firewall candidate
+  ansible.builtin.slurp:
+    src: "{{ host_firewall_pending_config_path }}"
+  register: host_firewall_pending_candidate
+  changed_when: false
+
+- name: Read pending host firewall metadata
+  ansible.builtin.slurp:
+    src: "{{ host_firewall_pending_metadata_path }}"
+  register: host_firewall_pending_metadata
+  changed_when: false
+
+- name: Validate pending host firewall identity and immutable candidate
+  ansible.builtin.assert:
+    that:
+      - (host_firewall_pending_candidate.content | b64decode | hash('sha256')) == host_firewall_candidate_sha256
+      - "('change_id=' + host_firewall_change_id) in (host_firewall_pending_metadata.content | b64decode)"
+      - "('candidate_sha256=' + host_firewall_candidate_sha256) in (host_firewall_pending_metadata.content | b64decode)"
+      - >-
+        ('policy_fingerprint=' + host_firewall_policy_fingerprint)
+        in (host_firewall_pending_metadata.content | b64decode)
+      - "('mode=' + host_firewall_mode) in (host_firewall_pending_metadata.content | b64decode)"
+      - >-
+        ('target=' + host_firewall_expected_inventory_hostname)
+        in (host_firewall_pending_metadata.content | b64decode)
+    fail_msg: "Pending firewall metadata, candidate, target, mode, or change identifier has drifted."
+
+- name: Read back active host firewall before confirmation
+  ansible.builtin.include_tasks: readback.yml
+
+- name: Stage independently verified host firewall confirmation request
+  ansible.builtin.copy:
+    content: |
+      change_id={{ host_firewall_change_id }}
+      policy_fingerprint={{ host_firewall_policy_fingerprint }}
+      positive_tests_passed=true
+      negative_tests_passed=true
+      evidence={{ host_firewall_test_evidence_reference }}
+    dest: "{{ host_firewall_confirmation_request_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Install crash-safe host firewall confirmation program
+  ansible.builtin.template:
+    src: confirm.sh.j2
+    dest: "{{ host_firewall_confirmation_script_path }}"
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Validate host firewall confirmation program syntax
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_bash_binary }}"
+      - -n
+      - "{{ host_firewall_confirmation_script_path }}"
+  changed_when: false
+
+- name: Install crash-safe host firewall confirmation service
+  ansible.builtin.template:
+    src: confirm.service.j2
+    dest: "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_confirmation_service_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Reload systemd after installing host firewall confirmation service
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_systemctl_binary }}"
+      - daemon-reload
+  changed_when: true
+
+- name: Execute crash-safe host firewall confirmation service
+  block:
+    - name: Start independent host firewall confirmation transaction
+      ansible.builtin.command:
+        argv:
+          - "{{ host_firewall_systemctl_binary }}"
+          - start
+          - "{{ host_firewall_confirmation_service_name }}"
+      changed_when: true
+
+    - name: Read host firewall confirmation completion evidence
+      ansible.builtin.slurp:
+        src: "{{ host_firewall_confirmation_path }}"
+      register: host_firewall_confirmation_completion
+      changed_when: false
+
+    - name: Validate host firewall confirmation completion evidence
+      ansible.builtin.assert:
+        that:
+          - >-
+            ('change_id=' + host_firewall_change_id)
+            in (host_firewall_confirmation_completion.content | b64decode)
+          - >-
+            ('candidate_sha256=' + host_firewall_candidate_sha256)
+            in (host_firewall_confirmation_completion.content | b64decode)
+          - >-
+            ('policy_fingerprint=' + host_firewall_policy_fingerprint)
+            in (host_firewall_confirmation_completion.content | b64decode)
+        fail_msg: "Independent host firewall confirmation returned incomplete or mismatched evidence."
+
+  rescue:
+    - name: Restore prior firewall after failed confirmation
+      ansible.builtin.command:
+        argv:
+          - "{{ host_firewall_systemctl_binary }}"
+          - start
+          - "{{ host_firewall_rollback_service_name }}"
+      register: host_firewall_confirm_rescue_result
+      changed_when: true
+      failed_when: false
+
+    - name: Stop after failed host firewall confirmation
+      ansible.builtin.fail:
+        msg: >-
+          Firewall confirmation failed. Rollback was requested with return code
+          {{ host_firewall_confirm_rescue_result.rc | default('unavailable') }}.
+
+- name: Read back confirmed host firewall table
+  ansible.builtin.include_tasks: readback.yml

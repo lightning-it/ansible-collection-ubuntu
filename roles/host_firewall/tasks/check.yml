@@ -1,0 +1,17 @@
+---
+- name: Ask nftables to check the complete candidate transaction
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_nft_binary }}"
+      - --check
+      - --file
+      - '-'
+    stdin: "{{ host_firewall_candidate_content }}"
+  register: host_firewall_check_result
+  changed_when: false
+
+- name: Confirm nftables accepted the candidate transaction
+  ansible.builtin.assert:
+    that:
+      - host_firewall_check_result.rc == 0
+    fail_msg: "nftables rejected the complete host firewall candidate; no apply is permitted."

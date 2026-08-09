@@ -1,0 +1,223 @@
+---
+- name: Verify host firewall safety lifecycle
+  hosts: host-firewall.example.test
+  become: false
+  gather_facts: false
+  vars:
+    host_firewall_test_directory: /tmp/wunder/lit-host-firewall-molecule
+    host_firewall_enabled: true
+    host_firewall_mode: bootstrap
+    host_firewall_expected_inventory_hostname: host-firewall.example.test
+    host_firewall_expected_public_ipv4: 192.0.2.10
+    host_firewall_expected_management_ipv4: 10.0.30.10
+    host_firewall_observed_ipv4_addresses:
+      - 192.0.2.10
+      - 10.0.30.10
+    host_firewall_platform_name: Ubuntu
+    host_firewall_platform_version: "24.04"
+    host_firewall_public_interface: enp1s0
+    host_firewall_management_interface: enp1s0.4091
+    host_firewall_container_interfaces:
+      - podman0
+      - podman1
+    host_firewall_controller_source_cidrs:
+      - 198.51.100.20/32
+    host_firewall_recovery_source_cidrs:
+      - 198.51.100.21/32
+    host_firewall_tang_consumer_cidrs:
+      - 192.0.2.21/32
+      - 192.0.2.22/32
+      - 192.0.2.23/32
+    host_firewall_control_source_ipv4: 198.51.100.20
+    host_firewall_control_destination_port: 2222
+    host_firewall_state_directory: /tmp/wunder/lit-host-firewall-molecule/state
+    host_firewall_persistent_config_path: /tmp/wunder/lit-host-firewall-molecule/nftables.conf
+    host_firewall_systemd_unit_directory: /tmp/wunder/lit-host-firewall-molecule/systemd
+    host_firewall_rollback_script_path: /tmp/wunder/lit-host-firewall-molecule/bin/rollback
+    host_firewall_confirmation_script_path: /tmp/wunder/lit-host-firewall-molecule/bin/confirm
+    host_firewall_nft_binary: /tmp/wunder/lit-host-firewall-molecule/nft
+    host_firewall_systemctl_binary: /tmp/wunder/lit-host-firewall-molecule/systemctl
+    host_firewall_bash_binary: /bin/bash
+    host_firewall_change_id: WBX-G2-MOLECULE
+  tasks:
+    - name: Check complete bootstrap candidate without mutation
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: check
+
+    - name: Apply rollback-protected bootstrap candidate
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: apply
+        host_firewall_apply_authorized: true
+
+    - name: Inspect applied host firewall transaction artifacts
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /tmp/wunder/lit-host-firewall-molecule/state/runtime-before.nft
+        - /tmp/wunder/lit-host-firewall-molecule/state/runtime-after.nft
+        - /tmp/wunder/lit-host-firewall-molecule/state/pending.nft
+        - /tmp/wunder/lit-host-firewall-molecule/state/pending.meta
+        - /tmp/wunder/lit-host-firewall-molecule/systemd/lit-host-firewall-rollback.service
+        - /tmp/wunder/lit-host-firewall-molecule/systemd/lit-host-firewall-rollback.timer
+      register: host_firewall_applied_artifacts
+      changed_when: false
+
+    - name: Confirm complete host firewall transaction artifacts
+      ansible.builtin.assert:
+        that:
+          - host_firewall_applied_artifacts.results | map(attribute='stat.exists') | min
+
+    - name: Read staged host firewall candidate
+      ansible.builtin.slurp:
+        src: /tmp/wunder/lit-host-firewall-molecule/state/pending.nft
+      register: host_firewall_staged_candidate
+      changed_when: false
+
+    - name: Validate bootstrap, IPv6, and container fail-closed policy
+      ansible.builtin.assert:
+        that:
+          - "'elements = { 22, 1905, 2222 }' in _host_firewall_staged_text"
+          - "'policy drop' in _host_firewall_staged_text"
+          - "'policy accept' in _host_firewall_staged_text"
+          - "'meta nfproto ipv6 counter drop' in _host_firewall_staged_text"
+          - "'iifname @container_interfaces goto container_guard' in _host_firewall_staged_text"
+          - "'oifname @container_interfaces goto container_guard' in _host_firewall_staged_text"
+          - "'flush ruleset' not in _host_firewall_staged_text"
+      vars:
+        _host_firewall_staged_text: "{{ host_firewall_staged_candidate.content | b64decode }}"
+
+    - name: Confirm candidate after external positive and negative test evidence
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: confirm
+        host_firewall_confirm_authorized: true
+        host_firewall_positive_tests_passed: true
+        host_firewall_negative_tests_passed: true
+        host_firewall_test_evidence_reference: molecule://host-firewall-basic/connectivity
+
+    - name: Read confirmed persistent host firewall candidate
+      ansible.builtin.slurp:
+        src: /tmp/wunder/lit-host-firewall-molecule/nftables.conf
+      register: host_firewall_persistent_candidate
+      changed_when: false
+
+    - name: Read host firewall confirmation evidence
+      ansible.builtin.slurp:
+        src: /tmp/wunder/lit-host-firewall-molecule/state/confirmed.meta
+      register: host_firewall_confirmation_evidence
+      changed_when: false
+
+    - name: Read rollback watchdog command log
+      ansible.builtin.slurp:
+        src: /tmp/wunder/lit-host-firewall-molecule/systemctl.log
+      register: host_firewall_systemctl_log
+      changed_when: false
+
+    - name: Validate confirmed host firewall and watchdog lifecycle
+      ansible.builtin.assert:
+        that:
+          - >-
+            (host_firewall_persistent_candidate.content | b64decode | hash('sha256'))
+            == (host_firewall_staged_candidate.content | b64decode | hash('sha256'))
+          - "'positive_tests_passed=true' in (host_firewall_confirmation_evidence.content | b64decode)"
+          - "'negative_tests_passed=true' in (host_firewall_confirmation_evidence.content | b64decode)"
+          - "'enable --now lit-host-firewall-rollback.timer' in (host_firewall_systemctl_log.content | b64decode)"
+          - "'stop lit-host-firewall-rollback.timer' in (host_firewall_systemctl_log.content | b64decode)"
+          - "'disable lit-host-firewall-rollback.timer' in (host_firewall_systemctl_log.content | b64decode)"
+
+    - name: Confirm hardened mode rejects a control session on bootstrap SSH
+      block:
+        - name: Attempt hardened apply through forbidden TCP 22
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: apply
+            host_firewall_mode: hardened
+            host_firewall_control_destination_port: 22
+            host_firewall_apply_authorized: true
+
+        - name: Fail when hardened control-port protection was bypassed
+          ansible.builtin.fail:
+            msg: "Hardened mode unexpectedly accepted a control connection on TCP 22."
+
+      rescue:
+        - name: Validate safe rejection of hardened TCP 22 control
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+
+    - name: Confirm broad source ranges are rejected
+      block:
+        - name: Attempt check with unrestricted management source
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: check
+            host_firewall_controller_source_cidrs:
+              - 0.0.0.0/0
+
+        - name: Fail when unrestricted management source was accepted
+          ansible.builtin.fail:
+            msg: "An unrestricted management source was unexpectedly accepted."
+
+      rescue:
+        - name: Validate safe rejection of unrestricted management source
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+
+    - name: Confirm control-character injection is rejected
+      block:
+        - name: Attempt check with a newline in a container interface
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: check
+            host_firewall_container_interfaces:
+              - "podman0\nmalicious"
+
+        - name: Fail when control-character injection was accepted
+          ansible.builtin.fail:
+            msg: "A container interface containing a control character was unexpectedly accepted."
+
+      rescue:
+        - name: Validate safe rejection of control-character injection
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+
+    - name: Execute explicit rollback of confirmed host firewall transaction
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: rollback
+        host_firewall_rollback_authorized: true
+
+    - name: Inspect host firewall state after explicit rollback
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /tmp/wunder/lit-host-firewall-molecule/nftables.conf
+        - /tmp/wunder/lit-host-firewall-molecule/state/confirmed.meta
+        - /tmp/wunder/lit-host-firewall-molecule/state/rolled-back.meta
+      register: host_firewall_rollback_artifacts
+      changed_when: false
+
+    - name: Read restored nftables runtime state
+      ansible.builtin.slurp:
+        src: /tmp/wunder/lit-host-firewall-molecule/runtime.nft
+      register: host_firewall_restored_runtime
+      changed_when: false
+
+    - name: Validate explicit rollback restored runtime and persistence boundary
+      ansible.builtin.assert:
+        that:
+          - not host_firewall_rollback_artifacts.results[0].stat.exists
+          - not host_firewall_rollback_artifacts.results[1].stat.exists
+          - host_firewall_rollback_artifacts.results[2].stat.exists
+          - "'table inet preexisting' in (host_firewall_restored_runtime.content | b64decode)"

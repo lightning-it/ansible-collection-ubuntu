@@ -1,0 +1,218 @@
+---
+- name: Validate host firewall base inputs
+  ansible.builtin.assert:
+    that:
+      - host_firewall_enabled is boolean
+      - host_firewall_action in ['plan', 'check', 'apply', 'confirm', 'rollback', 'readback']
+      - host_firewall_mode in ['bootstrap', 'hardened']
+      - host_firewall_apply_authorized is boolean
+      - host_firewall_confirm_authorized is boolean
+      - host_firewall_rollback_authorized is boolean
+      - host_firewall_positive_tests_passed is boolean
+      - host_firewall_negative_tests_passed is boolean
+    fail_msg: "Host firewall base variables are invalid."
+
+- name: Validate enabled host firewall identity and platform
+  ansible.builtin.assert:
+    that:
+      - host_firewall_expected_inventory_hostname | trim | length > 0
+      - host_firewall_expected_inventory_hostname | length <= 253
+      - >-
+        host_firewall_expected_inventory_hostname
+        is match('^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\Z')
+      - inventory_hostname == host_firewall_expected_inventory_hostname
+      - host_firewall_platform_name == 'Ubuntu'
+      - host_firewall_platform_version is match('^24\.04(?:\.[0-9]+)?\Z')
+      - host_firewall_observed_ipv4_addresses is sequence
+      - host_firewall_observed_ipv4_addresses is not string
+      - host_firewall_expected_public_ipv4 is match(host_firewall_ipv4_pattern)
+      - host_firewall_expected_management_ipv4 is match(host_firewall_ipv4_pattern)
+      - host_firewall_expected_public_ipv4 != host_firewall_expected_management_ipv4
+      - host_firewall_expected_public_ipv4 in host_firewall_observed_ipv4_addresses
+      - host_firewall_expected_management_ipv4 in host_firewall_observed_ipv4_addresses
+    fail_msg: >-
+      Target identity is ambiguous or does not match an Ubuntu 24.04 host with both expected IPv4 addresses.
+  when: host_firewall_enabled | bool
+
+- name: Validate enabled host firewall network policy shape
+  ansible.builtin.assert:
+    that:
+      - host_firewall_controller_source_cidrs is sequence
+      - host_firewall_controller_source_cidrs is not string
+      - host_firewall_recovery_source_cidrs is sequence
+      - host_firewall_recovery_source_cidrs is not string
+      - host_firewall_tang_consumer_cidrs is sequence
+      - host_firewall_tang_consumer_cidrs is not string
+      - host_firewall_controller_source_cidrs | length > 0
+      - host_firewall_recovery_source_cidrs | length > 0
+      - host_firewall_management_source_cidrs_effective | length > 0
+      - host_firewall_expected_tang_consumer_count == 3
+      - host_firewall_tang_consumer_cidrs | length == host_firewall_expected_tang_consumer_count
+      - host_firewall_tang_consumer_cidrs | unique | list | length == host_firewall_tang_consumer_cidrs | length
+      - >-
+        host_firewall_management_source_cidrs_effective | length
+        == host_firewall_controller_source_cidrs | length + host_firewall_recovery_source_cidrs | length
+      - >-
+        host_firewall_management_tcp_ports_effective
+        == ([22, 1905, 2222] if host_firewall_mode == 'bootstrap' else [1905, 2222])
+    fail_msg: >-
+      Management sources must be non-overlapping exact hosts and Tang must contain exactly three unique consumers.
+  when: host_firewall_enabled | bool
+
+- name: Validate every host firewall source as an exact IPv4 host CIDR
+  ansible.builtin.assert:
+    that:
+      - item is match(host_firewall_ipv4_host_cidr_pattern)
+    fail_msg: "Firewall sources must be valid IPv4 /32 values; broad, empty, IPv6, or malformed sources are rejected."
+  loop: "{{ host_firewall_management_source_cidrs_effective + host_firewall_tang_consumer_cidrs }}"
+  loop_control:
+    label: "{{ item }}"
+  when: host_firewall_enabled | bool
+
+- name: Validate host firewall interface inputs
+  ansible.builtin.assert:
+    that:
+      - host_firewall_public_interface is match('^[A-Za-z0-9_.:-]{1,15}\Z')
+      - host_firewall_management_interface is match('^[A-Za-z0-9_.:-]{1,15}\Z')
+      - host_firewall_public_interface != host_firewall_management_interface
+      - host_firewall_container_interfaces is sequence
+      - host_firewall_container_interfaces is not string
+      - host_firewall_container_interfaces | length > 0
+      - host_firewall_container_interfaces | unique | list | length == host_firewall_container_interfaces | length
+      - host_firewall_public_interface not in host_firewall_container_interfaces
+      - host_firewall_management_interface not in host_firewall_container_interfaces
+    fail_msg: "Public, management, and container interface identities must be explicit, distinct, and complete."
+  when: host_firewall_enabled | bool
+
+- name: Validate every host firewall container interface
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9_.:-]{1,15}\Z')
+    fail_msg: "Container interface names must be exact Linux interface names without patterns or control characters."
+  loop: "{{ host_firewall_container_interfaces }}"
+  loop_control:
+    label: "{{ item }}"
+  when: host_firewall_enabled | bool
+
+- name: Validate host firewall table, transaction, and command inputs
+  ansible.builtin.assert:
+    that:
+      - host_firewall_table_family == 'inet'
+      - host_firewall_table_name is match('^[a-z][a-z0-9_]{2,31}\Z')
+      - host_firewall_input_priority | int >= 1
+      - host_firewall_input_priority | int <= 50
+      - host_firewall_forward_priority | int >= 1
+      - host_firewall_forward_priority | int <= 50
+      - host_firewall_output_priority | int >= 1
+      - host_firewall_output_priority | int <= 50
+      - host_firewall_watchdog_timeout_seconds | int >= 60
+      - host_firewall_watchdog_timeout_seconds | int <= 900
+      - host_firewall_rollback_service_name is match('^[A-Za-z0-9_.@-]+\.service\Z')
+      - host_firewall_rollback_timer_name is match('^[A-Za-z0-9_.@-]+\.timer\Z')
+      - host_firewall_confirmation_service_name is match('^[A-Za-z0-9_.@-]+\.service\Z')
+      - host_firewall_persistence_service_name is match('^[A-Za-z0-9_.@-]+\.service\Z')
+      - host_firewall_nft_binary is match('^/[A-Za-z0-9_./-]+\Z')
+      - host_firewall_systemctl_binary is match('^/[A-Za-z0-9_./-]+\Z')
+      - host_firewall_bash_binary is match('^/[A-Za-z0-9_./-]+\Z')
+      - host_firewall_printenv_binary is match('^/[A-Za-z0-9_./-]+\Z')
+    fail_msg: "Firewall table, priority, watchdog, unit, or command inputs are invalid."
+  when: host_firewall_enabled | bool
+
+- name: Validate every managed host firewall path
+  ansible.builtin.assert:
+    that:
+      - item is match('^/[A-Za-z0-9_./-]+\Z')
+      - item != '/'
+      - "'..' not in item.split('/')"
+      - "'//' not in item"
+    fail_msg: "Managed firewall paths must be explicit absolute paths without traversal or control characters."
+  loop:
+    - "{{ host_firewall_state_directory }}"
+    - "{{ host_firewall_pending_config_path }}"
+    - "{{ host_firewall_runtime_backup_path }}"
+    - "{{ host_firewall_runtime_after_path }}"
+    - "{{ host_firewall_persistent_backup_path }}"
+    - "{{ host_firewall_persistent_state_path }}"
+    - "{{ host_firewall_pending_metadata_path }}"
+    - "{{ host_firewall_confirmation_path }}"
+    - "{{ host_firewall_confirmation_request_path }}"
+    - "{{ host_firewall_rollback_record_path }}"
+    - "{{ host_firewall_persistent_config_path }}"
+    - "{{ host_firewall_systemd_unit_directory }}"
+    - "{{ host_firewall_rollback_script_path }}"
+    - "{{ host_firewall_confirmation_script_path }}"
+  loop_control:
+    label: "{{ item }}"
+  when: host_firewall_enabled | bool
+
+- name: Validate host firewall state path containment
+  ansible.builtin.assert:
+    that:
+      - item.startswith(host_firewall_state_directory + '/')
+    fail_msg: "Transaction state files must remain inside host_firewall_state_directory."
+  loop:
+    - "{{ host_firewall_pending_config_path }}"
+    - "{{ host_firewall_runtime_backup_path }}"
+    - "{{ host_firewall_runtime_after_path }}"
+    - "{{ host_firewall_persistent_backup_path }}"
+    - "{{ host_firewall_persistent_state_path }}"
+    - "{{ host_firewall_pending_metadata_path }}"
+    - "{{ host_firewall_confirmation_path }}"
+    - "{{ host_firewall_confirmation_request_path }}"
+    - "{{ host_firewall_rollback_record_path }}"
+  loop_control:
+    label: "{{ item }}"
+  when: host_firewall_enabled | bool
+
+- name: Validate active control connection protection
+  ansible.builtin.assert:
+    that:
+      - host_firewall_control_source_ipv4 is match(host_firewall_ipv4_pattern)
+      - (host_firewall_control_source_ipv4 + '/32') in host_firewall_management_source_cidrs_effective
+      - host_firewall_control_destination_port | int in host_firewall_management_tcp_ports_effective
+    fail_msg: >-
+      The active control source and destination port must remain explicitly allowed by the selected policy mode.
+  when:
+    - host_firewall_enabled | bool
+    - host_firewall_action in ['apply', 'confirm', 'rollback']
+    - not ansible_check_mode
+
+- name: Validate authorized host firewall apply transaction
+  ansible.builtin.assert:
+    that:
+      - host_firewall_apply_authorized | bool
+      - host_firewall_change_id is match('^[A-Za-z0-9][A-Za-z0-9._-]{2,63}\Z')
+    fail_msg: "A real apply requires an explicit authorization and immutable change identifier."
+  when:
+    - host_firewall_enabled | bool
+    - host_firewall_action == 'apply'
+    - not ansible_check_mode
+
+- name: Validate authorized host firewall confirmation evidence
+  ansible.builtin.assert:
+    that:
+      - host_firewall_confirm_authorized | bool
+      - host_firewall_change_id is match('^[A-Za-z0-9][A-Za-z0-9._-]{2,63}\Z')
+      - host_firewall_positive_tests_passed | bool
+      - host_firewall_negative_tests_passed | bool
+      - host_firewall_test_evidence_reference | length <= 512
+      - >-
+        host_firewall_test_evidence_reference
+        is match('^[A-Za-z0-9][A-Za-z0-9:/?&._#=@+-]{7,511}\Z')
+    fail_msg: >-
+      Confirmation requires explicit authorization plus external positive and negative test evidence.
+  when:
+    - host_firewall_enabled | bool
+    - host_firewall_action == 'confirm'
+    - not ansible_check_mode
+
+- name: Validate authorized host firewall rollback transaction
+  ansible.builtin.assert:
+    that:
+      - host_firewall_rollback_authorized | bool
+      - host_firewall_change_id is match('^[A-Za-z0-9][A-Za-z0-9._-]{2,63}\Z')
+    fail_msg: "A real rollback requires an explicit authorization and immutable change identifier."
+  when:
+    - host_firewall_enabled | bool
+    - host_firewall_action == 'rollback'
+    - not ansible_check_mode

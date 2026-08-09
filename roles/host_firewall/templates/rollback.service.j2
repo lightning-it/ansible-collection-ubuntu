@@ -1,0 +1,25 @@
+[Unit]
+Description=Rollback unconfirmed lit host firewall transaction
+ConditionPathExists={{ host_firewall_runtime_backup_path }}
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart={{ host_firewall_rollback_script_path }}
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectSystem=strict
+ReadWritePaths={{ host_firewall_state_directory }} {{ host_firewall_persistent_config_path | dirname }}
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

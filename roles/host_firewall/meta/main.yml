@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: host_firewall
+  namespace: lit
+  author: Lightning IT
+  company: Lightning IT
+  description: Apply a fail-closed transactional nftables host firewall on Ubuntu 24.04.
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+  galaxy_tags:
+    - firewall
+    - nftables
+    - security
+    - ubuntu
+
+dependencies: []

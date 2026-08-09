@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - >-
+    host_firewall - add a fail-closed Ubuntu 24.04 nftables policy with atomic role-owned table replacement,
+    Podman-aware forward enforcement, control-session protection, and rollback-protected plan/check/apply/confirm
+    lifecycle.

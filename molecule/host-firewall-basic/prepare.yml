@@ -1,0 +1,97 @@
+---
+- name: Prepare host firewall command doubles
+  hosts: host-firewall.example.test
+  become: false
+  gather_facts: false
+  vars:
+    host_firewall_test_directory: /tmp/wunder/lit-host-firewall-molecule
+  tasks:
+    - name: Reset host firewall test directory
+      ansible.builtin.file:
+        path: "{{ host_firewall_test_directory }}"
+        state: absent
+
+    - name: Create host firewall test directory
+      ansible.builtin.file:
+        path: "{{ host_firewall_test_directory }}"
+        state: directory
+        mode: "0700"
+
+    - name: Install deterministic nft command double
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/nft"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          state=/tmp/wunder/lit-host-firewall-molecule/runtime.nft
+
+          validate_policy() {
+            local policy="$1"
+            grep --quiet 'destroy table inet lit_host_firewall' <<<"${policy}"
+            grep --quiet 'type filter hook input priority 10; policy drop;' <<<"${policy}"
+            grep --quiet 'type filter hook forward priority 10; policy drop;' <<<"${policy}"
+            grep --quiet 'type filter hook output priority 10; policy accept;' <<<"${policy}"
+            grep --quiet 'container_guard' <<<"${policy}"
+            grep --quiet 'meta nfproto ipv6 counter drop' <<<"${policy}"
+          }
+
+          if [[ "${1:-}" == '--check' && "${2:-}" == '--file' ]]; then
+            if [[ "${3:-}" == '-' ]]; then
+              policy="$(/bin/cat)"
+            else
+              policy="$(/bin/cat "${3}")"
+            fi
+            if grep --quiet '^flush ruleset' <<<"${policy}"; then
+              grep --quiet 'table inet preexisting' <<<"${policy}"
+            else
+              validate_policy "${policy}"
+            fi
+            exit 0
+          fi
+
+          if [[ "${1:-}" == '--file' ]]; then
+            if [[ "${2:-}" == '-' ]]; then
+              /bin/cat > "${state}"
+            else
+              /bin/cp -- "${2}" "${state}"
+            fi
+            exit 0
+          fi
+
+          if [[ "${1:-}" == 'list' && "${2:-}" == 'ruleset' ]]; then
+            if [[ -s "${state}" ]]; then
+              /bin/cat "${state}"
+            else
+              echo 'table inet preexisting { chain input { type filter hook input priority 0; policy accept; } }'
+            fi
+            exit 0
+          fi
+
+          if [[ "${1:-}" == 'list' && "${2:-}" == 'table' ]]; then
+            test -s "${state}"
+            /bin/cat "${state}"
+            exit 0
+          fi
+
+          echo "Unsupported nft test invocation" >&2
+          exit 64
+
+    - name: Install deterministic systemctl command double
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/systemctl"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo "$*" >> /tmp/wunder/lit-host-firewall-molecule/systemctl.log
+          if [[ "$*" == 'is-enabled nftables.service' ]]; then
+            echo enabled
+            exit 0
+          fi
+          if [[ "$*" == 'start lit-host-firewall-confirm.service' ]]; then
+            /tmp/wunder/lit-host-firewall-molecule/bin/confirm
+          fi
+          if [[ "$*" == 'start lit-host-firewall-rollback.service' ]]; then
+            /tmp/wunder/lit-host-firewall-molecule/bin/rollback
+          fi

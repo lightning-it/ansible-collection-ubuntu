@@ -1,0 +1,92 @@
+---
+- name: Inspect host firewall rollback assets
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ host_firewall_rollback_script_path }}"
+    - "{{ host_firewall_runtime_backup_path }}"
+    - "{{ host_firewall_persistent_state_path }}"
+    - "{{ host_firewall_pending_metadata_path }}"
+  register: host_firewall_rollback_asset_stats
+  changed_when: false
+
+- name: Require a complete rollback-protected host firewall transaction
+  ansible.builtin.assert:
+    that:
+      - host_firewall_rollback_asset_stats.results | map(attribute='stat.exists') | min
+    fail_msg: "Rollback is impossible because the protected transaction assets are incomplete."
+
+- name: Read pending host firewall metadata for rollback
+  ansible.builtin.slurp:
+    src: "{{ host_firewall_pending_metadata_path }}"
+  register: host_firewall_rollback_pending_metadata
+  changed_when: false
+
+- name: Validate rollback change identity
+  ansible.builtin.assert:
+    that:
+      - "('change_id=' + host_firewall_change_id) in (host_firewall_rollback_pending_metadata.content | b64decode)"
+    fail_msg: "Rollback change identifier does not match the protected transaction."
+
+- name: Stop host firewall rollback timer before explicit rollback
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_systemctl_binary }}"
+      - stop
+      - "{{ host_firewall_rollback_timer_name }}"
+  changed_when: true
+
+- name: Execute explicit host firewall rollback service
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_systemctl_binary }}"
+      - start
+      - "{{ host_firewall_rollback_service_name }}"
+  changed_when: true
+
+- name: Disable host firewall rollback timer after explicit rollback
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_systemctl_binary }}"
+      - disable
+      - "{{ host_firewall_rollback_timer_name }}"
+  changed_when: true
+
+- name: Reset remote control connection after firewall rollback
+  ansible.builtin.include_tasks: reset_connection.yml
+  when: ansible_connection | default('ssh') != 'local'
+
+- name: Wait for protected control connection after firewall rollback
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 2
+    timeout: 45
+  when: ansible_connection | default('ssh') != 'local'
+
+- name: Read complete nftables ruleset after rollback
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_nft_binary }}"
+      - list
+      - ruleset
+  register: host_firewall_rollback_readback_result
+  changed_when: false
+
+- name: Require successful nftables readback after rollback
+  ansible.builtin.assert:
+    that:
+      - host_firewall_rollback_readback_result.rc == 0
+    fail_msg: "nftables readback failed after explicit rollback."
+
+- name: Inspect explicit host firewall rollback record
+  ansible.builtin.stat:
+    path: "{{ host_firewall_rollback_record_path }}"
+  register: host_firewall_explicit_rollback_record
+  changed_when: false
+
+- name: Require explicit host firewall rollback completion evidence
+  ansible.builtin.assert:
+    that:
+      - host_firewall_explicit_rollback_record.stat.exists
+      - host_firewall_explicit_rollback_record.stat.isreg
+    fail_msg: "The rollback service returned without writing its completion record."

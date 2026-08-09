@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+runtime_backup='{{ host_firewall_runtime_backup_path }}'
+persistent_backup='{{ host_firewall_persistent_backup_path }}'
+persistent_state='{{ host_firewall_persistent_state_path }}'
+persistent_config='{{ host_firewall_persistent_config_path }}'
+rollback_record='{{ host_firewall_rollback_record_path }}'
+confirmation_record='{{ host_firewall_confirmation_path }}'
+nft_binary='{{ host_firewall_nft_binary }}'
+
+test -s "${runtime_backup}"
+test -s "${persistent_state}"
+"${nft_binary}" --check --file "${runtime_backup}"
+
+persistent_before="$(tr -d '\r\n' < "${persistent_state}")"
+case "${persistent_before}" in
+  present)
+    test -s "${persistent_backup}"
+    /usr/bin/install --owner=root --group=root --mode=0600 \
+      "${persistent_backup}" "${persistent_config}"
+    ;;
+  absent)
+    /usr/bin/rm --force -- "${persistent_config}"
+    ;;
+  *)
+    echo "Invalid persistent firewall state marker" >&2
+    exit 1
+    ;;
+esac
+
+"${nft_binary}" --file "${runtime_backup}"
+/usr/bin/rm --force -- "${confirmation_record}"
+/usr/bin/date --utc '+rolled_back_at=%Y-%m-%dT%H:%M:%SZ' > "${rollback_record}"
+/usr/bin/chmod 0600 "${rollback_record}"

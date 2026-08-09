@@ -1,0 +1,27 @@
+---
+- name: Read back the role-owned nftables table
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_nft_binary }}"
+      - list
+      - table
+      - "{{ host_firewall_table_family }}"
+      - "{{ host_firewall_table_name }}"
+  register: host_firewall_readback_result
+  changed_when: false
+
+- name: Validate fail-closed host firewall readback
+  ansible.builtin.assert:
+    that:
+      - host_firewall_readback_result.rc == 0
+      - (host_firewall_policy_fingerprint in host_firewall_readback_result.stdout)
+      - "'chain input' in host_firewall_readback_result.stdout"
+      - "'chain forward' in host_firewall_readback_result.stdout"
+      - "'chain output' in host_firewall_readback_result.stdout"
+      - host_firewall_readback_result.stdout.count('policy drop') >= 2
+      - "'policy accept' in host_firewall_readback_result.stdout"
+      - "'container_guard' in host_firewall_readback_result.stdout"
+      - host_firewall_management_interface in host_firewall_readback_result.stdout
+      - host_firewall_expected_public_ipv4 in host_firewall_readback_result.stdout
+      - "'tcp dport 80' in host_firewall_readback_result.stdout"
+    fail_msg: "Host firewall readback does not prove the expected fail-closed policy fingerprint and chains."

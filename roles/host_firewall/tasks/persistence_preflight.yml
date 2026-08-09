@@ -1,0 +1,18 @@
+---
+- name: Read nftables boot persistence service state
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_systemctl_binary }}"
+      - is-enabled
+      - "{{ host_firewall_persistence_service_name }}"
+  register: host_firewall_persistence_service_state
+  changed_when: false
+  failed_when: false
+
+- name: Require enabled nftables boot persistence before mutation
+  ansible.builtin.assert:
+    that:
+      - host_firewall_persistence_service_state.rc == 0
+      - host_firewall_persistence_service_state.stdout | trim == 'enabled'
+    fail_msg: >-
+      The nftables persistence service is not enabled; applying a policy that cannot survive reboot is prohibited.

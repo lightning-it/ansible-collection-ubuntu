@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+pending_config='{{ host_firewall_pending_config_path }}'
+confirmation_request='{{ host_firewall_confirmation_request_path }}'
+confirmation_record='{{ host_firewall_confirmation_path }}'
+persistent_config='{{ host_firewall_persistent_config_path }}'
+rollback_program='{{ host_firewall_rollback_script_path }}'
+nft_binary='{{ host_firewall_nft_binary }}'
+systemctl_binary='{{ host_firewall_systemctl_binary }}'
+rollback_timer='{{ host_firewall_rollback_timer_name }}'
+expected_sha256='{{ host_firewall_candidate_sha256 }}'
+confirmation_succeeded=0
+
+rollback_on_failure() {
+  local status="$?"
+  trap - EXIT INT TERM
+  if [[ "${confirmation_succeeded}" -ne 1 ]]; then
+    "${rollback_program}" || true
+  fi
+  exit "${status}"
+}
+trap rollback_on_failure EXIT INT TERM
+
+test -s "${pending_config}"
+test -s "${confirmation_request}"
+actual_sha256="$(/usr/bin/sha256sum "${pending_config}" | /usr/bin/cut --delimiter=' ' --fields=1)"
+test "${actual_sha256}" = "${expected_sha256}"
+
+"${systemctl_binary}" stop "${rollback_timer}"
+/usr/bin/install --owner=root --group=root --mode=0600 "${pending_config}" "${persistent_config}"
+"${nft_binary}" --check --file "${persistent_config}"
+{
+  /usr/bin/cat "${confirmation_request}"
+  /usr/bin/date --utc '+confirmed_at=%Y-%m-%dT%H:%M:%SZ'
+  echo "candidate_sha256=${expected_sha256}"
+} > "${confirmation_record}"
+/usr/bin/chmod 0600 "${confirmation_record}"
+"${systemctl_binary}" disable "${rollback_timer}"
+
+confirmation_succeeded=1
+trap - EXIT INT TERM

@@ -1,0 +1,23 @@
+---
+- name: Discover actual SSH control connection tuple
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_printenv_binary }}"
+      - SSH_CONNECTION
+  register: host_firewall_actual_control_connection
+  become: false
+  changed_when: false
+
+- name: Validate actual SSH control connection against approved policy
+  ansible.builtin.assert:
+    that:
+      - host_firewall_actual_control_connection.stdout.split() | length == 4
+      - host_firewall_actual_control_connection.stdout.split()[0] == host_firewall_control_source_ipv4
+      - >-
+        host_firewall_actual_control_connection.stdout.split()[2]
+        in [host_firewall_expected_public_ipv4, host_firewall_expected_management_ipv4]
+      - >-
+        host_firewall_actual_control_connection.stdout.split()[3] | int
+        == host_firewall_control_destination_port | int
+    fail_msg: >-
+      Actual SSH source, target address, or destination port differs from the explicitly protected control tuple.

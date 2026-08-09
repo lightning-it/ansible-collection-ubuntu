@@ -1,0 +1,72 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: End host firewall role when disabled
+  ansible.builtin.meta: end_role
+  when: not host_firewall_enabled | bool
+
+- name: Verify actual protected control connection
+  ansible.builtin.include_tasks: control_connection.yml
+  when:
+    - host_firewall_action in ['apply', 'confirm', 'rollback']
+    - not ansible_check_mode
+    - ansible_connection | default('ssh') != 'local'
+
+- name: Verify nftables boot persistence service
+  ansible.builtin.include_tasks: persistence_preflight.yml
+  when:
+    - host_firewall_action in ['apply', 'confirm']
+    - not ansible_check_mode
+
+- name: Render deterministic host firewall candidate
+  ansible.builtin.import_tasks: render.yml
+
+- name: Check host firewall candidate without applying it
+  ansible.builtin.include_tasks: check.yml
+  when: host_firewall_action in ['check', 'apply', 'confirm']
+
+- name: Apply host firewall transaction
+  ansible.builtin.include_tasks: apply.yml
+  when:
+    - host_firewall_action == 'apply'
+    - not ansible_check_mode
+
+- name: Report check-mode apply hold
+  ansible.builtin.debug:
+    msg: >-
+      Check mode validated the candidate only. No firewall, watchdog, state, or persistent configuration was changed.
+  when:
+    - host_firewall_action == 'apply'
+    - ansible_check_mode
+
+- name: Confirm host firewall transaction
+  ansible.builtin.include_tasks: confirm.yml
+  when:
+    - host_firewall_action == 'confirm'
+    - not ansible_check_mode
+
+- name: Report check-mode confirmation hold
+  ansible.builtin.debug:
+    msg: "Check mode did not persist or confirm the pending firewall transaction."
+  when:
+    - host_firewall_action == 'confirm'
+    - ansible_check_mode
+
+- name: Roll back host firewall transaction
+  ansible.builtin.include_tasks: rollback.yml
+  when:
+    - host_firewall_action == 'rollback'
+    - not ansible_check_mode
+
+- name: Report check-mode rollback hold
+  ansible.builtin.debug:
+    msg: "Check mode did not execute the rollback service or alter persistent configuration."
+  when:
+    - host_firewall_action == 'rollback'
+    - ansible_check_mode
+
+- name: Read back current host firewall table
+  ansible.builtin.include_tasks: readback.yml
+  when: host_firewall_action == 'readback'

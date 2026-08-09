@@ -1,0 +1,32 @@
+---
+- name: Converge host firewall plan without mutation
+  hosts: host-firewall.example.test
+  become: false
+  gather_facts: false
+  roles:
+    - role: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_enabled: true
+        host_firewall_action: plan
+        host_firewall_mode: bootstrap
+        host_firewall_expected_inventory_hostname: host-firewall.example.test
+        host_firewall_expected_public_ipv4: 192.0.2.10
+        host_firewall_expected_management_ipv4: 10.0.30.10
+        host_firewall_observed_ipv4_addresses:
+          - 192.0.2.10
+          - 10.0.30.10
+        host_firewall_platform_name: Ubuntu
+        host_firewall_platform_version: "24.04"
+        host_firewall_public_interface: enp1s0
+        host_firewall_management_interface: enp1s0.4091
+        host_firewall_container_interfaces:
+          - podman0
+          - podman1
+        host_firewall_controller_source_cidrs:
+          - 198.51.100.20/32
+        host_firewall_recovery_source_cidrs:
+          - 198.51.100.21/32
+        host_firewall_tang_consumer_cidrs:
+          - 192.0.2.21/32
+          - 192.0.2.22/32
+          - 192.0.2.23/32

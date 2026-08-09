@@ -1,0 +1,240 @@
+---
+- name: Inspect prior host firewall transaction state
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ host_firewall_pending_metadata_path }}"
+    - "{{ host_firewall_confirmation_path }}"
+    - "{{ host_firewall_rollback_record_path }}"
+  register: host_firewall_prior_transaction_state
+  changed_when: false
+
+- name: Refuse to overwrite an unresolved host firewall transaction
+  ansible.builtin.assert:
+    that:
+      - >-
+        not host_firewall_prior_transaction_state.results[0].stat.exists
+        or host_firewall_prior_transaction_state.results[1].stat.exists
+        or host_firewall_prior_transaction_state.results[2].stat.exists
+    fail_msg: >-
+      A pending firewall transaction has neither confirmation nor rollback evidence and must be resolved first.
+
+- name: Create protected host firewall transaction directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - "{{ host_firewall_state_directory }}"
+    - "{{ host_firewall_rollback_script_path | dirname }}"
+    - "{{ host_firewall_systemd_unit_directory }}"
+
+- name: Clear stale host firewall transaction completion records
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ host_firewall_confirmation_path }}"
+    - "{{ host_firewall_confirmation_request_path }}"
+    - "{{ host_firewall_rollback_record_path }}"
+
+- name: Capture complete nftables ruleset before apply
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_nft_binary }}"
+      - list
+      - ruleset
+  register: host_firewall_runtime_before_result
+  changed_when: false
+
+- name: Persist replayable nftables before-state for rollback
+  ansible.builtin.copy:
+    content: |-
+      flush ruleset
+      {{ host_firewall_runtime_before_result.stdout }}
+    dest: "{{ host_firewall_runtime_backup_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Validate replayable nftables runtime before-state
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_nft_binary }}"
+      - --check
+      - --file
+      - "{{ host_firewall_runtime_backup_path }}"
+  changed_when: false
+
+- name: Check persistent nftables configuration before apply
+  ansible.builtin.stat:
+    path: "{{ host_firewall_persistent_config_path }}"
+  register: host_firewall_persistent_before_stat
+  changed_when: false
+
+- name: Read persistent nftables configuration before apply
+  ansible.builtin.slurp:
+    src: "{{ host_firewall_persistent_config_path }}"
+  register: host_firewall_persistent_before_content
+  changed_when: false
+  when: host_firewall_persistent_before_stat.stat.exists
+
+- name: Save persistent nftables configuration before apply
+  ansible.builtin.copy:
+    content: "{{ host_firewall_persistent_before_content.content | b64decode }}"
+    dest: "{{ host_firewall_persistent_backup_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: host_firewall_persistent_before_stat.stat.exists
+
+- name: Validate persistent nftables before-state when present
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_nft_binary }}"
+      - --check
+      - --file
+      - "{{ host_firewall_persistent_backup_path }}"
+  changed_when: false
+  when: host_firewall_persistent_before_stat.stat.exists
+
+- name: Remove stale persistent nftables backup when no prior file exists
+  ansible.builtin.file:
+    path: "{{ host_firewall_persistent_backup_path }}"
+    state: absent
+  when: not host_firewall_persistent_before_stat.stat.exists
+
+- name: Record whether persistent nftables configuration existed before apply
+  ansible.builtin.copy:
+    content: "{{ 'present' if host_firewall_persistent_before_stat.stat.exists else 'absent' }}\n"
+    dest: "{{ host_firewall_persistent_state_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Stage immutable host firewall candidate
+  ansible.builtin.copy:
+    content: "{{ host_firewall_candidate_content }}"
+    dest: "{{ host_firewall_pending_config_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Record pending host firewall transaction metadata
+  ansible.builtin.copy:
+    content: |
+      change_id={{ host_firewall_change_id }}
+      candidate_sha256={{ host_firewall_candidate_sha256 }}
+      policy_fingerprint={{ host_firewall_policy_fingerprint }}
+      mode={{ host_firewall_mode }}
+      target={{ host_firewall_expected_inventory_hostname }}
+    dest: "{{ host_firewall_pending_metadata_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Install persistent host firewall rollback program
+  ansible.builtin.template:
+    src: rollback.sh.j2
+    dest: "{{ host_firewall_rollback_script_path }}"
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Validate host firewall rollback program syntax
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_bash_binary }}"
+      - -n
+      - "{{ host_firewall_rollback_script_path }}"
+  changed_when: false
+
+- name: Install host firewall rollback service
+  ansible.builtin.template:
+    src: rollback.service.j2
+    dest: "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_rollback_service_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install host firewall rollback timer
+  ansible.builtin.template:
+    src: rollback.timer.j2
+    dest: "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_rollback_timer_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Reload systemd after installing rollback units
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_systemctl_binary }}"
+      - daemon-reload
+  changed_when: true
+
+- name: Arm persistent host firewall rollback watchdog before apply
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_systemctl_binary }}"
+      - enable
+      - --now
+      - "{{ host_firewall_rollback_timer_name }}"
+  changed_when: true
+
+- name: Apply and validate host firewall under rollback protection
+  block:
+    - name: Atomically replace only the role-owned nftables table
+      ansible.builtin.command:
+        argv:
+          - "{{ host_firewall_nft_binary }}"
+          - --file
+          - '-'
+        stdin: "{{ host_firewall_candidate_content }}"
+      changed_when: true
+
+    - name: Reset remote control connection after firewall replacement
+      ansible.builtin.include_tasks: reset_connection.yml
+      when: ansible_connection | default('ssh') != 'local'
+
+    - name: Wait for the protected control connection to return
+      ansible.builtin.wait_for_connection:
+        connect_timeout: 10
+        sleep: 2
+        timeout: 45
+      when: ansible_connection | default('ssh') != 'local'
+
+    - name: Read back applied host firewall table
+      ansible.builtin.include_tasks: readback.yml
+
+    - name: Persist host firewall after-state evidence
+      ansible.builtin.copy:
+        content: "{{ host_firewall_readback_result.stdout }}\n"
+        dest: "{{ host_firewall_runtime_after_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+  rescue:
+    - name: Request immediate host firewall rollback after apply failure
+      ansible.builtin.command:
+        argv:
+          - "{{ host_firewall_systemctl_binary }}"
+          - start
+          - "{{ host_firewall_rollback_service_name }}"
+      register: host_firewall_apply_rescue_result
+      changed_when: true
+      failed_when: false
+
+    - name: Stop after failed host firewall apply and rollback request
+      ansible.builtin.fail:
+        msg: >-
+          Host firewall apply or readback failed. Immediate rollback was requested with return code
+          {{ host_firewall_apply_rescue_result.rc | default('unavailable') }}; the armed timer remains the fallback.
+
+- name: Report pending host firewall confirmation
+  ansible.builtin.debug:
+    msg: >-
+      Candidate {{ host_firewall_candidate_sha256 }} is active but not persistent. The rollback watchdog remains armed
+      until a separately evidenced confirm action succeeds.
