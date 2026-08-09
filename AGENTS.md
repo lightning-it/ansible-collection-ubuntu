@@ -53,7 +53,21 @@ If generic guidance conflicts with repository behavior, you MUST prefer reposito
    16. `scripts/devtools-molecule.sh`
    17. `scripts/wunder-devtools-ee.sh`
    18. `.github/workflows/shared-assets-guarded-automerge.yml`
-5. Repo-local exceptions MUST be explicit in the sync workflow and documented in the repository.
+   19. `scripts/security-release-intake.py`
+   20. `.github/workflows/security-release-intake.yml`
+   21. `scripts/security-release-dispatch.py`
+   22. `.github/workflows/security-release-dispatch.yml`
+   23. `tests/unit/test_security_release_request_dispatch.py`
+5. The Security intake and dispatch files in items 19 through 22 and the dispatch contract assertion in item 23
+   are supplementary-only MLX-90 Security assets.
+   Generic collection synchronization MUST exclude them;
+   only the narrow `ansible-collection-supplementary` enterprise sync may
+   install them. They MUST NOT remove the human-controlled checkpoint for
+   normal `develop` to `main` promotions. The retired temporary paths
+   `.lit/push-ready-secret-fixtures.json` and
+   `docs/development/push-ready-secret-fixtures.md` MUST remain absent after
+   the guarded cleanup sync and MUST NOT be recreated.
+6. Repo-local exceptions MUST be explicit in the sync workflow and documented in the repository.
 
 ## 2. Repository Baseline (This Repo)
 
@@ -254,7 +268,14 @@ The standard branch and release model is:
 - Major updates require manual approval.
 - `main` is the stable release branch.
 - Promotion from `develop` to `main` must happen through a pull request.
-- Promotion pull requests must remain a human-visible manual merge checkpoint after required checks pass.
+- Promotion pull requests remain a human-visible manual checkpoint after all
+  required checks pass.
+- In `ansible-collection-supplementary`, that checkpoint is an exact-head
+  protected human environment approval; a manual merge click alone is not the
+  approval record. Only an exact App-authored, evidence-bound MLX-90 Security
+  Release may use the dedicated reviewer-free authorization environment. It
+  remains subject to every independent Security and branch gate and receives
+  no bypass.
 - Do not direct-push from `develop` to `main`.
 - Collection release PRs are created automatically from `release/vX.Y.Z` branches after `main` receives unreleased
   changelog fragments.
