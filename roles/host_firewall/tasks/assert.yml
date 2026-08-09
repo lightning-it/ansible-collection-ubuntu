@@ -8,7 +8,9 @@
       - host_firewall_positive_tests_passed is boolean
       - host_firewall_negative_tests_passed is boolean
       - host_firewall_authorization_contract is mapping
-      - host_firewall_egress_stance == 'unresolved-permissive'
+      - host_firewall_egress_policy is mapping
+      - host_firewall_cis_ipv6_required is boolean
+      - host_firewall_provider_ipv6_filter_enabled is boolean
     fail_msg: "Host firewall base variables are invalid."
 
 - name: Validate enabled host firewall identity and platform
@@ -33,10 +35,16 @@
       - host_firewall_expected_management_ipv4 in host_firewall_observed_ipv4_addresses
       - >-
         host_firewall_expected_public_ipv6 | length == 0
-        or host_firewall_expected_public_ipv6 is match(host_firewall_ipv6_pattern)
+        or (
+          ':' in host_firewall_expected_public_ipv6
+          and host_firewall_expected_public_ipv6 == host_firewall_expected_public_ipv6 | lower
+        )
       - >-
         host_firewall_expected_management_ipv6 | length == 0
-        or host_firewall_expected_management_ipv6 is match(host_firewall_ipv6_pattern)
+        or (
+          ':' in host_firewall_expected_management_ipv6
+          and host_firewall_expected_management_ipv6 == host_firewall_expected_management_ipv6 | lower
+        )
       - >-
         host_firewall_expected_public_ipv6 | length == 0
         or host_firewall_expected_public_ipv6 in host_firewall_observed_ipv6_addresses
@@ -116,7 +124,7 @@
       - item.1 is match(host_firewall_ipv6_host_cidr_pattern)
       - host_firewall_host_ipv6_addresses_effective | length > 0
     fail_msg: >-
-      Management IPv6 sources must be canonical full-address /128 values and require an expected host IPv6 address.
+      Management IPv6 sources must be canonical compressed /128 values and require an expected host IPv6 address.
   loop: >-
     {{
       query(
@@ -168,7 +176,7 @@
     that:
       - item is match(host_firewall_ipv6_host_cidr_pattern)
       - host_firewall_expected_public_ipv6 | length > 0
-    fail_msg: "Tang IPv6 consumers must be canonical full-address /128 values and require the public host IPv6."
+    fail_msg: "Tang IPv6 consumers must be canonical compressed /128 values and require the public host IPv6."
   loop: "{{ host_firewall_tang_access.sources_ipv6 }}"
   loop_control:
     label: "{{ item }}"
@@ -212,16 +220,30 @@
       - host_firewall_output_priority | int <= 50
       - host_firewall_watchdog_timeout_seconds | int >= 60
       - host_firewall_watchdog_timeout_seconds | int <= 900
+      - host_firewall_command_timeout_seconds | int >= 5
+      - host_firewall_command_timeout_seconds | int <= 60
+      - host_firewall_lock_wait_timeout_seconds | int >= 1
+      - host_firewall_lock_wait_timeout_seconds | int <= 60
+      - >-
+        (host_firewall_command_timeout_seconds | int) * 2 + 5
+        < (host_firewall_watchdog_timeout_seconds | int)
+      - >-
+        (host_firewall_lock_wait_timeout_seconds | int) + 5
+        < (host_firewall_watchdog_timeout_seconds | int)
       - host_firewall_rollback_service_name is match('^[A-Za-z0-9_.@-]+\.service\Z')
       - host_firewall_rollback_timer_name is match('^[A-Za-z0-9_.@-]+\.timer\Z')
       - host_firewall_confirmation_service_name is match('^[A-Za-z0-9_.@-]+\.service\Z')
+      - host_firewall_confirmation_service_name != host_firewall_rollback_service_name
       - host_firewall_persistence_service_name is match('^[A-Za-z0-9_.@-]+\.service\Z')
+      - host_firewall_confirmation_service_name != host_firewall_persistence_service_name
+      - host_firewall_rollback_service_name != host_firewall_persistence_service_name
       - host_firewall_nft_binary is match('^/[A-Za-z0-9_./-]+\Z')
       - host_firewall_systemctl_binary is match('^/[A-Za-z0-9_./-]+\Z')
-      - host_firewall_bash_binary is match('^/[A-Za-z0-9_./-]+\Z')
-      - host_firewall_flock_binary is match('^/[A-Za-z0-9_./-]+\Z')
       - host_firewall_python_binary is match('^/[A-Za-z0-9_./-]+\Z')
       - host_firewall_printenv_binary is match('^/[A-Za-z0-9_./-]+\Z')
+      - >-
+        host_firewall_authorization_verifier_binary | length == 0
+        or host_firewall_authorization_verifier_binary is match('^/[A-Za-z0-9_./-]+\Z')
     fail_msg: "Firewall table, priority, watchdog, unit, or command inputs are invalid."
   when: host_firewall_enabled | bool
 
@@ -235,47 +257,60 @@
     fail_msg: "Managed firewall paths must be explicit absolute paths without traversal or control characters."
   loop:
     - "{{ host_firewall_state_directory }}"
-    - "{{ host_firewall_pending_config_path }}"
-    - "{{ host_firewall_runtime_backup_path }}"
-    - "{{ host_firewall_runtime_backup_state_path }}"
-    - "{{ host_firewall_runtime_after_path }}"
-    - "{{ host_firewall_persistent_backup_path }}"
-    - "{{ host_firewall_persistent_state_path }}"
-    - "{{ host_firewall_pending_metadata_path }}"
-    - "{{ host_firewall_confirmation_path }}"
-    - "{{ host_firewall_confirmation_request_path }}"
-    - "{{ host_firewall_rollback_record_path }}"
+    - "{{ host_firewall_transactions_directory }}"
+    - "{{ host_firewall_claims_directory }}"
+    - "{{ host_firewall_active_transaction_path }}"
     - "{{ host_firewall_transaction_lock_path }}"
     - "{{ host_firewall_persistent_root_config_path }}"
     - "{{ host_firewall_persistent_include_path }}"
     - "{{ host_firewall_systemd_unit_directory }}"
-    - "{{ host_firewall_apply_script_path }}"
-    - "{{ host_firewall_rollback_script_path }}"
-    - "{{ host_firewall_confirmation_script_path }}"
-    - "{{ host_firewall_canonicalizer_script_path }}"
+    - "{{ host_firewall_transaction_program_path }}"
+    - "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_confirmation_service_name }}"
+    - "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_rollback_service_name }}"
+    - "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_rollback_timer_name }}"
   loop_control:
     label: "{{ item }}"
   when: host_firewall_enabled | bool
 
-- name: Validate host firewall ownership boundaries
+- name: Validate host firewall state ownership boundaries
   ansible.builtin.assert:
     that:
-      - item.startswith(host_firewall_state_directory + '/')
-    fail_msg: "Transaction state files must remain inside host_firewall_state_directory."
-  loop:
-    - "{{ host_firewall_pending_config_path }}"
-    - "{{ host_firewall_runtime_backup_path }}"
-    - "{{ host_firewall_runtime_backup_state_path }}"
-    - "{{ host_firewall_runtime_after_path }}"
-    - "{{ host_firewall_persistent_backup_path }}"
-    - "{{ host_firewall_persistent_state_path }}"
-    - "{{ host_firewall_pending_metadata_path }}"
-    - "{{ host_firewall_confirmation_path }}"
-    - "{{ host_firewall_confirmation_request_path }}"
-    - "{{ host_firewall_rollback_record_path }}"
-    - "{{ host_firewall_transaction_lock_path }}"
-  loop_control:
-    label: "{{ item }}"
+      - host_firewall_transactions_directory | dirname == host_firewall_state_directory
+      - host_firewall_claims_directory | dirname == host_firewall_state_directory
+      - host_firewall_active_transaction_path | dirname == host_firewall_state_directory
+      - host_firewall_transaction_lock_path | dirname == host_firewall_state_directory
+    fail_msg: "Transaction directories, active pointer, and lock must be direct children of the state directory."
+  when: host_firewall_enabled | bool
+
+- name: Require pairwise-distinct configured firewall paths
+  ansible.builtin.assert:
+    that:
+      - _host_firewall_configured_paths | unique | list | length == _host_firewall_configured_paths | length
+    fail_msg: >-
+      State, transaction, claim, active, lock, persistence, program, and unit paths must be pairwise distinct.
+  vars:
+    _host_firewall_configured_paths:
+      - "{{ host_firewall_state_directory }}"
+      - "{{ host_firewall_transactions_directory }}"
+      - "{{ host_firewall_claims_directory }}"
+      - "{{ host_firewall_active_transaction_path }}"
+      - "{{ host_firewall_transaction_lock_path }}"
+      - "{{ host_firewall_persistent_root_config_path }}"
+      - "{{ host_firewall_persistent_include_path }}"
+      - "{{ host_firewall_transaction_program_path }}"
+      - "{{ host_firewall_systemd_unit_directory }}"
+      - "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_confirmation_service_name }}"
+      - "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_rollback_service_name }}"
+      - "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_rollback_timer_name }}"
+      - "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_persistence_service_name }}"
+      - "{{ host_firewall_nft_binary }}"
+      - "{{ host_firewall_systemctl_binary }}"
+      - >-
+        {{
+          host_firewall_authorization_verifier_binary
+          if host_firewall_authorization_verifier_binary | length > 0
+          else '/-'
+        }}
   when: host_firewall_enabled | bool
 
 - name: Validate isolated persistence boundary
@@ -336,6 +371,22 @@
     - host_firewall_action in ['apply', 'confirm', 'rollback']
     - not ansible_check_mode
 
+- name: Require independently evidenced provider IPv6 filtering for confirmation
+  ansible.builtin.assert:
+    that:
+      - host_firewall_provider_ipv6_filter_enabled | bool
+      - host_firewall_provider_ipv6_filter_evidence_reference | length <= 512
+      - >-
+        host_firewall_provider_ipv6_filter_evidence_reference
+        is match('^[A-Za-z0-9][A-Za-z0-9:/?&._#=@+-]{7,511}\Z')
+    fail_msg: >-
+      Confirmation requires evidence that the provider IPv6 filter is enabled. A disabled, unknown, or unevidenced
+      provider filter violates the end-to-end IPv4-only baseline.
+  when:
+    - host_firewall_enabled | bool
+    - host_firewall_action == 'confirm'
+    - not ansible_check_mode
+
 - name: Validate host firewall confirmation evidence
   ansible.builtin.assert:
     that:
@@ -351,13 +402,17 @@
     - host_firewall_action == 'confirm'
     - not ansible_check_mode
 
-- name: Block confirmation while egress remains unresolved
-  ansible.builtin.fail:
-    msg: >-
-      Productive confirmation is prohibited while output policy is unresolved-permissive. Approve and implement a
-      least-privilege IPv4/IPv6 egress policy before confirmation.
+- name: Require approved deny-by-default egress for confirmation
+  ansible.builtin.assert:
+    that:
+      - host_firewall_mode == 'hardened'
+      - host_firewall_egress_status == 'approved'
+      - host_firewall_egress_stance == 'deny-by-default'
+      - not host_firewall_egress_policy.functions.bootstrap_https.enabled | bool
+    fail_msg: >-
+      Productive confirmation requires hardened mode and the approved deny-by-default egress baseline. A bootstrap
+      HTTPS maintenance exception can be applied only under watchdog protection and can never be confirmed.
   when:
     - host_firewall_enabled | bool
     - host_firewall_action == 'confirm'
-    - host_firewall_egress_stance == 'unresolved-permissive'
     - not ansible_check_mode

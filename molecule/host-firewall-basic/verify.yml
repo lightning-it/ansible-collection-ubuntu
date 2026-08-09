@@ -1,8 +1,13 @@
 ---
+- name: Run global check-mode firewall validation in the standard verifier path
+  ansible.builtin.import_playbook: check-mode.yml
+
 - name: Verify host firewall safety contracts
   hosts: host-firewall.example.test
   become: false
   gather_facts: false
+  vars_files:
+    - vars/egress.yml
   vars:
     host_firewall_test_directory: /tmp/wunder/lit-host-firewall-molecule
     host_firewall_enabled: true
@@ -10,14 +15,12 @@
     host_firewall_expected_inventory_hostname: host-firewall.example.test
     host_firewall_expected_public_ipv4: 192.0.2.10
     host_firewall_expected_management_ipv4: 10.0.30.10
-    host_firewall_expected_public_ipv6: 2001:0db8:0000:0000:0000:0000:0000:0010
-    host_firewall_expected_management_ipv6: fd00:0000:0000:0030:0000:0000:0000:0010
+    host_firewall_expected_public_ipv6: ""
+    host_firewall_expected_management_ipv6: ""
     host_firewall_observed_ipv4_addresses:
       - 192.0.2.10
       - 10.0.30.10
-    host_firewall_observed_ipv6_addresses:
-      - 2001:0db8:0000:0000:0000:0000:0000:0010
-      - fd00:0000:0000:0030:0000:0000:0000:0010
+    host_firewall_observed_ipv6_addresses: []
     host_firewall_platform_name: Ubuntu
     host_firewall_platform_version: "24.04"
     host_firewall_public_interface: enp1s0
@@ -35,12 +38,12 @@
         port: 1905
         modes: [bootstrap, hardened]
         sources_ipv4: [198.51.100.20/32]
-        sources_ipv6: [2001:0db8:0000:0000:0000:0000:0000:0020/128]
+        sources_ipv6: []
       dropbear:
         port: 2222
         modes: [bootstrap, hardened]
         sources_ipv4: [198.51.100.20/32]
-        sources_ipv6: [2001:0db8:0000:0000:0000:0000:0000:0020/128]
+        sources_ipv6: []
     host_firewall_tang_access:
       port: 80
       sources_ipv4:
@@ -56,17 +59,27 @@
     host_firewall_test_include_directive: >-
       include "{{ host_firewall_persistent_include_path }}"
     host_firewall_systemd_unit_directory: /tmp/wunder/lit-host-firewall-molecule/systemd
-    host_firewall_apply_script_path: /tmp/wunder/lit-host-firewall-molecule/bin/apply
-    host_firewall_rollback_script_path: /tmp/wunder/lit-host-firewall-molecule/bin/rollback
-    host_firewall_confirmation_script_path: /tmp/wunder/lit-host-firewall-molecule/bin/confirm
-    host_firewall_canonicalizer_script_path: /tmp/wunder/lit-host-firewall-molecule/bin/canonicalize
+    host_firewall_transaction_program_path: /tmp/wunder/lit-host-firewall-molecule/bin/transaction
     host_firewall_nft_binary: /tmp/wunder/lit-host-firewall-molecule/nft
     host_firewall_systemctl_binary: /tmp/wunder/lit-host-firewall-molecule/systemctl
-    host_firewall_bash_binary: /bin/bash
-    host_firewall_flock_binary: /tmp/wunder/lit-host-firewall-molecule/flock
     host_firewall_python_binary: /usr/bin/python3
     host_firewall_change_id: WBX-G2-MOLECULE
     host_firewall_approved_readback_sha256: 586745c405ef46dbe8af5f7768deaf4b0ea7bcbcb9d9be72d712c36bd52594fa
+  pre_tasks:
+    - name: Run host firewall transaction unit and race-safety tests
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - -m
+          - unittest
+          - discover
+          - -s
+          - "{{ playbook_dir }}/../../tests/unit/roles/host_firewall"
+          - -p
+          - test_*.py
+      environment:
+        PYTHONDONTWRITEBYTECODE: "1"
+      changed_when: false
   tasks:
     - name: Check complete candidate with the nft command double
       ansible.builtin.include_role:
@@ -91,11 +104,74 @@
           - "'tcp dport 1905' in host_firewall_candidate_content"
           - "'@dropbear_sources_v4' in host_firewall_candidate_content"
           - "'tcp dport 2222' in host_firewall_candidate_content"
-          - "'set openssh_sources_v6' in host_firewall_candidate_content"
-          - "'set dropbear_sources_v6' in host_firewall_candidate_content"
+          - "'ip6 ' not in host_firewall_candidate_content"
+          - "'nfproto ipv6' not in host_firewall_candidate_content"
+          - "'meta nfproto ipv4 ct state { established, related } accept' in host_firewall_candidate_content"
           - "'management_sources_v4' not in host_firewall_candidate_content"
           - "'flush ruleset' not in host_firewall_candidate_content"
-          - "'UNRESOLVED' in host_firewall_candidate_content"
+          - "'type filter hook output priority 10; policy drop;' in host_firewall_candidate_content"
+          - "'ip daddr { 1.1.1.1/32, 8.8.8.8/32 } udp dport 53' in host_firewall_candidate_content"
+          - "'ip daddr { 1.1.1.1/32, 8.8.8.8/32 } tcp dport 53' in host_firewall_candidate_content"
+          - "'ip daddr { 0.0.0.0/0 } udp dport 123' in host_firewall_candidate_content"
+          - "'ip daddr { 10.10.30.24/32 } tcp dport 3100' in host_firewall_candidate_content"
+          - "'ip daddr { 0.0.0.0/0 } tcp dport 443' in host_firewall_candidate_content"
+
+    - name: Confirm every IPv6 source fails the end-to-end IPv4-only boundary
+      block:
+        - name: Attempt plan with one IPv6 management source
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: plan
+            host_firewall_expected_public_ipv6: 2001:db8::10
+            host_firewall_observed_ipv6_addresses: [2001:db8::10]
+            host_firewall_management_access:
+              bootstrap_ssh:
+                port: 22
+                modes: [bootstrap]
+                sources_ipv4: [198.51.100.21/32]
+                sources_ipv6: []
+              openssh:
+                port: 1905
+                modes: [bootstrap, hardened]
+                sources_ipv4: [198.51.100.20/32]
+                sources_ipv6: [2001:db8::20/128]
+              dropbear:
+                port: 2222
+                modes: [bootstrap, hardened]
+                sources_ipv4: [198.51.100.20/32]
+                sources_ipv6: []
+
+        - name: Fail when an IPv6 source was accepted
+          ansible.builtin.fail:
+            msg: "An IPv6 management source unexpectedly passed the IPv4-only boundary."
+
+      rescue:
+        - name: Validate end-to-end IPv4-only source rejection
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+              - "'end-to-end IPv4-only' in ansible_failed_result.msg"
+
+    - name: Confirm a disabled provider IPv6 filter blocks confirmation
+      block:
+        - name: Attempt confirmation without provider IPv6 filter evidence
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: confirm
+            host_firewall_provider_ipv6_filter_enabled: false
+
+        - name: Fail when an unknown provider IPv6 filter was accepted
+          ansible.builtin.fail:
+            msg: "Confirmation unexpectedly accepted an unknown provider IPv6 filter."
+
+      rescue:
+        - name: Validate provider IPv6 filter rejection
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+              - "'provider IPv6 filter' in ansible_failed_result.msg"
 
     - name: Confirm deprecated aggregate sources fail closed
       block:
@@ -117,7 +193,7 @@
             that:
               - ansible_failed_result is failed
 
-    - name: Confirm broad IPv4 and non-canonical IPv6 sources fail closed
+    - name: Confirm broad management IPv4 sources fail closed
       block:
         - name: Attempt plan with unsafe address ranges
           ansible.builtin.include_role:
@@ -146,7 +222,7 @@
             msg: "Unsafe IPv4/IPv6 source unexpectedly passed."
 
       rescue:
-        - name: Validate exact-host IPv4/IPv6 boundary
+        - name: Validate exact-host management boundary
           ansible.builtin.assert:
             that:
               - ansible_failed_result is failed
@@ -176,7 +252,7 @@
           ansible.builtin.assert:
             that:
               - ansible_failed_result is failed
-              - "'signature verification' in ansible_failed_result.msg"
+              - "'exact signed v2 envelope' in ansible_failed_result.msg"
 
     - name: Read back canonical approved nftables JSON
       ansible.builtin.include_role:

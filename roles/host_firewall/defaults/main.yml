@@ -79,16 +79,9 @@ host_firewall_forward_priority: 10
 host_firewall_output_priority: 10
 
 host_firewall_state_directory: /var/lib/lit-host-firewall
-host_firewall_pending_config_path: "{{ host_firewall_state_directory }}/pending.nft"
-host_firewall_runtime_backup_path: "{{ host_firewall_state_directory }}/owned-table-before.nft"
-host_firewall_runtime_backup_state_path: "{{ host_firewall_state_directory }}/owned-table-before.state"
-host_firewall_runtime_after_path: "{{ host_firewall_state_directory }}/owned-table-after.json"
-host_firewall_persistent_backup_path: "{{ host_firewall_state_directory }}/persistent-include-before.nft"
-host_firewall_persistent_state_path: "{{ host_firewall_state_directory }}/persistent-include-before.state"
-host_firewall_pending_metadata_path: "{{ host_firewall_state_directory }}/pending.json"
-host_firewall_confirmation_path: "{{ host_firewall_state_directory }}/confirmed.json"
-host_firewall_confirmation_request_path: "{{ host_firewall_state_directory }}/confirmation-request.json"
-host_firewall_rollback_record_path: "{{ host_firewall_state_directory }}/rolled-back.json"
+host_firewall_transactions_directory: "{{ host_firewall_state_directory }}/transactions"
+host_firewall_claims_directory: "{{ host_firewall_state_directory }}/claims"
+host_firewall_active_transaction_path: "{{ host_firewall_state_directory }}/active.json"
 host_firewall_transaction_lock_path: "{{ host_firewall_state_directory }}/transaction.lock"
 
 # The root file is read-only to this role. Persistence is isolated in one exact include file, and confirmation is
@@ -99,22 +92,20 @@ host_firewall_persistent_include_directive: >-
   include "{{ host_firewall_persistent_include_path }}"
 
 host_firewall_systemd_unit_directory: /etc/systemd/system
-host_firewall_apply_script_path: /usr/local/libexec/lit-host-firewall-apply
-host_firewall_rollback_script_path: /usr/local/libexec/lit-host-firewall-rollback
-host_firewall_confirmation_script_path: /usr/local/libexec/lit-host-firewall-confirm
-host_firewall_canonicalizer_script_path: /usr/local/libexec/lit-host-firewall-canonicalize-json
+host_firewall_transaction_program_path: /usr/local/libexec/lit-host-firewall-transaction
 host_firewall_rollback_service_name: lit-host-firewall-rollback.service
 host_firewall_rollback_timer_name: lit-host-firewall-rollback.timer
 host_firewall_confirmation_service_name: lit-host-firewall-confirm.service
 host_firewall_persistence_service_name: nftables.service
 host_firewall_watchdog_timeout_seconds: 300
+host_firewall_command_timeout_seconds: 15
+host_firewall_lock_wait_timeout_seconds: 30
 
 host_firewall_nft_binary: /usr/sbin/nft
 host_firewall_systemctl_binary: /usr/bin/systemctl
-host_firewall_bash_binary: /usr/bin/bash
-host_firewall_flock_binary: /usr/bin/flock
 host_firewall_python_binary: /usr/bin/python3
 host_firewall_printenv_binary: /usr/bin/printenv
+host_firewall_authorization_verifier_binary: ""
 
 host_firewall_change_id: ""
 host_firewall_approved_readback_sha256: ""
@@ -123,18 +114,51 @@ host_firewall_positive_tests_passed: false
 host_firewall_negative_tests_passed: false
 host_firewall_test_evidence_reference: ""
 
-# Egress is intentionally unresolved in this revision. The candidate makes that stance visible, and productive
-# confirmation remains blocked until an approved least-privilege egress contract replaces it.
-host_firewall_egress_stance: unresolved-permissive
+# The complete egress policy is mandatory when the role is enabled. Keeping the default empty prevents a generic
+# collection default from silently authorizing target-specific DNS, NTP, observability, proxy, or Internet flows.
+host_firewall_egress_policy: {}
+host_firewall_cis_ipv6_required: "{{ ubtu24cis_ipv6_required | default(false) }}"
+host_firewall_provider_ipv6_filter_enabled: false
+host_firewall_provider_ipv6_filter_evidence_reference: ""
 
-host_firewall_ipv4_pattern: >-
-  ^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}\Z
+host_firewall_egress_function_contract:
+  dns_udp:
+    protocol: udp
+    port: 53
+    modes: [bootstrap, hardened]
+    interface_role: public
+  dns_tcp:
+    protocol: tcp
+    port: 53
+    modes: [bootstrap, hardened]
+    interface_role: public
+  ntp:
+    protocol: udp
+    port: 123
+    modes: [bootstrap, hardened]
+    interface_role: public
+  atlas_loki:
+    protocol: tcp
+    port: 3100
+    modes: [bootstrap, hardened]
+    interface_role: management
+  bootstrap_https:
+    protocol: tcp
+    port: 443
+    modes: [bootstrap]
+    interface_role: public
+  https_proxy:
+    protocol: tcp
+    port: 3128
+    modes: [hardened]
+    interface_role: management
+
 host_firewall_ipv4_host_cidr_pattern: >-
   ^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}/32\Z
-# IPv6 authorization inputs use one deliberately narrow lowercase, zero-padded, uncompressed /128
-# representation. Equivalent alternate spellings and broad prefixes are rejected before rendering.
-host_firewall_ipv6_pattern: '^(?:[0-9a-f]{4}:){7}[0-9a-f]{4}\Z'
-host_firewall_ipv6_host_cidr_pattern: '^(?:[0-9a-f]{4}:){7}[0-9a-f]{4}/128\Z'
+# IPv6 inputs are normalized to RFC 5952-style lowercase compressed addresses before policy hashing and rendering.
+host_firewall_ipv4_pattern: >-
+  ^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}\Z
+host_firewall_ipv6_host_cidr_pattern: '^(?:[0-9a-f:]+)/128\Z'
 
 host_firewall_host_ipv4_addresses_effective:
   - "{{ host_firewall_expected_public_ipv4 }}"
@@ -162,7 +186,7 @@ host_firewall_all_management_sources_ipv6: >-
     | list
   }}
 host_firewall_policy_material:
-  schema: lit.host_firewall.policy/v2
+  schema: lit.host_firewall.policy/v3
   mode: "{{ host_firewall_mode }}"
   target: "{{ host_firewall_expected_inventory_hostname }}"
   public_ipv4: "{{ host_firewall_expected_public_ipv4 }}"
@@ -176,6 +200,68 @@ host_firewall_policy_material:
   tang_access: "{{ host_firewall_tang_access }}"
   input_policy: drop
   forward_policy: drop
-  output_policy: accept
-  egress_stance: "{{ host_firewall_egress_stance }}"
+  output_policy: drop
+  ipv4_only: true
+  provider_ipv6_filter_enabled: "{{ host_firewall_provider_ipv6_filter_enabled }}"
+  provider_ipv6_filter_evidence_reference: "{{ host_firewall_provider_ipv6_filter_evidence_reference }}"
+  egress_policy: "{{ host_firewall_egress_policy }}"
 host_firewall_policy_fingerprint: "{{ host_firewall_policy_material | to_json | hash('sha256') }}"
+host_firewall_egress_policy_sha256: "{{ host_firewall_egress_policy | to_json | hash('sha256') }}"
+host_firewall_egress_status: "{{ host_firewall_egress_policy.get('status', 'draft') }}"
+host_firewall_egress_stance: "{{ host_firewall_egress_policy.get('stance', 'unconfigured') }}"
+
+host_firewall_transaction_program_argv:
+  - "{{ host_firewall_transaction_program_path }}"
+  - --state-directory
+  - "{{ host_firewall_state_directory }}"
+  - --transactions-directory
+  - "{{ host_firewall_transactions_directory }}"
+  - --claims-directory
+  - "{{ host_firewall_claims_directory }}"
+  - --active-path
+  - "{{ host_firewall_active_transaction_path }}"
+  - --lock-path
+  - "{{ host_firewall_transaction_lock_path }}"
+  - --persistent-root
+  - "{{ host_firewall_persistent_root_config_path }}"
+  - --persistent-include
+  - "{{ host_firewall_persistent_include_path }}"
+  - --program-path
+  - "{{ host_firewall_transaction_program_path }}"
+  - --systemd-unit-directory
+  - "{{ host_firewall_systemd_unit_directory }}"
+  - --confirmation-service
+  - "{{ host_firewall_confirmation_service_name }}"
+  - --rollback-service
+  - "{{ host_firewall_rollback_service_name }}"
+  - --rollback-timer
+  - "{{ host_firewall_rollback_timer_name }}"
+  - --persistence-service
+  - "{{ host_firewall_persistence_service_name }}"
+  - --watchdog-timeout-seconds
+  - "{{ host_firewall_watchdog_timeout_seconds }}"
+  - --command-timeout-seconds
+  - "{{ host_firewall_command_timeout_seconds }}"
+  - --lock-wait-timeout-seconds
+  - "{{ host_firewall_lock_wait_timeout_seconds }}"
+  - --expected-target
+  - "{{ host_firewall_expected_inventory_hostname }}"
+  - --expected-egress-policy-sha256
+  - "{{ host_firewall_egress_policy_sha256 }}"
+  - --expected-egress-status
+  - "{{ host_firewall_egress_status }}"
+  - --table-family
+  - "{{ host_firewall_table_family }}"
+  - --table-name
+  - "{{ host_firewall_table_name }}"
+  - --nft-binary
+  - "{{ host_firewall_nft_binary }}"
+  - --systemctl-binary
+  - "{{ host_firewall_systemctl_binary }}"
+  - --verifier-binary
+  - >-
+    {{
+      host_firewall_authorization_verifier_binary
+      if host_firewall_authorization_verifier_binary | length > 0
+      else '-'
+    }}

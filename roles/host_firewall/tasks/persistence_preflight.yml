@@ -43,21 +43,20 @@
       - host_firewall_persistence_boundary_stats.results[1].stat.isdir
       - not host_firewall_persistence_boundary_stats.results[1].stat.islnk
       - host_firewall_persistence_boundary_stats.results[1].stat.uid == 0
-      - >-
-        not host_firewall_persistence_boundary_stats.results[2].stat.exists
-        or (
-          host_firewall_persistence_boundary_stats.results[2].stat.isreg
-          and not host_firewall_persistence_boundary_stats.results[2].stat.islnk
-          and host_firewall_persistence_boundary_stats.results[2].stat.uid == 0
-        )
+      - host_firewall_persistence_boundary_stats.results[2].stat.exists
+      - host_firewall_persistence_boundary_stats.results[2].stat.isreg
+      - not host_firewall_persistence_boundary_stats.results[2].stat.islnk
+      - host_firewall_persistence_boundary_stats.results[2].stat.uid == 0
+      - host_firewall_persistence_boundary_stats.results[2].stat.mode is match('^0[0246][04][04]\Z')
       - >-
         _host_firewall_root_lines
         | select('equalto', host_firewall_persistent_include_directive)
         | list
         | length == 1
     fail_msg: >-
-      Persistence is not safe: nftables.service, root ownership, non-symlink boundaries, and exactly one
-      administrator-provisioned exact include directive are required. This role never rewrites /etc/nftables.conf.
+      Persistence is not rollback-safe: nftables.service, a preprovisioned root-owned regular include, non-symlink
+      boundaries, and exactly one administrator-provisioned exact include directive are required. The role never
+      rewrites /etc/nftables.conf and never models a dangling include as an acceptable absent state.
   vars:
     _host_firewall_root_lines: >-
       {{

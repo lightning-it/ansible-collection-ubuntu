@@ -34,6 +34,13 @@
           }
           include "{{ host_firewall_test_directory }}/nftables.d/lit-host-firewall.nft"
 
+    - name: Install valid preprovisioned rollback placeholder include
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/nftables.d/lit-host-firewall.nft"
+        mode: "0600"
+        content: |
+          # Valid empty role-owned rollback baseline.
+
     - name: Install deterministic structured nft readback fixture
       ansible.builtin.copy:
         dest: "{{ host_firewall_test_directory }}/runtime.json"
@@ -90,6 +97,7 @@
             grep --quiet 'destroy table inet lit_host_firewall' <<<"${policy}"
             grep --quiet 'type filter hook input priority 10; policy drop;' <<<"${policy}"
             grep --quiet 'type filter hook forward priority 10; policy drop;' <<<"${policy}"
+            grep --quiet 'type filter hook output priority 10; policy drop;' <<<"${policy}"
             exit 0
           fi
 
@@ -122,13 +130,3 @@
             exit 3
           fi
           exit 0
-
-    - name: Install deterministic exclusive-lock command double
-      ansible.builtin.copy:
-        dest: "{{ host_firewall_test_directory }}/flock"
-        mode: "0755"
-        content: |
-          #!/usr/bin/env bash
-          set -euo pipefail
-          echo "$*" >> /tmp/wunder/lit-host-firewall-molecule/flock.log
-          test "${1:-}" = '--exclusive'

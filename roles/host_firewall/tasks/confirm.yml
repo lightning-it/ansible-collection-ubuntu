@@ -1,219 +1,94 @@
 ---
-- name: Inspect pending host firewall transaction files
-  ansible.builtin.stat:
-    path: "{{ item }}"
-    follow: false
-  loop:
-    - "{{ host_firewall_pending_config_path }}"
-    - "{{ host_firewall_pending_metadata_path }}"
-    - "{{ host_firewall_runtime_backup_path }}"
-    - "{{ host_firewall_runtime_backup_state_path }}"
-    - "{{ host_firewall_persistent_state_path }}"
-    - "{{ host_firewall_rollback_script_path }}"
-    - "{{ host_firewall_canonicalizer_script_path }}"
-    - "{{ host_firewall_rollback_record_path }}"
-  register: host_firewall_pending_file_stats
-  changed_when: false
-
-- name: Require a complete pending host firewall transaction
-  ansible.builtin.assert:
-    that:
-      - host_firewall_pending_file_stats.results[:7] | map(attribute='stat.exists') | min
-      - host_firewall_pending_file_stats.results[:7] | map(attribute='stat.isreg') | min
-      - not host_firewall_pending_file_stats.results[:7] | map(attribute='stat.islnk') | max
-      - not host_firewall_pending_file_stats.results[7].stat.exists
-    fail_msg: "Confirmation is impossible because rollback-protected transaction files are missing or unsafe."
-
-- name: Read pending host firewall candidate
-  ansible.builtin.slurp:
-    src: "{{ host_firewall_pending_config_path }}"
-  register: host_firewall_pending_candidate
-  changed_when: false
-
-- name: Read exact pending host firewall metadata
-  ansible.builtin.slurp:
-    src: "{{ host_firewall_pending_metadata_path }}"
-  register: host_firewall_pending_metadata
-  changed_when: false
-
-- name: Parse exact pending host firewall metadata
-  ansible.builtin.set_fact:
-    host_firewall_pending_metadata_parsed: "{{ host_firewall_pending_metadata.content | b64decode | from_json }}"
-
-- name: Validate pending host firewall identity and immutable candidate
-  ansible.builtin.assert:
-    that:
-      - >-
-        host_firewall_pending_metadata_parsed.keys() | list | sort
-        == [
-          'action',
-          'approved_readback_sha256',
-          'candidate_sha256',
-          'change_id',
-          'mode',
-          'persistent_backup_sha256',
-          'persistent_state_sha256',
-          'policy_fingerprint',
-          'runtime_backup_sha256',
-          'runtime_backup_state_sha256',
-          'runtime_before_canonical_sha256',
-          'schema',
-          'target'
-        ]
-      - host_firewall_pending_metadata_parsed.schema == 'lit.host_firewall.transaction/v2'
-      - host_firewall_pending_metadata_parsed.action == 'apply'
-      - host_firewall_pending_metadata_parsed.target == host_firewall_expected_inventory_hostname
-      - host_firewall_pending_metadata_parsed.change_id == host_firewall_change_id
-      - host_firewall_pending_metadata_parsed.candidate_sha256 == host_firewall_candidate_sha256
-      - host_firewall_pending_metadata_parsed.approved_readback_sha256 == host_firewall_approved_readback_sha256
-      - host_firewall_pending_metadata_parsed.policy_fingerprint == host_firewall_policy_fingerprint
-      - host_firewall_pending_metadata_parsed.mode == host_firewall_mode
-      - host_firewall_pending_metadata_parsed.runtime_backup_sha256 is match('^[a-f0-9]{64}\Z')
-      - host_firewall_pending_metadata_parsed.runtime_backup_state_sha256 is match('^[a-f0-9]{64}\Z')
-      - >-
-        host_firewall_pending_metadata_parsed.runtime_before_canonical_sha256 == 'absent'
-        or host_firewall_pending_metadata_parsed.runtime_before_canonical_sha256 is match('^[a-f0-9]{64}\Z')
-      - host_firewall_pending_metadata_parsed.persistent_state_sha256 is match('^[a-f0-9]{64}\Z')
-      - >-
-        host_firewall_pending_metadata_parsed.persistent_backup_sha256 == 'absent'
-        or host_firewall_pending_metadata_parsed.persistent_backup_sha256 is match('^[a-f0-9]{64}\Z')
-      - (host_firewall_pending_candidate.content | b64decode | hash('sha256')) == host_firewall_candidate_sha256
-    fail_msg: "Pending firewall JSON metadata, candidate, target, mode, or change identifier has drifted."
-
-- name: Read back active host firewall before confirmation
-  ansible.builtin.include_tasks: readback.yml
-
-- name: Stage exact independently verified host firewall confirmation request
-  ansible.builtin.copy:
-    content: >-
-      {{
-        {
-          'schema': 'lit.host_firewall.confirmation-request/v2',
-          'target': host_firewall_expected_inventory_hostname,
-          'action': 'confirm',
-          'change_id': host_firewall_change_id,
-          'candidate_sha256': host_firewall_candidate_sha256,
-          'approved_readback_sha256': host_firewall_approved_readback_sha256,
-          'policy_fingerprint': host_firewall_policy_fingerprint,
-          'positive_tests_passed': true,
-          'negative_tests_passed': true,
-          'evidence': host_firewall_test_evidence_reference
-        }
-        | to_nice_json
-      }}
-    dest: "{{ host_firewall_confirmation_request_path }}"
-    owner: root
-    group: root
-    mode: "0600"
-
-- name: Snapshot exact host firewall confirmation request
-  ansible.builtin.slurp:
-    src: "{{ host_firewall_confirmation_request_path }}"
-  register: host_firewall_confirmation_request_snapshot
-  changed_when: false
-
-- name: Bind confirmation program to exact metadata and request hashes
-  ansible.builtin.set_fact:
-    host_firewall_pending_metadata_sha256: >-
-      {{ host_firewall_pending_metadata.content | b64decode | hash('sha256') }}
-    host_firewall_confirmation_request_sha256: >-
-      {{ host_firewall_confirmation_request_snapshot.content | b64decode | hash('sha256') }}
-
-- name: Install locked host firewall confirmation program
-  ansible.builtin.template:
-    src: confirm.sh.j2
-    dest: "{{ host_firewall_confirmation_script_path }}"
-    owner: root
-    group: root
-    mode: "0750"
-
-- name: Validate host firewall confirmation program syntax
+- name: Stage exact signed confirmation request under the transaction lock
   ansible.builtin.command:
-    argv:
-      - "{{ host_firewall_bash_binary }}"
-      - -n
-      - "{{ host_firewall_confirmation_script_path }}"
-  changed_when: false
+    argv: "{{ host_firewall_transaction_program_argv + ['stage-confirm'] }}"
+    stdin: "{{ host_firewall_transaction_request | to_json | b64encode }}"
+    stdin_add_newline: false
+  register: host_firewall_confirmation_stage_command
+  changed_when: true
 
-- name: Install locked host firewall confirmation service
-  ansible.builtin.template:
-    src: confirm.service.j2
-    dest: "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_confirmation_service_name }}"
-    owner: root
-    group: root
-    mode: "0644"
+- name: Parse exact confirmation staging result
+  ansible.builtin.set_fact:
+    host_firewall_confirmation_stage: "{{ host_firewall_confirmation_stage_command.stdout | from_json }}"
 
-- name: Reload systemd after installing host firewall confirmation service
+- name: Validate exact confirmation staging boundary
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_confirmation_stage.keys() | list | sort
+        == ['confirmation_path', 'schema', 'transaction_id', 'transaction_path']
+      - host_firewall_confirmation_stage.schema == 'lit.host_firewall.confirm-stage/v3'
+      - host_firewall_confirmation_stage.transaction_id is match('^[a-f0-9]{32}\\Z')
+      - >-
+        host_firewall_confirmation_stage.transaction_path
+        == host_firewall_transactions_directory + '/' + host_firewall_confirmation_stage.transaction_id
+      - >-
+        host_firewall_confirmation_stage.confirmation_path
+        == host_firewall_confirmation_stage.transaction_path + '/terminal.json'
+    fail_msg: "The transaction routine returned an invalid or escaped confirmation path."
+
+- name: Start locked static host firewall confirmation service
   ansible.builtin.command:
     argv:
       - "{{ host_firewall_systemctl_binary }}"
-      - daemon-reload
+      - start
+      - "{{ host_firewall_confirmation_service_name }}"
   changed_when: true
 
-- name: Execute locked host firewall confirmation service
-  block:
-    - name: Start independent host firewall confirmation transaction
-      ansible.builtin.command:
-        argv:
-          - "{{ host_firewall_systemctl_binary }}"
-          - start
-          - "{{ host_firewall_confirmation_service_name }}"
-      changed_when: true
+- name: Reset protected remote control connection after firewall confirmation
+  ansible.builtin.include_tasks: reset_connection.yml
+  when: ansible_connection | default('ssh') != 'local'
 
-    - name: Read host firewall confirmation completion evidence
-      ansible.builtin.slurp:
-        src: "{{ host_firewall_confirmation_path }}"
-      register: host_firewall_confirmation_completion
-      changed_when: false
+- name: Wait for protected control connection after firewall confirmation
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 2
+    timeout: 45
+  when: ansible_connection | default('ssh') != 'local'
 
-    - name: Parse host firewall confirmation completion evidence
-      ansible.builtin.set_fact:
-        host_firewall_confirmation_completion_parsed: >-
-          {{ host_firewall_confirmation_completion.content | b64decode | from_json }}
+- name: Read immutable host firewall confirmation record
+  ansible.builtin.slurp:
+    src: "{{ host_firewall_confirmation_stage.confirmation_path }}"
+  register: host_firewall_confirmation_record_raw
+  changed_when: false
 
-    - name: Validate exact host firewall confirmation completion evidence
-      ansible.builtin.assert:
-        that:
-          - >-
-            host_firewall_confirmation_completion_parsed.keys() | list | sort
-            == [
-              'approved_readback_sha256',
-              'candidate_sha256',
-              'change_id',
-              'confirmed_at',
-              'policy_fingerprint',
-              'schema',
-              'target'
-            ]
-          - host_firewall_confirmation_completion_parsed.schema == 'lit.host_firewall.confirmation/v2'
-          - host_firewall_confirmation_completion_parsed.target == host_firewall_expected_inventory_hostname
-          - host_firewall_confirmation_completion_parsed.change_id == host_firewall_change_id
-          - host_firewall_confirmation_completion_parsed.candidate_sha256 == host_firewall_candidate_sha256
-          - >-
-            host_firewall_confirmation_completion_parsed.approved_readback_sha256
-            == host_firewall_approved_readback_sha256
-          - host_firewall_confirmation_completion_parsed.policy_fingerprint == host_firewall_policy_fingerprint
-          - >-
-            host_firewall_confirmation_completion_parsed.confirmed_at
-            is match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z')
-        fail_msg: "Independent host firewall confirmation returned incomplete or mismatched JSON evidence."
+- name: Parse immutable host firewall confirmation record
+  ansible.builtin.set_fact:
+    host_firewall_confirmation_record: "{{ host_firewall_confirmation_record_raw.content | b64decode | from_json }}"
 
-  rescue:
-    - name: Restore prior firewall after failed confirmation
-      ansible.builtin.command:
-        argv:
-          - "{{ host_firewall_systemctl_binary }}"
-          - start
-          - "{{ host_firewall_rollback_service_name }}"
-      register: host_firewall_confirm_rescue_result
-      changed_when: true
-      failed_when: false
-
-    - name: Stop after failed host firewall confirmation
-      ansible.builtin.fail:
-        msg: >-
-          Firewall confirmation failed. Locked rollback was requested with return code
-          {{ host_firewall_confirm_rescue_result.rc | default('unavailable') }}.
-
-- name: Read back confirmed host firewall table
-  ansible.builtin.include_tasks: readback.yml
+- name: Require exact host firewall confirmation evidence
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_confirmation_record.keys() | list | sort
+        == [
+          'approved_readback_sha256',
+          'authorization_claim_id',
+          'authorization_sha256',
+          'authorization_verification_sha256',
+          'candidate_sha256',
+          'change_id',
+          'confirmed_at',
+          'egress_policy_sha256',
+          'egress_status',
+          'policy_fingerprint',
+          'schema',
+          'target',
+          'transaction_id'
+        ]
+      - host_firewall_confirmation_record.schema == 'lit.host_firewall.confirmation/v3'
+      - host_firewall_confirmation_record.transaction_id == host_firewall_confirmation_stage.transaction_id
+      - host_firewall_confirmation_record.target == host_firewall_expected_inventory_hostname
+      - host_firewall_confirmation_record.change_id == host_firewall_change_id
+      - host_firewall_confirmation_record.candidate_sha256 == host_firewall_candidate_sha256
+      - host_firewall_confirmation_record.approved_readback_sha256 == host_firewall_approved_readback_sha256
+      - host_firewall_confirmation_record.policy_fingerprint == host_firewall_policy_fingerprint
+      - host_firewall_confirmation_record.egress_policy_sha256 == host_firewall_egress_policy_sha256
+      - host_firewall_confirmation_record.egress_status == 'approved'
+      - host_firewall_confirmation_record.authorization_claim_id == host_firewall_authorization_contract.claim_id
+      - host_firewall_confirmation_record.authorization_sha256 is match('^[a-f0-9]{64}\\Z')
+      - host_firewall_confirmation_record.authorization_verification_sha256 is match('^[a-f0-9]{64}\\Z')
+      - >-
+        host_firewall_confirmation_record.confirmed_at
+        is match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\\Z')
+    fail_msg: "The static confirmation service returned without exact approved completion evidence."

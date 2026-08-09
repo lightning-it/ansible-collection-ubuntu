@@ -1,0 +1,69 @@
+---
+- name: Validate immutable transaction installation boundaries before mutation
+  ansible.builtin.command:
+    argv: >-
+      {{
+        [
+          host_firewall_python_binary,
+          '-c',
+          lookup('ansible.builtin.file', role_path + '/files/firewall_transaction.py')
+        ]
+        + host_firewall_transaction_program_argv[1:]
+        + ['validate-setup']
+      }}
+  register: host_firewall_setup_preflight
+  changed_when: false
+  check_mode: false
+
+- name: Create only the root-owned transaction lock directory
+  ansible.builtin.file:
+    path: "{{ host_firewall_state_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Build immutable static runtime installation payload
+  ansible.builtin.set_fact:
+    host_firewall_runtime_install_payload:
+      schema: lit.host_firewall.runtime-install/v3
+      program_base64: >-
+        {{ lookup('ansible.builtin.file', role_path + '/files/firewall_transaction.py') | b64encode }}
+      confirmation_unit_base64: >-
+        {{ lookup('ansible.builtin.template', 'confirm.service.j2') | b64encode }}
+      rollback_unit_base64: >-
+        {{ lookup('ansible.builtin.template', 'rollback.service.j2') | b64encode }}
+      rollback_timer_base64: >-
+        {{ lookup('ansible.builtin.template', 'rollback.timer.j2') | b64encode }}
+
+- name: Install every static runtime asset under the shared transaction lock
+  ansible.builtin.command:
+    argv: >-
+      {{
+        [
+          host_firewall_python_binary,
+          '-c',
+          lookup('ansible.builtin.file', role_path + '/files/firewall_transaction.py')
+        ]
+        + host_firewall_transaction_program_argv[1:]
+        + ['install-runtime', '--stdin-base64']
+      }}
+    stdin: "{{ host_firewall_runtime_install_payload | to_json | b64encode }}"
+    stdin_add_newline: false
+  register: host_firewall_runtime_install_command
+  changed_when: true
+
+- name: Parse locked static runtime installation result
+  ansible.builtin.set_fact:
+    host_firewall_runtime_install_result: "{{ host_firewall_runtime_install_command.stdout | from_json }}"
+
+- name: Require exact locked static runtime installation evidence
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_runtime_install_result.keys() | list | sort
+        == ['asset_sha256', 'schema', 'status']
+      - host_firewall_runtime_install_result.schema == 'lit.host_firewall.runtime-install-result/v3'
+      - host_firewall_runtime_install_result.status == 'installed'
+      - host_firewall_runtime_install_result.asset_sha256 | length == 4
+    fail_msg: "The shared-lock runtime installer did not return exact static-asset evidence."

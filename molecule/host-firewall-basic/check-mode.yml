@@ -3,6 +3,8 @@
   hosts: host-firewall.example.test
   become: false
   gather_facts: false
+  vars_files:
+    - vars/egress.yml
   vars:
     host_firewall_test_directory: /tmp/wunder/lit-host-firewall-molecule
     host_firewall_enabled: true
@@ -40,13 +42,13 @@
       sources_ipv6: []
     host_firewall_nft_binary: /tmp/wunder/lit-host-firewall-molecule/nft
     host_firewall_systemctl_binary: /tmp/wunder/lit-host-firewall-molecule/systemctl
-    host_firewall_flock_binary: /tmp/wunder/lit-host-firewall-molecule/flock
     host_firewall_change_id: WBX-G2-CHECK-MODE
     host_firewall_approved_readback_sha256: 586745c405ef46dbe8af5f7768deaf4b0ea7bcbcb9d9be72d712c36bd52594fa
   tasks:
     - name: Execute apply path under global check mode
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: lit.ubuntu.host_firewall
+      check_mode: true
 
     - name: Inspect mutation command log after global check mode
       ansible.builtin.stat:

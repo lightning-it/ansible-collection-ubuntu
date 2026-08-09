@@ -1,14 +1,14 @@
 [Unit]
 Description=Confirm rollback-protected lit host firewall transaction
-ConditionPathExists={{ host_firewall_pending_config_path }}
-ConditionPathExists={{ host_firewall_confirmation_request_path }}
+ConditionPathExists={{ host_firewall_active_transaction_path }}
 OnFailure={{ host_firewall_rollback_service_name }}
 After=local-fs.target {{ host_firewall_rollback_timer_name }}
 RequiresMountsFor={{ host_firewall_state_directory }} {{ host_firewall_persistent_include_path | dirname }}
 
 [Service]
 Type=oneshot
-ExecStart={{ host_firewall_confirmation_script_path }}
+ExecStart={{ host_firewall_transaction_program_argv | join(' ') }} confirm
+UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectControlGroups=yes
@@ -17,7 +17,7 @@ ProtectKernelLogs=yes
 ProtectKernelModules=yes
 ProtectSystem=strict
 ReadWritePaths={{ host_firewall_state_directory }} {{ host_firewall_persistent_include_path | dirname }}
-ReadOnlyPaths={{ host_firewall_persistent_root_config_path }}
+ReadOnlyPaths={{ host_firewall_persistent_root_config_path }} {{ host_firewall_transaction_program_path }} {{ host_firewall_authorization_verifier_binary }}
 CapabilityBoundingSet=CAP_NET_ADMIN
 AmbientCapabilities=CAP_NET_ADMIN
 LockPersonality=yes

@@ -1,6 +1,16 @@
 ---
+- name: Normalize firewall inputs
+  ansible.builtin.import_tasks: normalize.yml
+  when: host_firewall_enabled | bool
+  tags: always
+
 - name: Prechecks
   ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Validate least-privilege egress contract
+  ansible.builtin.import_tasks: egress_assert.yml
+  when: host_firewall_enabled | bool
   tags: always
 
 - name: End host firewall role when disabled
@@ -32,6 +42,18 @@
 - name: Check host firewall candidate without applying it
   ansible.builtin.include_tasks: check.yml
   when: host_firewall_action in ['check', 'apply', 'confirm']
+
+- name: Install static host firewall transaction runtime
+  ansible.builtin.include_tasks: setup.yml
+  when:
+    - host_firewall_action == 'apply'
+    - not ansible_check_mode
+
+- name: Validate existing static host firewall transaction runtime
+  ansible.builtin.include_tasks: runtime_preflight.yml
+  when:
+    - host_firewall_action in ['confirm', 'rollback']
+    - not ansible_check_mode
 
 - name: Apply host firewall transaction
   ansible.builtin.include_tasks: apply.yml

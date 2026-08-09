@@ -22,15 +22,16 @@
 
 - name: Canonicalize structured host firewall readback
   ansible.builtin.command:
-    argv:
-      - "{{ host_firewall_python_binary }}"
-      - -c
-      - "{{ lookup('ansible.builtin.file', role_path + '/files/canonicalize_nft_json.py') }}"
-      - --family
-      - "{{ host_firewall_table_family }}"
-      - --table
-      - "{{ host_firewall_table_name }}"
-      - --stdin-base64
+    argv: >-
+      {{
+        [
+          host_firewall_python_binary,
+          '-c',
+          lookup('ansible.builtin.file', role_path + '/files/firewall_transaction.py')
+        ]
+        + host_firewall_transaction_program_argv[1:]
+        + ['canonicalize', '--stdin-base64']
+      }}
     stdin: "{{ host_firewall_readback_result.stdout | b64encode }}"
     stdin_add_newline: false
   register: host_firewall_readback_canonical_result

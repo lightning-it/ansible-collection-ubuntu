@@ -1,0 +1,49 @@
+---
+- name: Canonically normalize firewall address inputs
+  ansible.builtin.command:
+    argv: >-
+      {{
+        [
+          host_firewall_python_binary,
+          '-c',
+          lookup('ansible.builtin.file', role_path + '/files/firewall_transaction.py')
+        ]
+        + host_firewall_transaction_program_argv[1:]
+        + ['normalize-inputs', '--stdin-base64']
+      }}
+    stdin: >-
+      {{
+        {
+          'control_source_address': host_firewall_control_source_address,
+          'expected_public_ipv4': host_firewall_expected_public_ipv4,
+          'expected_management_ipv4': host_firewall_expected_management_ipv4,
+          'expected_public_ipv6': host_firewall_expected_public_ipv6,
+          'expected_management_ipv6': host_firewall_expected_management_ipv6,
+          'observed_ipv4_addresses': host_firewall_observed_ipv4_addresses,
+          'observed_ipv6_addresses': host_firewall_observed_ipv6_addresses,
+          'management_access': host_firewall_management_access,
+          'tang_access': host_firewall_tang_access
+        }
+        | to_json
+        | b64encode
+      }}
+    stdin_add_newline: false
+  register: host_firewall_normalization_result
+  changed_when: false
+  check_mode: false
+
+- name: Parse canonical firewall address inputs
+  ansible.builtin.set_fact:
+    host_firewall_normalized_inputs: "{{ host_firewall_normalization_result.stdout | from_json }}"
+
+- name: Use canonical firewall address inputs for validation and rendering
+  ansible.builtin.set_fact:
+    host_firewall_expected_public_ipv4: "{{ host_firewall_normalized_inputs.expected_public_ipv4 }}"
+    host_firewall_expected_management_ipv4: "{{ host_firewall_normalized_inputs.expected_management_ipv4 }}"
+    host_firewall_expected_public_ipv6: "{{ host_firewall_normalized_inputs.expected_public_ipv6 }}"
+    host_firewall_expected_management_ipv6: "{{ host_firewall_normalized_inputs.expected_management_ipv6 }}"
+    host_firewall_observed_ipv4_addresses: "{{ host_firewall_normalized_inputs.observed_ipv4_addresses }}"
+    host_firewall_observed_ipv6_addresses: "{{ host_firewall_normalized_inputs.observed_ipv6_addresses }}"
+    host_firewall_management_access: "{{ host_firewall_normalized_inputs.management_access }}"
+    host_firewall_tang_access: "{{ host_firewall_normalized_inputs.tang_access }}"
+    host_firewall_control_source_address: "{{ host_firewall_normalized_inputs.control_source_address }}"

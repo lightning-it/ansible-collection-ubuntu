@@ -3,35 +3,67 @@
   ansible.builtin.set_fact:
     host_firewall_candidate_content: "{{ lookup('ansible.builtin.template', 'host-firewall.nft.j2') }}"
 
-- name: Calculate host firewall candidate checksum
+- name: Calculate immutable host firewall policy bindings
   ansible.builtin.set_fact:
     host_firewall_candidate_sha256: "{{ host_firewall_candidate_content | hash('sha256') }}"
     host_firewall_authorization_contract_expected:
-      schema: lit.host_firewall.authorization/v1
+      schema: lit.host_firewall.authorization/v2
       target: "{{ host_firewall_expected_inventory_hostname }}"
       action: "{{ host_firewall_action }}"
       candidate_sha256: "{{ host_firewall_candidate_content | hash('sha256') }}"
       approved_readback_sha256: "{{ host_firewall_approved_readback_sha256 }}"
       policy_fingerprint: "{{ host_firewall_policy_fingerprint }}"
+      egress_policy_sha256: "{{ host_firewall_egress_policy_sha256 }}"
+      egress_status: "{{ host_firewall_egress_status }}"
       change_id: "{{ host_firewall_change_id }}"
     host_firewall_plan:
-      schema: lit.host_firewall.plan/v2
+      schema: lit.host_firewall.plan/v3
       action: "{{ host_firewall_action }}"
       candidate_sha256: "{{ host_firewall_candidate_content | hash('sha256') }}"
       approved_readback_sha256: "{{ host_firewall_approved_readback_sha256 }}"
       policy_fingerprint: "{{ host_firewall_policy_fingerprint }}"
+      egress_policy_sha256: "{{ host_firewall_egress_policy_sha256 }}"
+      egress_status: "{{ host_firewall_egress_status }}"
+      egress_stance: "{{ host_firewall_egress_stance }}"
       mode: "{{ host_firewall_mode }}"
       target: "{{ host_firewall_expected_inventory_hostname }}"
       input_policy: drop
       forward_policy: drop
-      output_policy: accept
-      egress_stance: "{{ host_firewall_egress_stance }}"
+      output_policy: drop
+      ipv4_only: "{{ host_firewall_egress_policy.ipv4_only }}"
       ipv6_forwarding: denied
+      provider_ipv6_filter_enabled: "{{ host_firewall_provider_ipv6_filter_enabled }}"
+      provider_ipv6_filter_evidence_reference: "{{ host_firewall_provider_ipv6_filter_evidence_reference }}"
       new_container_forwarding: denied
       persistence_include: "{{ host_firewall_persistent_include_path }}"
       root_persistence_file_owned: false
-      signed_authorization_verifier: unavailable
+      signed_authorization_verifier: >-
+        {{ 'configured' if host_firewall_authorization_verifier_binary | length > 0 else 'unavailable' }}
       persistent_change: "{{ host_firewall_action == 'confirm' and not ansible_check_mode }}"
+
+- name: Build exact host firewall transaction request
+  ansible.builtin.set_fact:
+    host_firewall_transaction_request: >-
+      {{
+        {
+          'schema': 'lit.host_firewall.transaction-request/v3',
+          'target': host_firewall_expected_inventory_hostname,
+          'action': host_firewall_action,
+          'change_id': host_firewall_change_id,
+          'mode': host_firewall_mode,
+          'candidate_sha256': host_firewall_candidate_content | hash('sha256'),
+          'approved_readback_sha256': host_firewall_approved_readback_sha256,
+          'policy_fingerprint': host_firewall_policy_fingerprint,
+          'egress_policy_sha256': host_firewall_egress_policy_sha256,
+          'egress_status': host_firewall_egress_status,
+          'authorization': host_firewall_authorization_contract
+        }
+        | combine(
+          {'candidate_base64': host_firewall_candidate_content | b64encode}
+          if host_firewall_action == 'apply'
+          else {}
+        )
+      }}
 
 - name: Report immutable host firewall plan
   ansible.builtin.debug:

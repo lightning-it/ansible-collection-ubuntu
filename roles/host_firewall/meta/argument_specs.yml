@@ -69,25 +69,11 @@ argument_specs:
         type: int
       host_firewall_state_directory:
         type: path
-      host_firewall_pending_config_path:
+      host_firewall_transactions_directory:
         type: path
-      host_firewall_runtime_backup_path:
+      host_firewall_claims_directory:
         type: path
-      host_firewall_runtime_backup_state_path:
-        type: path
-      host_firewall_runtime_after_path:
-        type: path
-      host_firewall_persistent_backup_path:
-        type: path
-      host_firewall_persistent_state_path:
-        type: path
-      host_firewall_pending_metadata_path:
-        type: path
-      host_firewall_confirmation_path:
-        type: path
-      host_firewall_confirmation_request_path:
-        type: path
-      host_firewall_rollback_record_path:
+      host_firewall_active_transaction_path:
         type: path
       host_firewall_transaction_lock_path:
         type: path
@@ -97,13 +83,7 @@ argument_specs:
         type: path
       host_firewall_systemd_unit_directory:
         type: path
-      host_firewall_apply_script_path:
-        type: path
-      host_firewall_rollback_script_path:
-        type: path
-      host_firewall_confirmation_script_path:
-        type: path
-      host_firewall_canonicalizer_script_path:
+      host_firewall_transaction_program_path:
         type: path
       host_firewall_rollback_service_name:
         type: str
@@ -115,18 +95,20 @@ argument_specs:
         type: str
       host_firewall_watchdog_timeout_seconds:
         type: int
+      host_firewall_command_timeout_seconds:
+        type: int
+      host_firewall_lock_wait_timeout_seconds:
+        type: int
       host_firewall_nft_binary:
         type: path
       host_firewall_systemctl_binary:
-        type: path
-      host_firewall_bash_binary:
-        type: path
-      host_firewall_flock_binary:
         type: path
       host_firewall_python_binary:
         type: path
       host_firewall_printenv_binary:
         type: path
+      host_firewall_authorization_verifier_binary:
+        type: str
       host_firewall_change_id:
         type: str
       host_firewall_approved_readback_sha256:
@@ -139,6 +121,11 @@ argument_specs:
         type: bool
       host_firewall_test_evidence_reference:
         type: str
-      host_firewall_egress_stance:
+      host_firewall_egress_policy:
+        type: dict
+      host_firewall_cis_ipv6_required:
+        type: bool
+      host_firewall_provider_ipv6_filter_enabled:
+        type: bool
+      host_firewall_provider_ipv6_filter_evidence_reference:
         type: str
-        choices: [unresolved-permissive]

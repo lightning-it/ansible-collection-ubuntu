@@ -1,71 +1,13 @@
 ---
-- name: Inspect host firewall rollback assets
-  ansible.builtin.stat:
-    path: "{{ item }}"
-    follow: false
-  loop:
-    - "{{ host_firewall_rollback_script_path }}"
-    - "{{ host_firewall_runtime_backup_path }}"
-    - "{{ host_firewall_runtime_backup_state_path }}"
-    - "{{ host_firewall_persistent_state_path }}"
-    - "{{ host_firewall_pending_metadata_path }}"
-  register: host_firewall_rollback_asset_stats
-  changed_when: false
-
-- name: Require a complete rollback-protected host firewall transaction
-  ansible.builtin.assert:
-    that:
-      - host_firewall_rollback_asset_stats.results | map(attribute='stat.exists') | min
-      - host_firewall_rollback_asset_stats.results | map(attribute='stat.isreg') | min
-      - not host_firewall_rollback_asset_stats.results | map(attribute='stat.islnk') | max
-    fail_msg: "Rollback is impossible because the protected transaction assets are incomplete or unsafe."
-
-- name: Read exact pending host firewall metadata for rollback
-  ansible.builtin.slurp:
-    src: "{{ host_firewall_pending_metadata_path }}"
-  register: host_firewall_rollback_pending_metadata
-  changed_when: false
-
-- name: Parse exact pending host firewall metadata for rollback
-  ansible.builtin.set_fact:
-    host_firewall_rollback_pending_metadata_parsed: >-
-      {{ host_firewall_rollback_pending_metadata.content | b64decode | from_json }}
-
-- name: Validate exact rollback transaction identity
-  ansible.builtin.assert:
-    that:
-      - host_firewall_rollback_pending_metadata_parsed.schema == 'lit.host_firewall.transaction/v2'
-      - host_firewall_rollback_pending_metadata_parsed.target == host_firewall_expected_inventory_hostname
-      - host_firewall_rollback_pending_metadata_parsed.change_id == host_firewall_change_id
-      - host_firewall_rollback_pending_metadata_parsed.candidate_sha256 == host_firewall_candidate_sha256
-      - >-
-        host_firewall_rollback_pending_metadata_parsed.keys() | list | sort
-        == [
-          'action',
-          'approved_readback_sha256',
-          'candidate_sha256',
-          'change_id',
-          'mode',
-          'persistent_backup_sha256',
-          'persistent_state_sha256',
-          'policy_fingerprint',
-          'runtime_backup_sha256',
-          'runtime_backup_state_sha256',
-          'runtime_before_canonical_sha256',
-          'schema',
-          'target'
-        ]
-    fail_msg: "Rollback JSON metadata does not exactly match the protected target, change, and candidate."
-
-- name: Execute explicit locked host firewall rollback service
+- name: Execute explicit signed host firewall rollback under the transaction lock
   ansible.builtin.command:
-    argv:
-      - "{{ host_firewall_systemctl_binary }}"
-      - start
-      - "{{ host_firewall_rollback_service_name }}"
+    argv: "{{ host_firewall_transaction_program_argv + ['rollback'] }}"
+    stdin: "{{ host_firewall_transaction_request | to_json | b64encode }}"
+    stdin_add_newline: false
+  register: host_firewall_rollback_command
   changed_when: true
 
-- name: Reset remote control connection after firewall rollback
+- name: Reset protected remote control connection after firewall rollback
   ansible.builtin.include_tasks: reset_connection.yml
   when: ansible_connection | default('ssh') != 'local'
 
@@ -76,82 +18,64 @@
     timeout: 45
   when: ansible_connection | default('ssh') != 'local'
 
-- name: Read role-owned table existence marker before rollback
-  ansible.builtin.slurp:
-    src: "{{ host_firewall_runtime_backup_state_path }}"
-  register: host_firewall_runtime_backup_state_content
-  changed_when: false
-
-- name: Read role-owned table after rollback as structured JSON
-  ansible.builtin.command:
-    argv:
-      - "{{ host_firewall_nft_binary }}"
-      - --json
-      - list
-      - table
-      - "{{ host_firewall_table_family }}"
-      - "{{ host_firewall_table_name }}"
-  register: host_firewall_rollback_readback_result
-  changed_when: false
-  failed_when: host_firewall_rollback_readback_result.rc not in [0, 1]
-
-- name: Canonicalize restored role-owned table
-  ansible.builtin.command:
-    argv:
-      - "{{ host_firewall_python_binary }}"
-      - -c
-      - "{{ lookup('ansible.builtin.file', role_path + '/files/canonicalize_nft_json.py') }}"
-      - --family
-      - "{{ host_firewall_table_family }}"
-      - --table
-      - "{{ host_firewall_table_name }}"
-      - --stdin-base64
-    stdin: "{{ host_firewall_rollback_readback_result.stdout | b64encode }}"
-    stdin_add_newline: false
-  register: host_firewall_rollback_canonical_result
-  changed_when: false
-  when: host_firewall_rollback_readback_result.rc == 0
-
-- name: Validate restored role-owned table boundary
-  ansible.builtin.assert:
-    that:
-      - >-
-        (
-          _host_firewall_runtime_before == 'present'
-          and host_firewall_rollback_readback_result.rc == 0
-          and host_firewall_rollback_canonical_result.stdout | hash('sha256')
-              == host_firewall_rollback_pending_metadata_parsed.runtime_before_canonical_sha256
-        )
-        or (
-          _host_firewall_runtime_before == 'absent'
-          and host_firewall_rollback_readback_result.rc == 1
-          and host_firewall_rollback_pending_metadata_parsed.runtime_before_canonical_sha256 == 'absent'
-        )
-    fail_msg: "Rollback did not restore exactly the prior role-owned table state."
-  vars:
-    _host_firewall_runtime_before: "{{ host_firewall_runtime_backup_state_content.content | b64decode | trim }}"
-
-- name: Read explicit host firewall rollback record
-  ansible.builtin.slurp:
-    src: "{{ host_firewall_rollback_record_path }}"
-  register: host_firewall_explicit_rollback_record
-  changed_when: false
-
 - name: Parse explicit host firewall rollback record
   ansible.builtin.set_fact:
-    host_firewall_explicit_rollback_record_parsed: >-
-      {{ host_firewall_explicit_rollback_record.content | b64decode | from_json }}
+    host_firewall_rollback_record: "{{ host_firewall_rollback_command.stdout | from_json }}"
 
 - name: Require exact explicit host firewall rollback completion evidence
   ansible.builtin.assert:
     that:
       - >-
-        host_firewall_explicit_rollback_record_parsed.keys() | list | sort
-        == ['change_id', 'rolled_back_at', 'schema', 'target']
-      - host_firewall_explicit_rollback_record_parsed.schema == 'lit.host_firewall.rollback/v2'
-      - host_firewall_explicit_rollback_record_parsed.target == host_firewall_expected_inventory_hostname
-      - host_firewall_explicit_rollback_record_parsed.change_id == host_firewall_change_id
+        host_firewall_rollback_record.keys() | list | sort
+        == [
+          'action',
+          'approved_readback_sha256',
+          'authorization_claim_id',
+          'authorization_sha256',
+          'authorization_verification_sha256',
+          'candidate_sha256',
+          'change_id',
+          'egress_policy_sha256',
+          'egress_status',
+          'mode',
+          'policy_fingerprint',
+          'restored_persistent_sha256',
+          'restored_persistent_state',
+          'restored_readback_sha256',
+          'restored_runtime_state',
+          'rolled_back_at',
+          'schema',
+          'source',
+          'target',
+          'transaction_id'
+        ]
+      - host_firewall_rollback_record.schema == 'lit.host_firewall.rollback/v3'
+      - host_firewall_rollback_record.source == 'explicit'
+      - host_firewall_rollback_record.action == 'apply'
+      - host_firewall_rollback_record.mode == host_firewall_mode
+      - host_firewall_rollback_record.target == host_firewall_expected_inventory_hostname
+      - host_firewall_rollback_record.change_id == host_firewall_change_id
+      - host_firewall_rollback_record.candidate_sha256 == host_firewall_candidate_sha256
+      - host_firewall_rollback_record.approved_readback_sha256 == host_firewall_approved_readback_sha256
+      - host_firewall_rollback_record.policy_fingerprint == host_firewall_policy_fingerprint
+      - host_firewall_rollback_record.egress_policy_sha256 == host_firewall_egress_policy_sha256
+      - host_firewall_rollback_record.egress_status == host_firewall_egress_status
+      - host_firewall_rollback_record.authorization_claim_id == host_firewall_authorization_contract.claim_id
+      - host_firewall_rollback_record.authorization_sha256 is match('^[a-f0-9]{64}\\Z')
+      - host_firewall_rollback_record.authorization_verification_sha256 is match('^[a-f0-9]{64}\\Z')
+      - host_firewall_rollback_record.restored_runtime_state in ['present', 'absent']
       - >-
-        host_firewall_explicit_rollback_record_parsed.rolled_back_at
-        is match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z')
-    fail_msg: "The rollback service returned without exact JSON completion evidence."
+        (
+          host_firewall_rollback_record.restored_runtime_state == 'present'
+          and host_firewall_rollback_record.restored_readback_sha256 is match('^[a-f0-9]{64}\\Z')
+        )
+        or (
+          host_firewall_rollback_record.restored_runtime_state == 'absent'
+          and host_firewall_rollback_record.restored_readback_sha256 == ''
+        )
+      - host_firewall_rollback_record.restored_persistent_state == 'present'
+      - host_firewall_rollback_record.restored_persistent_sha256 is match('^[a-f0-9]{64}\\Z')
+      - >-
+        host_firewall_rollback_record.rolled_back_at
+        is match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\\Z')
+    fail_msg: "The locked rollback routine returned without exact closed completion evidence."
