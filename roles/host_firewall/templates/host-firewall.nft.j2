@@ -1,10 +1,10 @@
 #!/usr/sbin/nft -f
 # Managed by lit.ubuntu.host_firewall. Local changes are overwritten.
+# Policy schema: lit.host_firewall.policy/v2
 # Mode: {{ host_firewall_mode }}
 # Policy fingerprint: {{ host_firewall_policy_fingerprint }}
 
-# Replacing only the role-owned table keeps Podman/Netavark tables intact.
-# destroy is idempotent and the complete file is one atomic nft transaction.
+# Replacing only the role-owned table keeps foreign and container-runtime tables intact.
 destroy table {{ host_firewall_table_family }} {{ host_firewall_table_name }}
 
 table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
@@ -12,23 +12,47 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
         type ipv4_addr
         elements = { {{ host_firewall_host_ipv4_addresses_effective | join(', ') }} }
     }
+{% if host_firewall_host_ipv6_addresses_effective | length > 0 %}
 
-    set management_sources_v4 {
+    set host_ipv6_addresses {
+        type ipv6_addr
+        elements = { {{ host_firewall_host_ipv6_addresses_effective | join(', ') }} }
+    }
+{% endif %}
+{% for function in host_firewall_management_access | dict2items %}
+{% if function.value.sources_ipv4 | length > 0 %}
+
+    set {{ function.key }}_sources_v4 {
         type ipv4_addr
         flags interval
-        elements = { {{ host_firewall_management_source_cidrs_effective | join(', ') }} }
+        elements = { {{ function.value.sources_ipv4 | join(', ') }} }
     }
+{% endif %}
+{% if function.value.sources_ipv6 | length > 0 %}
 
-    set management_tcp_ports {
-        type inet_service
-        elements = { {{ host_firewall_management_tcp_ports_effective | join(', ') }} }
+    set {{ function.key }}_sources_v6 {
+        type ipv6_addr
+        flags interval
+        elements = { {{ function.value.sources_ipv6 | join(', ') }} }
     }
+{% endif %}
+{% endfor %}
+{% if host_firewall_tang_access.sources_ipv4 | length > 0 %}
 
-    set tang_consumers_v4 {
+    set tang_sources_v4 {
         type ipv4_addr
         flags interval
-        elements = { {{ host_firewall_tang_consumer_cidrs | join(', ') }} }
+        elements = { {{ host_firewall_tang_access.sources_ipv4 | join(', ') }} }
     }
+{% endif %}
+{% if host_firewall_tang_access.sources_ipv6 | length > 0 %}
+
+    set tang_sources_v6 {
+        type ipv6_addr
+        flags interval
+        elements = { {{ host_firewall_tang_access.sources_ipv6 | join(', ') }} }
+    }
+{% endif %}
 
     set container_interfaces {
         type ifname
@@ -45,8 +69,15 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
         counter comment "lit-host-firewall policy={{ host_firewall_policy_fingerprint }} mode={{ host_firewall_mode }}"
         iifname "lo" accept
         ct state invalid drop
+        ct state { established, related } accept
 
-        # IPv6 remains denied except for the minimum control-plane ICMPv6 needed for correct local link behaviour.
+        meta nfproto ipv4 icmp type {
+            destination-unreachable,
+            time-exceeded,
+            parameter-problem
+        } accept
+        meta nfproto ipv4 icmp type echo-request limit rate 10/second burst 20 packets accept
+
         meta nfproto ipv6 icmpv6 type {
             destination-unreachable,
             packet-too-big,
@@ -60,36 +91,38 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
             nd-neighbor-advert
         } accept
         meta nfproto ipv6 icmpv6 type echo-request limit rate 10/second burst 20 packets accept
-        meta nfproto ipv6 counter drop
 
-        ct state { established, related } accept
+{% for function in host_firewall_management_access | dict2items %}
+{% if host_firewall_mode in function.value.modes %}
+{% if function.value.sources_ipv4 | length > 0 %}
+        iifname { "{{ host_firewall_public_interface }}", "{{ host_firewall_management_interface }}" } ip saddr @{{ function.key }}_sources_v4 ip daddr @host_ipv4_addresses tcp dport {{ function.value.port }} ct state new accept
+{% endif %}
+{% if function.value.sources_ipv6 | length > 0 %}
+        iifname { "{{ host_firewall_public_interface }}", "{{ host_firewall_management_interface }}" } ip6 saddr @{{ function.key }}_sources_v6 ip6 daddr @host_ipv6_addresses tcp dport {{ function.value.port }} ct state new accept
+{% endif %}
+{% endif %}
+{% endfor %}
+{% if host_firewall_tang_access.sources_ipv4 | length > 0 %}
 
-        meta nfproto ipv4 icmp type {
-            destination-unreachable,
-            time-exceeded,
-            parameter-problem
-        } accept
-        meta nfproto ipv4 icmp type echo-request limit rate 10/second burst 20 packets accept
-
-        iifname { "{{ host_firewall_public_interface }}", "{{ host_firewall_management_interface }}" } ip saddr @management_sources_v4 ip daddr @host_ipv4_addresses tcp dport @management_tcp_ports ct state new accept
-
-        # Tang is an explicit public service and is never exposed through the management interface.
-        iifname "{{ host_firewall_public_interface }}" ip saddr @tang_consumers_v4 ip daddr {{ host_firewall_expected_public_ipv4 }} tcp dport 80 ct state new accept
+        iifname "{{ host_firewall_public_interface }}" ip saddr @tang_sources_v4 ip daddr {{ host_firewall_expected_public_ipv4 }} tcp dport {{ host_firewall_tang_access.port }} ct state new accept
+{% endif %}
+{% if host_firewall_tang_access.sources_ipv6 | length > 0 %}
+        iifname "{{ host_firewall_public_interface }}" ip6 saddr @tang_sources_v6 ip6 daddr {{ host_firewall_expected_public_ipv6 }} tcp dport {{ host_firewall_tang_access.port }} ct state new accept
+{% endif %}
 
         counter drop
     }
 
     chain container_guard {
-        # New container/application forwarding is deliberately closed until a separately reviewed rule is added.
+        # New container/application forwarding remains closed until a separately approved rule exists.
         counter drop
     }
 
     chain forward {
-        # This later-priority guard is still evaluated after an earlier Podman/Netavark accept verdict.
+        # This later-priority guard is evaluated after an earlier Podman/Netavark accept verdict.
         type filter hook forward priority {{ host_firewall_forward_priority }}; policy drop;
 
         ct state invalid drop
-        meta nfproto ipv6 counter drop
         iifname "{{ host_firewall_management_interface }}" counter drop
         oifname "{{ host_firewall_management_interface }}" counter drop
         iifname @container_interfaces goto container_guard
@@ -99,6 +132,7 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
     }
 
     chain output {
+        # UNRESOLVED: productive confirmation is blocked until least-privilege IPv4/IPv6 egress is approved.
         type filter hook output priority {{ host_firewall_output_priority }}; policy accept;
     }
 }

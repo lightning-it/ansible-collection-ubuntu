@@ -11,11 +11,64 @@
         path: "{{ host_firewall_test_directory }}"
         state: absent
 
-    - name: Create host firewall test directory
+    - name: Create host firewall test directories
       ansible.builtin.file:
-        path: "{{ host_firewall_test_directory }}"
+        path: "{{ item }}"
         state: directory
         mode: "0700"
+      loop:
+        - "{{ host_firewall_test_directory }}"
+        - "{{ host_firewall_test_directory }}/nftables.d"
+        - "{{ host_firewall_test_directory }}/state"
+        - "{{ host_firewall_test_directory }}/bin"
+        - "{{ host_firewall_test_directory }}/systemd"
+
+    - name: Install administrator-owned root configuration fixture
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/nftables.conf"
+        mode: "0600"
+        content: |
+          # Administrator-owned foreign policy remains outside the role boundary.
+          table inet foreign_table {
+            chain input { type filter hook input priority 0; policy accept; }
+          }
+          include "{{ host_firewall_test_directory }}/nftables.d/lit-host-firewall.nft"
+
+    - name: Install deterministic structured nft readback fixture
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/runtime.json"
+        mode: "0600"
+        content: |
+          {{ _host_firewall_runtime_fixture | to_json }}
+      vars:
+        _host_firewall_runtime_fixture:
+          nftables:
+            - metainfo:
+                version: 1.0.9
+                json_schema_version: 1
+            - table:
+                family: inet
+                name: lit_host_firewall
+                handle: 9
+            - chain:
+                family: inet
+                table: lit_host_firewall
+                name: input
+                type: filter
+                hook: input
+                prio: 10
+                policy: drop
+                handle: 10
+            - rule:
+                family: inet
+                table: lit_host_firewall
+                chain: input
+                handle: 11
+                expr:
+                  - counter:
+                      packets: 7
+                      bytes: 42
+                  - drop: null
 
     - name: Install deterministic nft command double
       ansible.builtin.copy:
@@ -24,17 +77,8 @@
         content: |
           #!/usr/bin/env bash
           set -euo pipefail
-          state=/tmp/wunder/lit-host-firewall-molecule/runtime.nft
-
-          validate_policy() {
-            local policy="$1"
-            grep --quiet 'destroy table inet lit_host_firewall' <<<"${policy}"
-            grep --quiet 'type filter hook input priority 10; policy drop;' <<<"${policy}"
-            grep --quiet 'type filter hook forward priority 10; policy drop;' <<<"${policy}"
-            grep --quiet 'type filter hook output priority 10; policy accept;' <<<"${policy}"
-            grep --quiet 'container_guard' <<<"${policy}"
-            grep --quiet 'meta nfproto ipv6 counter drop' <<<"${policy}"
-          }
+          test_directory=/tmp/wunder/lit-host-firewall-molecule
+          echo "$*" >> "${test_directory}/nft.log"
 
           if [[ "${1:-}" == '--check' && "${2:-}" == '--file' ]]; then
             if [[ "${3:-}" == '-' ]]; then
@@ -42,39 +86,24 @@
             else
               policy="$(/bin/cat "${3}")"
             fi
-            if grep --quiet '^flush ruleset' <<<"${policy}"; then
-              grep --quiet 'table inet preexisting' <<<"${policy}"
-            else
-              validate_policy "${policy}"
-            fi
+            ! grep --quiet 'flush ruleset' <<<"${policy}"
+            grep --quiet 'destroy table inet lit_host_firewall' <<<"${policy}"
+            grep --quiet 'type filter hook input priority 10; policy drop;' <<<"${policy}"
+            grep --quiet 'type filter hook forward priority 10; policy drop;' <<<"${policy}"
             exit 0
           fi
 
-          if [[ "${1:-}" == '--file' ]]; then
-            if [[ "${2:-}" == '-' ]]; then
-              /bin/cat > "${state}"
-            else
-              /bin/cp -- "${2}" "${state}"
-            fi
-            exit 0
-          fi
-
-          if [[ "${1:-}" == 'list' && "${2:-}" == 'ruleset' ]]; then
-            if [[ -s "${state}" ]]; then
-              /bin/cat "${state}"
-            else
-              echo 'table inet preexisting { chain input { type filter hook input priority 0; policy accept; } }'
-            fi
+          if [[ "${1:-}" == '--json' && "${2:-}" == 'list' && "${3:-}" == 'table' ]]; then
+            /bin/cat "${test_directory}/runtime.json"
             exit 0
           fi
 
           if [[ "${1:-}" == 'list' && "${2:-}" == 'table' ]]; then
-            test -s "${state}"
-            /bin/cat "${state}"
+            echo 'table inet lit_host_firewall { chain input { type filter hook input priority 10; policy drop; } }'
             exit 0
           fi
 
-          echo "Unsupported nft test invocation" >&2
+          echo "Unsupported nft test invocation: $*" >&2
           exit 64
 
     - name: Install deterministic systemctl command double
@@ -89,9 +118,17 @@
             echo enabled
             exit 0
           fi
-          if [[ "$*" == 'start lit-host-firewall-confirm.service' ]]; then
-            /tmp/wunder/lit-host-firewall-molecule/bin/confirm
+          if [[ "${1:-}" == 'is-active' ]]; then
+            exit 3
           fi
-          if [[ "$*" == 'start lit-host-firewall-rollback.service' ]]; then
-            /tmp/wunder/lit-host-firewall-molecule/bin/rollback
-          fi
+          exit 0
+
+    - name: Install deterministic exclusive-lock command double
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/flock"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo "$*" >> /tmp/wunder/lit-host-firewall-molecule/flock.log
+          test "${1:-}" = '--exclusive'

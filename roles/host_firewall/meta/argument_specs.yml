@@ -7,25 +7,24 @@ argument_specs:
         type: bool
       host_firewall_action:
         type: str
-        choices:
-          - plan
-          - check
-          - apply
-          - confirm
-          - rollback
-          - readback
+        choices: [plan, check, apply, confirm, rollback, readback]
       host_firewall_mode:
         type: str
-        choices:
-          - bootstrap
-          - hardened
+        choices: [bootstrap, hardened]
       host_firewall_expected_inventory_hostname:
         type: str
       host_firewall_expected_public_ipv4:
         type: str
       host_firewall_expected_management_ipv4:
         type: str
+      host_firewall_expected_public_ipv6:
+        type: str
+      host_firewall_expected_management_ipv6:
+        type: str
       host_firewall_observed_ipv4_addresses:
+        type: list
+        elements: str
+      host_firewall_observed_ipv6_addresses:
         type: list
         elements: str
       host_firewall_platform_name:
@@ -39,6 +38,12 @@ argument_specs:
       host_firewall_container_interfaces:
         type: list
         elements: str
+      host_firewall_management_access:
+        type: dict
+      host_firewall_tang_access:
+        type: dict
+      host_firewall_expected_tang_consumer_count:
+        type: int
       host_firewall_controller_source_cidrs:
         type: list
         elements: str
@@ -48,9 +53,7 @@ argument_specs:
       host_firewall_tang_consumer_cidrs:
         type: list
         elements: str
-      host_firewall_expected_tang_consumer_count:
-        type: int
-      host_firewall_control_source_ipv4:
+      host_firewall_control_source_address:
         type: str
       host_firewall_control_destination_port:
         type: int
@@ -70,6 +73,8 @@ argument_specs:
         type: path
       host_firewall_runtime_backup_path:
         type: path
+      host_firewall_runtime_backup_state_path:
+        type: path
       host_firewall_runtime_after_path:
         type: path
       host_firewall_persistent_backup_path:
@@ -84,13 +89,21 @@ argument_specs:
         type: path
       host_firewall_rollback_record_path:
         type: path
-      host_firewall_persistent_config_path:
+      host_firewall_transaction_lock_path:
+        type: path
+      host_firewall_persistent_root_config_path:
+        type: path
+      host_firewall_persistent_include_path:
         type: path
       host_firewall_systemd_unit_directory:
+        type: path
+      host_firewall_apply_script_path:
         type: path
       host_firewall_rollback_script_path:
         type: path
       host_firewall_confirmation_script_path:
+        type: path
+      host_firewall_canonicalizer_script_path:
         type: path
       host_firewall_rollback_service_name:
         type: str
@@ -108,19 +121,24 @@ argument_specs:
         type: path
       host_firewall_bash_binary:
         type: path
+      host_firewall_flock_binary:
+        type: path
+      host_firewall_python_binary:
+        type: path
       host_firewall_printenv_binary:
         type: path
       host_firewall_change_id:
         type: str
-      host_firewall_apply_authorized:
-        type: bool
-      host_firewall_confirm_authorized:
-        type: bool
-      host_firewall_rollback_authorized:
-        type: bool
+      host_firewall_approved_readback_sha256:
+        type: str
+      host_firewall_authorization_contract:
+        type: dict
       host_firewall_positive_tests_passed:
         type: bool
       host_firewall_negative_tests_passed:
         type: bool
       host_firewall_test_evidence_reference:
         type: str
+      host_firewall_egress_stance:
+        type: str
+        choices: [unresolved-permissive]

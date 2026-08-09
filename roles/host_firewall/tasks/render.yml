@@ -6,17 +6,31 @@
 - name: Calculate host firewall candidate checksum
   ansible.builtin.set_fact:
     host_firewall_candidate_sha256: "{{ host_firewall_candidate_content | hash('sha256') }}"
-    host_firewall_plan:
+    host_firewall_authorization_contract_expected:
+      schema: lit.host_firewall.authorization/v1
+      target: "{{ host_firewall_expected_inventory_hostname }}"
       action: "{{ host_firewall_action }}"
       candidate_sha256: "{{ host_firewall_candidate_content | hash('sha256') }}"
+      approved_readback_sha256: "{{ host_firewall_approved_readback_sha256 }}"
+      policy_fingerprint: "{{ host_firewall_policy_fingerprint }}"
+      change_id: "{{ host_firewall_change_id }}"
+    host_firewall_plan:
+      schema: lit.host_firewall.plan/v2
+      action: "{{ host_firewall_action }}"
+      candidate_sha256: "{{ host_firewall_candidate_content | hash('sha256') }}"
+      approved_readback_sha256: "{{ host_firewall_approved_readback_sha256 }}"
       policy_fingerprint: "{{ host_firewall_policy_fingerprint }}"
       mode: "{{ host_firewall_mode }}"
       target: "{{ host_firewall_expected_inventory_hostname }}"
       input_policy: drop
       forward_policy: drop
       output_policy: accept
+      egress_stance: "{{ host_firewall_egress_stance }}"
       ipv6_forwarding: denied
       new_container_forwarding: denied
+      persistence_include: "{{ host_firewall_persistent_include_path }}"
+      root_persistence_file_owned: false
+      signed_authorization_verifier: unavailable
       persistent_change: "{{ host_firewall_action == 'confirm' and not ansible_check_mode }}"
 
 - name: Report immutable host firewall plan

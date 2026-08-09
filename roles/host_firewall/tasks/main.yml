@@ -14,14 +14,20 @@
     - not ansible_check_mode
     - ansible_connection | default('ssh') != 'local'
 
-- name: Verify nftables boot persistence service
-  ansible.builtin.include_tasks: persistence_preflight.yml
-  when:
-    - host_firewall_action in ['apply', 'confirm']
-    - not ansible_check_mode
-
 - name: Render deterministic host firewall candidate
   ansible.builtin.import_tasks: render.yml
+
+- name: Validate productive authorization boundary
+  ansible.builtin.include_tasks: authorization.yml
+  when:
+    - host_firewall_action in ['apply', 'confirm', 'rollback']
+    - not ansible_check_mode
+
+- name: Verify nftables boot persistence service and include boundary
+  ansible.builtin.include_tasks: persistence_preflight.yml
+  when:
+    - host_firewall_action in ['apply', 'confirm', 'rollback']
+    - not ansible_check_mode
 
 - name: Check host firewall candidate without applying it
   ansible.builtin.include_tasks: check.yml

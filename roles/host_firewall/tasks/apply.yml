@@ -2,6 +2,7 @@
 - name: Inspect prior host firewall transaction state
   ansible.builtin.stat:
     path: "{{ item }}"
+    follow: false
   loop:
     - "{{ host_firewall_pending_metadata_path }}"
     - "{{ host_firewall_confirmation_path }}"
@@ -19,17 +20,38 @@
     fail_msg: >-
       A pending firewall transaction has neither confirmation nor rollback evidence and must be resolved first.
 
-- name: Create protected host firewall transaction directories
+- name: Create protected host firewall transaction state directory
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ host_firewall_state_directory }}"
     state: directory
     owner: root
     group: root
     mode: "0700"
+
+- name: Inspect shared host firewall program and systemd directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
   loop:
-    - "{{ host_firewall_state_directory }}"
-    - "{{ host_firewall_rollback_script_path | dirname }}"
+    - "{{ host_firewall_apply_script_path | dirname }}"
     - "{{ host_firewall_systemd_unit_directory }}"
+  register: host_firewall_shared_directory_stats
+  changed_when: false
+
+- name: Require safe preprovisioned shared host firewall directories
+  ansible.builtin.assert:
+    that:
+      - host_firewall_shared_directory_stats.results | map(attribute='stat.exists') | min
+      - host_firewall_shared_directory_stats.results | map(attribute='stat.isdir') | min
+      - not host_firewall_shared_directory_stats.results | map(attribute='stat.islnk') | max
+      - host_firewall_shared_directory_stats.results | map(attribute='stat.uid') | min == 0
+      - host_firewall_shared_directory_stats.results | map(attribute='stat.uid') | max == 0
+      - host_firewall_apply_script_path | dirname == host_firewall_rollback_script_path | dirname
+      - host_firewall_apply_script_path | dirname == host_firewall_confirmation_script_path | dirname
+      - host_firewall_apply_script_path | dirname == host_firewall_canonicalizer_script_path | dirname
+    fail_msg: >-
+      Program and systemd directories must already exist as root-owned, non-symlink directories. The role will not
+      create or chmod shared host directories.
 
 - name: Clear stale host firewall transaction completion records
   ansible.builtin.file:
@@ -40,48 +62,105 @@
     - "{{ host_firewall_confirmation_request_path }}"
     - "{{ host_firewall_rollback_record_path }}"
 
-- name: Capture complete nftables ruleset before apply
+- name: Read only the prior role-owned nftables table
   ansible.builtin.command:
     argv:
       - "{{ host_firewall_nft_binary }}"
       - list
-      - ruleset
+      - table
+      - "{{ host_firewall_table_family }}"
+      - "{{ host_firewall_table_name }}"
   register: host_firewall_runtime_before_result
   changed_when: false
+  failed_when: host_firewall_runtime_before_result.rc not in [0, 1]
 
-- name: Persist replayable nftables before-state for rollback
+- name: Persist replayable role-owned table before-state
   ansible.builtin.copy:
     content: |-
-      flush ruleset
+      destroy table {{ host_firewall_table_family }} {{ host_firewall_table_name }}
+      {% if host_firewall_runtime_before_result.rc == 0 %}
       {{ host_firewall_runtime_before_result.stdout }}
+      {% endif %}
     dest: "{{ host_firewall_runtime_backup_path }}"
     owner: root
     group: root
     mode: "0600"
 
-- name: Validate replayable nftables runtime before-state
+- name: Read structured prior role-owned nftables table
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_nft_binary }}"
+      - --json
+      - list
+      - table
+      - "{{ host_firewall_table_family }}"
+      - "{{ host_firewall_table_name }}"
+  register: host_firewall_runtime_before_json_result
+  changed_when: false
+  failed_when: host_firewall_runtime_before_json_result.rc not in [0, 1]
+
+- name: Canonicalize structured prior role-owned table
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_python_binary }}"
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path + '/files/canonicalize_nft_json.py') }}"
+      - --family
+      - "{{ host_firewall_table_family }}"
+      - --table
+      - "{{ host_firewall_table_name }}"
+      - --stdin-base64
+    stdin: "{{ host_firewall_runtime_before_json_result.stdout | b64encode }}"
+    stdin_add_newline: false
+  register: host_firewall_runtime_before_canonical_result
+  changed_when: false
+  when: host_firewall_runtime_before_json_result.rc == 0
+
+- name: Require consistent role-owned runtime before-state reads
+  ansible.builtin.assert:
+    that:
+      - host_firewall_runtime_before_result.rc == host_firewall_runtime_before_json_result.rc
+      - >-
+        host_firewall_runtime_before_json_result.rc == 1
+        or host_firewall_runtime_before_canonical_result.rc == 0
+    fail_msg: >-
+      The role-owned table changed while its rollback snapshot was being captured; no transaction may proceed from
+      an inconsistent before-state.
+
+- name: Record whether the role-owned runtime table existed before apply
+  ansible.builtin.copy:
+    content: "{{ 'present' if host_firewall_runtime_before_result.rc == 0 else 'absent' }}\n"
+    dest: "{{ host_firewall_runtime_backup_state_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Validate replayable role-owned table before-state
   ansible.builtin.command:
     argv:
       - "{{ host_firewall_nft_binary }}"
       - --check
       - --file
       - "{{ host_firewall_runtime_backup_path }}"
+  register: host_firewall_runtime_backup_check
   changed_when: false
+  check_mode: false
 
-- name: Check persistent nftables configuration before apply
+- name: Inspect prior role-owned persistent include
   ansible.builtin.stat:
-    path: "{{ host_firewall_persistent_config_path }}"
+    path: "{{ host_firewall_persistent_include_path }}"
+    follow: false
   register: host_firewall_persistent_before_stat
   changed_when: false
 
-- name: Read persistent nftables configuration before apply
+- name: Read prior role-owned persistent include
   ansible.builtin.slurp:
-    src: "{{ host_firewall_persistent_config_path }}"
+    src: "{{ host_firewall_persistent_include_path }}"
   register: host_firewall_persistent_before_content
   changed_when: false
   when: host_firewall_persistent_before_stat.stat.exists
 
-- name: Save persistent nftables configuration before apply
+- name: Save prior role-owned persistent include
   ansible.builtin.copy:
     content: "{{ host_firewall_persistent_before_content.content | b64decode }}"
     dest: "{{ host_firewall_persistent_backup_path }}"
@@ -90,7 +169,7 @@
     mode: "0600"
   when: host_firewall_persistent_before_stat.stat.exists
 
-- name: Validate persistent nftables before-state when present
+- name: Validate prior role-owned persistent include
   ansible.builtin.command:
     argv:
       - "{{ host_firewall_nft_binary }}"
@@ -98,15 +177,16 @@
       - --file
       - "{{ host_firewall_persistent_backup_path }}"
   changed_when: false
+  check_mode: false
   when: host_firewall_persistent_before_stat.stat.exists
 
-- name: Remove stale persistent nftables backup when no prior file exists
+- name: Remove stale persistent include backup when no prior include exists
   ansible.builtin.file:
     path: "{{ host_firewall_persistent_backup_path }}"
     state: absent
   when: not host_firewall_persistent_before_stat.stat.exists
 
-- name: Record whether persistent nftables configuration existed before apply
+- name: Record whether the role-owned persistent include existed before apply
   ansible.builtin.copy:
     content: "{{ 'present' if host_firewall_persistent_before_stat.stat.exists else 'absent' }}\n"
     dest: "{{ host_firewall_persistent_state_path }}"
@@ -122,76 +202,146 @@
     group: root
     mode: "0600"
 
-- name: Record pending host firewall transaction metadata
+- name: Read staged transaction assets for exact metadata hashes
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop:
+    - "{{ host_firewall_runtime_backup_path }}"
+    - "{{ host_firewall_runtime_backup_state_path }}"
+    - "{{ host_firewall_persistent_state_path }}"
+  register: host_firewall_staged_transaction_assets
+  changed_when: false
+
+- name: Record exact pending host firewall transaction metadata
   ansible.builtin.copy:
-    content: |
-      change_id={{ host_firewall_change_id }}
-      candidate_sha256={{ host_firewall_candidate_sha256 }}
-      policy_fingerprint={{ host_firewall_policy_fingerprint }}
-      mode={{ host_firewall_mode }}
-      target={{ host_firewall_expected_inventory_hostname }}
+    content: >-
+      {{
+        {
+          'schema': 'lit.host_firewall.transaction/v2',
+          'target': host_firewall_expected_inventory_hostname,
+          'action': 'apply',
+          'change_id': host_firewall_change_id,
+          'candidate_sha256': host_firewall_candidate_sha256,
+          'approved_readback_sha256': host_firewall_approved_readback_sha256,
+          'policy_fingerprint': host_firewall_policy_fingerprint,
+          'mode': host_firewall_mode,
+          'runtime_backup_sha256': (
+            host_firewall_staged_transaction_assets.results[0].content | b64decode | hash('sha256')
+          ),
+          'runtime_backup_state_sha256': (
+            host_firewall_staged_transaction_assets.results[1].content | b64decode | hash('sha256')
+          ),
+          'runtime_before_canonical_sha256': (
+            host_firewall_runtime_before_canonical_result.stdout | hash('sha256')
+            if host_firewall_runtime_before_json_result.rc == 0
+            else 'absent'
+          ),
+          'persistent_state_sha256': (
+            host_firewall_staged_transaction_assets.results[2].content | b64decode | hash('sha256')
+          ),
+          'persistent_backup_sha256': (
+            host_firewall_persistent_before_content.content | b64decode | hash('sha256')
+            if host_firewall_persistent_before_stat.stat.exists
+            else 'absent'
+          )
+        }
+        | to_nice_json
+      }}
     dest: "{{ host_firewall_pending_metadata_path }}"
     owner: root
     group: root
     mode: "0600"
 
-- name: Install persistent host firewall rollback program
+- name: Snapshot exact pending metadata for locked transaction programs
+  ansible.builtin.slurp:
+    src: "{{ host_firewall_pending_metadata_path }}"
+  register: host_firewall_pending_metadata_snapshot
+  changed_when: false
+
+- name: Bind locked transaction programs to staged asset hashes
+  ansible.builtin.set_fact:
+    host_firewall_pending_metadata_sha256: >-
+      {{ host_firewall_pending_metadata_snapshot.content | b64decode | hash('sha256') }}
+    host_firewall_runtime_backup_sha256: >-
+      {{ host_firewall_staged_transaction_assets.results[0].content | b64decode | hash('sha256') }}
+    host_firewall_runtime_backup_state_sha256: >-
+      {{ host_firewall_staged_transaction_assets.results[1].content | b64decode | hash('sha256') }}
+    host_firewall_persistent_state_sha256: >-
+      {{ host_firewall_staged_transaction_assets.results[2].content | b64decode | hash('sha256') }}
+    host_firewall_persistent_backup_sha256: >-
+      {{
+        host_firewall_persistent_before_content.content | b64decode | hash('sha256')
+        if host_firewall_persistent_before_stat.stat.exists
+        else 'absent'
+      }}
+
+- name: Install host firewall transaction programs
   ansible.builtin.template:
-    src: rollback.sh.j2
-    dest: "{{ host_firewall_rollback_script_path }}"
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - src: apply.sh.j2
+      dest: "{{ host_firewall_apply_script_path }}"
+    - src: rollback.sh.j2
+      dest: "{{ host_firewall_rollback_script_path }}"
+    - src: confirm.sh.j2
+      dest: "{{ host_firewall_confirmation_script_path }}"
+  loop_control:
+    label: "{{ item.dest }}"
+
+- name: Install canonical nftables JSON verifier
+  ansible.builtin.copy:
+    src: canonicalize_nft_json.py
+    dest: "{{ host_firewall_canonicalizer_script_path }}"
     owner: root
     group: root
     mode: "0750"
 
-- name: Validate host firewall rollback program syntax
+- name: Validate host firewall transaction program syntax
   ansible.builtin.command:
     argv:
       - "{{ host_firewall_bash_binary }}"
       - -n
-      - "{{ host_firewall_rollback_script_path }}"
+      - "{{ item }}"
+  loop:
+    - "{{ host_firewall_apply_script_path }}"
+    - "{{ host_firewall_rollback_script_path }}"
+    - "{{ host_firewall_confirmation_script_path }}"
   changed_when: false
 
-- name: Install host firewall rollback service
+- name: Install host firewall systemd transaction units
   ansible.builtin.template:
-    src: rollback.service.j2
-    dest: "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_rollback_service_name }}"
+    src: "{{ item.src }}"
+    dest: "{{ host_firewall_systemd_unit_directory }}/{{ item.dest }}"
     owner: root
     group: root
     mode: "0644"
+  loop:
+    - src: rollback.service.j2
+      dest: "{{ host_firewall_rollback_service_name }}"
+    - src: rollback.timer.j2
+      dest: "{{ host_firewall_rollback_timer_name }}"
+    - src: confirm.service.j2
+      dest: "{{ host_firewall_confirmation_service_name }}"
+  loop_control:
+    label: "{{ item.dest }}"
 
-- name: Install host firewall rollback timer
-  ansible.builtin.template:
-    src: rollback.timer.j2
-    dest: "{{ host_firewall_systemd_unit_directory }}/{{ host_firewall_rollback_timer_name }}"
-    owner: root
-    group: root
-    mode: "0644"
-
-- name: Reload systemd after installing rollback units
+- name: Reload systemd after installing firewall transaction units
   ansible.builtin.command:
     argv:
       - "{{ host_firewall_systemctl_binary }}"
       - daemon-reload
   changed_when: true
 
-- name: Arm persistent host firewall rollback watchdog before apply
-  ansible.builtin.command:
-    argv:
-      - "{{ host_firewall_systemctl_binary }}"
-      - enable
-      - --now
-      - "{{ host_firewall_rollback_timer_name }}"
-  changed_when: true
-
 - name: Apply and validate host firewall under rollback protection
   block:
-    - name: Atomically replace only the role-owned nftables table
+    - name: Execute locked role-owned firewall apply program
       ansible.builtin.command:
         argv:
-          - "{{ host_firewall_nft_binary }}"
-          - --file
-          - '-'
-        stdin: "{{ host_firewall_candidate_content }}"
+          - "{{ host_firewall_apply_script_path }}"
       changed_when: true
 
     - name: Reset remote control connection after firewall replacement
@@ -208,16 +358,16 @@
     - name: Read back applied host firewall table
       ansible.builtin.include_tasks: readback.yml
 
-    - name: Persist host firewall after-state evidence
+    - name: Persist canonical host firewall after-state evidence
       ansible.builtin.copy:
-        content: "{{ host_firewall_readback_result.stdout }}\n"
+        content: "{{ host_firewall_readback_canonical_json }}\n"
         dest: "{{ host_firewall_runtime_after_path }}"
         owner: root
         group: root
         mode: "0600"
 
   rescue:
-    - name: Request immediate host firewall rollback after apply failure
+    - name: Request immediate locked host firewall rollback after apply failure
       ansible.builtin.command:
         argv:
           - "{{ host_firewall_systemctl_binary }}"
@@ -230,11 +380,11 @@
     - name: Stop after failed host firewall apply and rollback request
       ansible.builtin.fail:
         msg: >-
-          Host firewall apply or readback failed. Immediate rollback was requested with return code
+          Host firewall apply or structured readback failed. Immediate rollback was requested with return code
           {{ host_firewall_apply_rescue_result.rc | default('unavailable') }}; the armed timer remains the fallback.
 
 - name: Report pending host firewall confirmation
   ansible.builtin.debug:
     msg: >-
       Candidate {{ host_firewall_candidate_sha256 }} is active but not persistent. The rollback watchdog remains armed
-      until a separately evidenced confirm action succeeds.
+      until a separately signed and evidenced confirm action succeeds.

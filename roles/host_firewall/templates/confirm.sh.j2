@@ -3,41 +3,73 @@ set -euo pipefail
 umask 077
 
 pending_config='{{ host_firewall_pending_config_path }}'
+pending_metadata='{{ host_firewall_pending_metadata_path }}'
 confirmation_request='{{ host_firewall_confirmation_request_path }}'
 confirmation_record='{{ host_firewall_confirmation_path }}'
-persistent_config='{{ host_firewall_persistent_config_path }}'
-rollback_program='{{ host_firewall_rollback_script_path }}'
+rollback_record='{{ host_firewall_rollback_record_path }}'
+persistent_root='{{ host_firewall_persistent_root_config_path }}'
+persistent_include='{{ host_firewall_persistent_include_path }}'
+transaction_lock='{{ host_firewall_transaction_lock_path }}'
+canonicalizer='{{ host_firewall_canonicalizer_script_path }}'
 nft_binary='{{ host_firewall_nft_binary }}'
 systemctl_binary='{{ host_firewall_systemctl_binary }}'
+flock_binary='{{ host_firewall_flock_binary }}'
+rollback_service='{{ host_firewall_rollback_service_name }}'
 rollback_timer='{{ host_firewall_rollback_timer_name }}'
-expected_sha256='{{ host_firewall_candidate_sha256 }}'
-confirmation_succeeded=0
+expected_candidate_sha256='{{ host_firewall_candidate_sha256 }}'
+expected_readback_sha256='{{ host_firewall_approved_readback_sha256 }}'
+expected_metadata_sha256='{{ host_firewall_pending_metadata_sha256 }}'
+expected_request_sha256='{{ host_firewall_confirmation_request_sha256 }}'
 
-rollback_on_failure() {
-  local status="$?"
-  trap - EXIT INT TERM
-  if [[ "${confirmation_succeeded}" -ne 1 ]]; then
-    "${rollback_program}" || true
-  fi
-  exit "${status}"
-}
-trap rollback_on_failure EXIT INT TERM
+exec 9>"${transaction_lock}"
+"${flock_binary}" --exclusive 9
+
+if "${systemctl_binary}" is-active --quiet "${rollback_service}"; then
+  echo "Rollback is active; confirmation is prohibited" >&2
+  exit 1
+fi
+
+# Close the watchdog race while the shared transaction lock is held. A timer-triggered rollback that started after
+# the first check is detected by the second check and wins; no persistent confirmation is then written.
+"${systemctl_binary}" stop "${rollback_timer}"
+if "${systemctl_binary}" is-active --quiet "${rollback_service}"; then
+  echo "Rollback became active while the watchdog was being stopped" >&2
+  exit 1
+fi
+
+# A completed rollback is terminal for this transaction even after its service becomes inactive.
+test ! -e "${rollback_record}"
 
 test -s "${pending_config}"
+test -s "${pending_metadata}"
 test -s "${confirmation_request}"
-actual_sha256="$(/usr/bin/sha256sum "${pending_config}" | /usr/bin/cut --delimiter=' ' --fields=1)"
-test "${actual_sha256}" = "${expected_sha256}"
+test "$(/usr/bin/sha256sum "${pending_config}" | /usr/bin/cut --delimiter=' ' --fields=1)" = \
+  "${expected_candidate_sha256}"
+test "$(/usr/bin/sha256sum "${pending_metadata}" | /usr/bin/cut --delimiter=' ' --fields=1)" = \
+  "${expected_metadata_sha256}"
+test "$(/usr/bin/sha256sum "${confirmation_request}" | /usr/bin/cut --delimiter=' ' --fields=1)" = \
+  "${expected_request_sha256}"
+"{{ host_firewall_python_binary }}" -c 'import json,sys; value=json.load(sys.stdin); assert isinstance(value,dict)' \
+  < "${pending_metadata}"
+"{{ host_firewall_python_binary }}" -c 'import json,sys; value=json.load(sys.stdin); assert isinstance(value,dict)' \
+  < "${confirmation_request}"
 
-"${systemctl_binary}" stop "${rollback_timer}"
-/usr/bin/install --owner=root --group=root --mode=0600 "${pending_config}" "${persistent_config}"
-"${nft_binary}" --check --file "${persistent_config}"
-{
-  /usr/bin/cat "${confirmation_request}"
-  /usr/bin/date --utc '+confirmed_at=%Y-%m-%dT%H:%M:%SZ'
-  echo "candidate_sha256=${expected_sha256}"
-} > "${confirmation_record}"
+actual_readback_sha256="$(
+  "${nft_binary}" --json list table '{{ host_firewall_table_family }}' '{{ host_firewall_table_name }}' \
+    | "${canonicalizer}" --family '{{ host_firewall_table_family }}' --table '{{ host_firewall_table_name }}' \
+    | /usr/bin/sha256sum \
+    | /usr/bin/cut --delimiter=' ' --fields=1
+)"
+test "${actual_readback_sha256}" = "${expected_readback_sha256}"
+
+/usr/bin/install --owner=root --group=root --mode=0600 "${pending_config}" "${persistent_include}"
+"${nft_binary}" --check --file "${persistent_include}"
+"${nft_binary}" --check --file "${persistent_root}"
+confirmed_at="$(/usr/bin/date --utc '+%Y-%m-%dT%H:%M:%SZ')"
+/usr/bin/printf \
+  '{"schema":"lit.host_firewall.confirmation/v2","change_id":"%s","target":"%s","candidate_sha256":"%s","approved_readback_sha256":"%s","policy_fingerprint":"%s","confirmed_at":"%s"}\n' \
+  '{{ host_firewall_change_id }}' '{{ host_firewall_expected_inventory_hostname }}' \
+  "${expected_candidate_sha256}" "${expected_readback_sha256}" '{{ host_firewall_policy_fingerprint }}' \
+  "${confirmed_at}" > "${confirmation_record}"
 /usr/bin/chmod 0600 "${confirmation_record}"
 "${systemctl_binary}" disable "${rollback_timer}"
-
-confirmation_succeeded=1
-trap - EXIT INT TERM

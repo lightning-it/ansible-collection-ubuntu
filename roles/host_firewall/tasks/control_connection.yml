@@ -12,10 +12,13 @@
   ansible.builtin.assert:
     that:
       - host_firewall_actual_control_connection.stdout.split() | length == 4
-      - host_firewall_actual_control_connection.stdout.split()[0] == host_firewall_control_source_ipv4
+      - host_firewall_actual_control_connection.stdout.split()[0] == host_firewall_control_source_address
       - >-
         host_firewall_actual_control_connection.stdout.split()[2]
-        in [host_firewall_expected_public_ipv4, host_firewall_expected_management_ipv4]
+        in (
+          host_firewall_host_ipv4_addresses_effective
+          + host_firewall_host_ipv6_addresses_effective
+        )
       - >-
         host_firewall_actual_control_connection.stdout.split()[3] | int
         == host_firewall_control_destination_port | int

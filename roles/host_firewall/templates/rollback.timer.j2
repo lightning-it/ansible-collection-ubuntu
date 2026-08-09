@@ -1,10 +1,12 @@
 [Unit]
 Description=Rollback unconfirmed lit host firewall transaction after timeout
+After=local-fs.target
 
 [Timer]
 OnActiveSec={{ host_firewall_watchdog_timeout_seconds }}s
 AccuracySec=1s
 Unit={{ host_firewall_rollback_service_name }}
+Persistent=true
 
 [Install]
 WantedBy=timers.target

@@ -12,9 +12,14 @@
         host_firewall_expected_inventory_hostname: host-firewall.example.test
         host_firewall_expected_public_ipv4: 192.0.2.10
         host_firewall_expected_management_ipv4: 10.0.30.10
+        host_firewall_expected_public_ipv6: 2001:0db8:0000:0000:0000:0000:0000:0010
+        host_firewall_expected_management_ipv6: fd00:0000:0000:0030:0000:0000:0000:0010
         host_firewall_observed_ipv4_addresses:
           - 192.0.2.10
           - 10.0.30.10
+        host_firewall_observed_ipv6_addresses:
+          - 2001:0db8:0000:0000:0000:0000:0000:0010
+          - fd00:0000:0000:0030:0000:0000:0000:0010
         host_firewall_platform_name: Ubuntu
         host_firewall_platform_version: "24.04"
         host_firewall_public_interface: enp1s0
@@ -22,11 +27,26 @@
         host_firewall_container_interfaces:
           - podman0
           - podman1
-        host_firewall_controller_source_cidrs:
-          - 198.51.100.20/32
-        host_firewall_recovery_source_cidrs:
-          - 198.51.100.21/32
-        host_firewall_tang_consumer_cidrs:
-          - 192.0.2.21/32
-          - 192.0.2.22/32
-          - 192.0.2.23/32
+        host_firewall_management_access:
+          bootstrap_ssh:
+            port: 22
+            modes: [bootstrap]
+            sources_ipv4: [198.51.100.21/32]
+            sources_ipv6: []
+          openssh:
+            port: 1905
+            modes: [bootstrap, hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: [2001:0db8:0000:0000:0000:0000:0000:0020/128]
+          dropbear:
+            port: 2222
+            modes: [bootstrap, hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: [2001:0db8:0000:0000:0000:0000:0000:0020/128]
+        host_firewall_tang_access:
+          port: 80
+          sources_ipv4:
+            - 192.0.2.21/32
+            - 192.0.2.22/32
+            - 192.0.2.23/32
+          sources_ipv6: []

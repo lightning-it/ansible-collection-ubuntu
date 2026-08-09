@@ -1,0 +1,26 @@
+---
+- name: Require an exact productive authorization contract
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_authorization_contract.keys() | list | sort
+        == [
+          'action',
+          'approved_readback_sha256',
+          'candidate_sha256',
+          'change_id',
+          'policy_fingerprint',
+          'schema',
+          'target'
+        ]
+      - host_firewall_authorization_contract == host_firewall_authorization_contract_expected
+    fail_msg: >-
+      Authorization must exactly bind schema, target, action, candidate, approved readback, policy fingerprint, and
+      change ID. Additional, missing, or mismatched fields are rejected.
+
+- name: Block productive actions until signed approval verification is integrated
+  ansible.builtin.fail:
+    msg: >-
+      The closed authorization contract matches, but productive host-firewall actions remain fail-closed because
+      this collection does not yet provide trusted signature verification, expiry checking, and an atomic one-time
+      claim. Integrate the approved external signer before enabling apply, confirm, or rollback.

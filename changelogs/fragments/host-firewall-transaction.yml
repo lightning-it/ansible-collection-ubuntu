@@ -1,6 +1,10 @@
 ---
 minor_changes:
   - >-
-    host_firewall - add a fail-closed Ubuntu 24.04 nftables policy with atomic role-owned table replacement,
-    Podman-aware forward enforcement, control-session protection, and rollback-protected plan/check/apply/confirm
-    lifecycle.
+    host_firewall - add a fail-closed Ubuntu 24.04 nftables policy with per-function IPv4/IPv6 management sources,
+    canonical JSON readback, isolated table/include ownership, and a serialized rollback-protected lifecycle.
+security_fixes:
+  - >-
+    host_firewall - prohibit whole-ruleset backup/replay and root nftables configuration replacement, execute nft
+    validation during global check mode, reject ambiguous aggregate source lists, and keep productive actions closed
+    until signed one-time approval and least-privilege egress contracts are available.

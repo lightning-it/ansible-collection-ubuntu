@@ -3,7 +3,8 @@ Description=Confirm rollback-protected lit host firewall transaction
 ConditionPathExists={{ host_firewall_pending_config_path }}
 ConditionPathExists={{ host_firewall_confirmation_request_path }}
 OnFailure={{ host_firewall_rollback_service_name }}
-After=local-fs.target
+After=local-fs.target {{ host_firewall_rollback_timer_name }}
+RequiresMountsFor={{ host_firewall_state_directory }} {{ host_firewall_persistent_include_path | dirname }}
 
 [Service]
 Type=oneshot
@@ -15,10 +16,12 @@ ProtectHome=yes
 ProtectKernelLogs=yes
 ProtectKernelModules=yes
 ProtectSystem=strict
-ReadWritePaths={{ host_firewall_state_directory }} {{ host_firewall_persistent_config_path | dirname }} {{ host_firewall_systemd_unit_directory }}
+ReadWritePaths={{ host_firewall_state_directory }} {{ host_firewall_persistent_include_path | dirname }}
+ReadOnlyPaths={{ host_firewall_persistent_root_config_path }}
 CapabilityBoundingSet=CAP_NET_ADMIN
 AmbientCapabilities=CAP_NET_ADMIN
 LockPersonality=yes
 MemoryDenyWriteExecute=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
+TimeoutStartSec={{ host_firewall_watchdog_timeout_seconds }}s

@@ -9,9 +9,14 @@
     stdin: "{{ host_firewall_candidate_content }}"
   register: host_firewall_check_result
   changed_when: false
+  check_mode: false
 
-- name: Confirm nftables accepted the candidate transaction
+- name: Confirm nftables executed and accepted the candidate transaction
   ansible.builtin.assert:
     that:
+      - not host_firewall_check_result.skipped | default(false)
+      - host_firewall_check_result.rc is defined
       - host_firewall_check_result.rc == 0
-    fail_msg: "nftables rejected the complete host firewall candidate; no apply is permitted."
+    fail_msg: >-
+      nftables did not execute the complete candidate check or rejected it; skipped check-mode validation never
+      authorizes a later apply.
