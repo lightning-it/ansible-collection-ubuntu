@@ -1,0 +1,7 @@
+---
+- name: Validate previously installed immutable transaction runtime
+  ansible.builtin.command:
+    argv: "{{ host_firewall_transaction_program_argv + ['validate-runtime'] }}"
+  register: host_firewall_runtime_preflight
+  changed_when: false
+  check_mode: false

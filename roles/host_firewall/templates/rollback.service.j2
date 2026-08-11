@@ -1,0 +1,31 @@
+[Unit]
+Description=Rollback unconfirmed lit host firewall transaction
+ConditionPathExists={{ host_firewall_active_transaction_path }}
+After=local-fs.target
+Before={{ host_firewall_confirmation_service_name }}
+RequiresMountsFor={{ host_firewall_state_directory }} {{ host_firewall_persistent_include_path | dirname }}
+StartLimitIntervalSec={{ host_firewall_watchdog_timeout_seconds * 2 }}s
+StartLimitBurst=4
+
+[Service]
+Type=oneshot
+ExecStart={{ host_firewall_transaction_program_argv | join(' ') }} rollback --watchdog
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectSystem=strict
+ReadWritePaths={{ host_firewall_state_directory }} {{ host_firewall_persistent_include_path | dirname }}
+ReadOnlyPaths={{ host_firewall_persistent_root_config_path }} {{ host_firewall_transaction_program_path }} {{ host_firewall_authorization_verifier_binary }}
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+TimeoutStartSec={{ host_firewall_watchdog_timeout_seconds }}s

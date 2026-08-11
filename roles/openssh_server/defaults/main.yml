@@ -23,6 +23,8 @@ openssh_server_kbd_interactive_authentication: "no"
 openssh_server_pubkey_authentication: "yes"
 openssh_server_permit_empty_passwords: "no"
 openssh_server_x11_forwarding: "no"
+openssh_server_disable_forwarding: "yes"
+openssh_server_forwarding_exceptions: []
 openssh_server_use_pam: "yes"
 openssh_server_max_auth_tries: 3
 openssh_server_max_sessions: 10

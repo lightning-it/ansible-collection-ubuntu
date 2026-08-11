@@ -1,0 +1,58 @@
+---
+- name: Discover actual SSH control connection tuple
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_printenv_binary }}"
+      - SSH_CONNECTION
+  register: host_firewall_actual_control_connection
+  become: false
+  changed_when: false
+  failed_when: false
+
+- name: Read established TCP sockets when SSH tuple is not exported
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/ss
+      - -Htn
+      - state
+      - established
+  register: host_firewall_established_sockets
+  changed_when: false
+  when: host_firewall_actual_control_connection.rc | int != 0
+
+- name: Select exact protected control socket fallback
+  ansible.builtin.set_fact:
+    host_firewall_control_socket_matches: >-
+      {{
+        host_firewall_established_sockets.stdout_lines
+        | default([])
+        | select('search', host_firewall_control_source_address | regex_escape)
+        | select('search', ':' ~ (host_firewall_control_destination_port | string) ~ ' ')
+        | list
+      }}
+  when: host_firewall_actual_control_connection.rc | int != 0
+
+- name: Validate actual SSH control connection against approved policy
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          host_firewall_actual_control_connection.rc | int == 0
+          and host_firewall_actual_control_connection.stdout.split() | length == 4
+          and host_firewall_actual_control_connection.stdout.split()[0]
+              == host_firewall_control_source_address
+          and host_firewall_actual_control_connection.stdout.split()[2]
+              in (
+                host_firewall_host_ipv4_addresses_effective
+                + host_firewall_host_ipv6_addresses_effective
+              )
+          and host_firewall_actual_control_connection.stdout.split()[3] | int
+              == host_firewall_control_destination_port | int
+        )
+        or
+        (
+          host_firewall_actual_control_connection.rc | int != 0
+          and host_firewall_control_socket_matches | length == 1
+        )
+    fail_msg: >-
+      Actual SSH source, target address, or destination port differs from the explicitly protected control tuple.

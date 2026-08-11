@@ -1,0 +1,13 @@
+---
+minor_changes:
+  - >-
+    host_firewall - add a fail-closed Ubuntu 24.04 nftables policy with per-function IPv4 management sources,
+    canonical JSON readback, isolated table/include ownership, a single locked rollback-protected transaction routine,
+    and canonical rejection of every IPv6 input spelling for this target baseline.
+security_fixes:
+  - >-
+    host_firewall - prohibit whole-ruleset backup/replay and root nftables configuration replacement, execute nft
+    validation during global check mode, reject ambiguous aggregate source lists, require short-lived signed one-time
+    authorization, enforce a target-specific deny-by-default egress contract, and reject confirmation unless the
+    end-to-end IPv4-only and evidenced provider IPv6-filter boundaries hold. Bound external commands and lock waits
+    below the rollback watchdog, retry stale-lock rollback, and durably order terminal and active-state transitions.

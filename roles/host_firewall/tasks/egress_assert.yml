@@ -1,0 +1,227 @@
+---
+- name: Validate closed egress policy envelope
+  ansible.builtin.assert:
+    that:
+      - host_firewall_egress_policy is mapping
+      - host_firewall_egress_policy.keys() | list | sort == ['functions', 'ipv4_only', 'schema', 'stance', 'status']
+      - host_firewall_egress_policy.schema == 'lit.host_firewall.egress/v1'
+      - host_firewall_egress_policy.status in ['draft', 'approved']
+      - host_firewall_egress_policy.stance in ['bootstrap-restricted', 'deny-by-default']
+      - host_firewall_egress_policy.ipv4_only is boolean
+      - host_firewall_egress_policy.functions is mapping
+      - >-
+        host_firewall_egress_policy.functions.keys() | list | sort
+        == host_firewall_egress_function_contract.keys() | list | sort
+    fail_msg: >-
+      Egress must use the complete v1 function contract. An omitted or additional function never creates an implicit
+      network grant.
+
+- name: Validate every isolated egress function contract
+  ansible.builtin.assert:
+    that:
+      - item.value is mapping
+      - >-
+        item.value.keys() | list | sort
+        == [
+          'declared_fqdns',
+          'destinations_ipv4',
+          'destinations_ipv6',
+          'enabled',
+          'interface',
+          'modes',
+          'mtls_required',
+          'port',
+          'protocol',
+          'residual',
+          'status'
+        ]
+      - item.value.enabled is boolean
+      - item.value.mtls_required is boolean
+      - item.value.protocol == host_firewall_egress_function_contract[item.key].protocol
+      - item.value.port == host_firewall_egress_function_contract[item.key].port
+      - item.value.modes == host_firewall_egress_function_contract[item.key].modes
+      - >-
+        item.value.interface
+        == (
+          host_firewall_public_interface
+          if host_firewall_egress_function_contract[item.key].interface_role == 'public'
+          else host_firewall_management_interface
+        )
+      - item.value.status in ['approved', 'transitional-port-only', 'temporary-maintenance', 'disabled-staged-transfer']
+      - item.value.destinations_ipv4 is sequence
+      - item.value.destinations_ipv4 is not string
+      - item.value.destinations_ipv6 is sequence
+      - item.value.destinations_ipv6 is not string
+      - item.value.declared_fqdns is sequence
+      - item.value.declared_fqdns is not string
+      - item.value.residual is string
+      - item.value.destinations_ipv4 | unique | list | length == item.value.destinations_ipv4 | length
+      - item.value.destinations_ipv6 | unique | list | length == item.value.destinations_ipv6 | length
+      - item.value.declared_fqdns | unique | list | length == item.value.declared_fqdns | length
+      - not item.value.enabled or host_firewall_mode in item.value.modes
+      - item.value.enabled or item.value.status == 'disabled-staged-transfer'
+    fail_msg: "An egress function changed its fixed protocol, port, mode, interface, or closed schema."
+  loop: "{{ host_firewall_egress_policy.functions | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Validate every IPv4 egress destination
+  ansible.builtin.assert:
+    that:
+      - >-
+        item.1
+        is match(
+          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}/(?:0|32)\\Z'
+        )
+    fail_msg: "Egress IPv4 destinations must be canonical /32 hosts or an explicitly checked /0 exception."
+  loop: >-
+    {{
+      query(
+        'ansible.builtin.subelements',
+        host_firewall_egress_policy.functions | dict2items,
+        'value.destinations_ipv4',
+        {'skip_missing': false}
+      )
+    }}
+  loop_control:
+    label: "{{ item.0.key }}={{ item.1 }}"
+
+- name: Validate declared egress names as evidence-only FQDNs
+  ansible.builtin.assert:
+    that:
+      - item.1 is match('^[A-Za-z0-9](?:[A-Za-z0-9.-]{1,251}[A-Za-z0-9])?\\Z')
+    fail_msg: "Declared egress FQDNs must be exact names; they never become runtime nftables destinations."
+  loop: >-
+    {{
+      query(
+        'ansible.builtin.subelements',
+        host_firewall_egress_policy.functions | dict2items,
+        'value.declared_fqdns',
+        {'skip_missing': false}
+      )
+    }}
+  loop_control:
+    label: "{{ item.0.key }}={{ item.1 }}"
+
+- name: Enforce IPv4-only egress boundary
+  ansible.builtin.assert:
+    that:
+      - host_firewall_egress_policy.ipv4_only | bool
+      - >-
+        host_firewall_egress_policy.functions.values()
+        | map(attribute='destinations_ipv6')
+        | flatten
+        | length == 0
+    fail_msg: >-
+      This target baseline is IPv4-only. IPv6 egress requires a separately approved identity, destination set, and
+      policy revision; it cannot be inferred from IPv4.
+
+- name: Enforce IPv4-only authorizations while host firewall denies observed IPv6
+  ansible.builtin.assert:
+    that:
+      - host_firewall_expected_public_ipv6 | length == 0
+      - host_firewall_expected_management_ipv6 | length == 0
+      - host_firewall_all_management_sources_ipv6 | length == 0
+      - host_firewall_tang_access.sources_ipv6 | length == 0
+      - "':' not in host_firewall_control_source_address"
+    fail_msg: >-
+      This target authorizes IPv4 only. Observed IPv6 addresses receive no allow
+      rule and are denied by the host input, forward, and output policies.
+
+- name: Enforce portable DNS, NTP, and protected telemetry egress decisions
+  ansible.builtin.assert:
+    that:
+      - _dns_udp.enabled | bool
+      - _dns_udp.status == 'approved'
+      - _dns_udp.destinations_ipv4 | length >= 1
+      - _dns_udp.destinations_ipv6 | length == 0
+      - _dns_udp.declared_fqdns | length == 0
+      - not _dns_udp.mtls_required | bool
+      - _dns_tcp.enabled | bool
+      - _dns_tcp.status == 'approved'
+      - _dns_tcp.destinations_ipv4 == _dns_udp.destinations_ipv4
+      - _dns_tcp.destinations_ipv6 | length == 0
+      - _dns_tcp.declared_fqdns | length == 0
+      - not _dns_tcp.mtls_required | bool
+      - _ntp.enabled | bool
+      - _ntp.status in ['approved', 'transitional-port-only']
+      - _ntp.destinations_ipv4 | length >= 1
+      - _ntp.destinations_ipv6 | length == 0
+      - >-
+        '0.0.0.0/0' not in _ntp.destinations_ipv4
+        or _ntp.residual | trim | length >= 16
+      - not _ntp.mtls_required | bool
+      - _atlas.enabled | bool
+      - _atlas.status == 'approved'
+      - _atlas.destinations_ipv4 | length == 1
+      - _atlas.destinations_ipv4[0] is match(host_firewall_ipv4_host_cidr_pattern)
+      - _atlas.destinations_ipv6 | length == 0
+      - _atlas.declared_fqdns | length == 0
+      - _atlas.mtls_required | bool
+    fail_msg: >-
+      DNS transports must share explicit destinations, unrestricted NTP must retain visible residual risk, and
+      telemetry must use one explicit protected IPv4 destination with mTLS.
+  vars:
+    _dns_udp: "{{ host_firewall_egress_policy.functions.dns_udp }}"
+    _dns_tcp: "{{ host_firewall_egress_policy.functions.dns_tcp }}"
+    _ntp: "{{ host_firewall_egress_policy.functions.ntp }}"
+    _atlas: "{{ host_firewall_egress_policy.functions.atlas_loki }}"
+
+- name: Enforce mode-specific HTTPS egress boundary
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          host_firewall_mode == 'bootstrap'
+          and host_firewall_egress_policy.status == 'draft'
+          and host_firewall_egress_policy.stance == 'bootstrap-restricted'
+          and _bootstrap_https.enabled | bool
+          and _bootstrap_https.status == 'temporary-maintenance'
+          and _bootstrap_https.destinations_ipv4 == ['0.0.0.0/0']
+          and not _proxy.enabled | bool
+          and _proxy.status == 'disabled-staged-transfer'
+          and _proxy.destinations_ipv4 | length == 0
+        )
+        or (
+          host_firewall_mode == 'hardened'
+          and host_firewall_egress_policy.status == 'approved'
+          and host_firewall_egress_policy.stance == 'deny-by-default'
+          and not _bootstrap_https.enabled | bool
+          and _bootstrap_https.status == 'disabled-staged-transfer'
+          and _bootstrap_https.destinations_ipv4 | length == 0
+          and (
+            (
+              not _proxy.enabled | bool
+              and _proxy.status == 'disabled-staged-transfer'
+              and _proxy.destinations_ipv4 | length == 0
+            )
+            or (
+              _proxy.enabled | bool
+              and _proxy.status == 'approved'
+              and _proxy.destinations_ipv4 | length == 1
+              and _proxy.destinations_ipv4[0] is match(host_firewall_ipv4_host_cidr_pattern)
+              and _proxy.declared_fqdns | length >= 1
+            )
+          )
+        )
+      - _bootstrap_https.destinations_ipv6 | length == 0
+      - _proxy.destinations_ipv6 | length == 0
+      - not _bootstrap_https.mtls_required | bool
+    fail_msg: >-
+      Bootstrap HTTPS is a temporary, never-confirmable public exception. Hardened mode must disable it and either
+      use one approved management proxy /32 on TCP 3128 or use controller-pull/staged transfer with no HTTPS rule.
+  vars:
+    _bootstrap_https: "{{ host_firewall_egress_policy.functions.bootstrap_https }}"
+    _proxy: "{{ host_firewall_egress_policy.functions.https_proxy }}"
+
+- name: Keep incompatible CIS IPv6 and target egress decisions visibly blocked at confirmation
+  ansible.builtin.assert:
+    that:
+      - not host_firewall_cis_ipv6_required | bool
+    fail_msg: >-
+      Confirmation is blocked because the CIS baseline requires IPv6 while this target egress baseline is explicitly
+      IPv4-only. Resolve that architecture decision; this role will not silently weaken either policy.
+  when:
+    - host_firewall_action == 'confirm'
+    - not ansible_check_mode

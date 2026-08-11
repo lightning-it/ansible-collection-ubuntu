@@ -1,0 +1,3 @@
+---
+- name: Reset protected remote control connection
+  ansible.builtin.meta: reset_connection
