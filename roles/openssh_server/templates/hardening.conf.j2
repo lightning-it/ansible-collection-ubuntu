@@ -13,6 +13,7 @@ KbdInteractiveAuthentication {{ openssh_server_kbd_interactive_authentication }}
 PubkeyAuthentication {{ openssh_server_pubkey_authentication }}
 PermitEmptyPasswords {{ openssh_server_permit_empty_passwords }}
 X11Forwarding {{ openssh_server_x11_forwarding }}
+DisableForwarding {{ openssh_server_disable_forwarding }}
 UsePAM {{ openssh_server_use_pam }}
 MaxAuthTries {{ openssh_server_max_auth_tries }}
 MaxSessions {{ openssh_server_max_sessions }}
@@ -20,4 +21,19 @@ ClientAliveInterval {{ openssh_server_client_alive_interval }}
 ClientAliveCountMax {{ openssh_server_client_alive_count_max }}
 {% if openssh_server_allow_users | length > 0 %}
 AllowUsers {{ openssh_server_allow_users | join(' ') }}
+{% endif %}
+{% for exception in openssh_server_forwarding_exceptions %}
+
+Match User {{ exception.user }}
+    AllowTcpForwarding {{ exception.allow_tcp_forwarding }}
+    PermitOpen {{ exception.permit_open | join(' ') }}
+{% endfor %}
+{% if openssh_server_forwarding_exceptions | length > 0 %}
+
+Match all
+    AllowTcpForwarding no
+    AllowAgentForwarding no
+    AllowStreamLocalForwarding no
+    PermitOpen none
+    PermitListen none
 {% endif %}
