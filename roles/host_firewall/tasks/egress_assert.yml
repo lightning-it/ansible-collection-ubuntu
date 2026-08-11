@@ -129,12 +129,12 @@
       This target authorizes IPv4 only. Observed IPv6 addresses receive no allow
       rule and are denied by the host input, forward, and output policies.
 
-- name: Enforce exact DNS, NTP, and Atlas egress decisions
+- name: Enforce portable DNS, NTP, and protected telemetry egress decisions
   ansible.builtin.assert:
     that:
       - _dns_udp.enabled | bool
       - _dns_udp.status == 'approved'
-      - _dns_udp.destinations_ipv4 == ['1.1.1.1/32', '8.8.8.8/32']
+      - _dns_udp.destinations_ipv4 | length >= 1
       - _dns_udp.destinations_ipv6 | length == 0
       - _dns_udp.declared_fqdns | length == 0
       - not _dns_udp.mtls_required | bool
@@ -145,21 +145,23 @@
       - _dns_tcp.declared_fqdns | length == 0
       - not _dns_tcp.mtls_required | bool
       - _ntp.enabled | bool
-      - _ntp.status == 'transitional-port-only'
-      - _ntp.destinations_ipv4 == ['0.0.0.0/0']
+      - _ntp.status in ['approved', 'transitional-port-only']
+      - _ntp.destinations_ipv4 | length >= 1
       - _ntp.destinations_ipv6 | length == 0
-      - _ntp.declared_fqdns == ['ntp1.hetzner.de', 'ntp2.hetzner.com', 'ntp3.hetzner.net']
-      - _ntp.residual | trim | length >= 16
+      - >-
+        '0.0.0.0/0' not in _ntp.destinations_ipv4
+        or _ntp.residual | trim | length >= 16
       - not _ntp.mtls_required | bool
       - _atlas.enabled | bool
       - _atlas.status == 'approved'
-      - _atlas.destinations_ipv4 == ['10.10.30.24/32']
+      - _atlas.destinations_ipv4 | length == 1
+      - _atlas.destinations_ipv4[0] is match(host_firewall_ipv4_host_cidr_pattern)
       - _atlas.destinations_ipv6 | length == 0
       - _atlas.declared_fqdns | length == 0
       - _atlas.mtls_required | bool
     fail_msg: >-
-      DNS must stay on the exact public resolvers, NTP must retain its visible port-only transition, and Loki must
-      stay on the management network with an explicit mTLS boundary.
+      DNS transports must share explicit destinations, unrestricted NTP must retain visible residual risk, and
+      telemetry must use one explicit protected IPv4 destination with mTLS.
   vars:
     _dns_udp: "{{ host_firewall_egress_policy.functions.dns_udp }}"
     _dns_tcp: "{{ host_firewall_egress_policy.functions.dns_tcp }}"
@@ -199,8 +201,7 @@
               and _proxy.status == 'approved'
               and _proxy.destinations_ipv4 | length == 1
               and _proxy.destinations_ipv4[0] is match(host_firewall_ipv4_host_cidr_pattern)
-              and _proxy.declared_fqdns | length >= 3
-              and _proxy.declared_fqdns[0:2] == ['mirror.hetzner.com', 'fsn1.your-objectstorage.com']
+              and _proxy.declared_fqdns | length >= 1
             )
           )
         )

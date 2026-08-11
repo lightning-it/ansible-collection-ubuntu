@@ -11,6 +11,9 @@
       - host_firewall_egress_policy is mapping
       - host_firewall_cis_ipv6_required is boolean
       - host_firewall_provider_ipv6_filter_enabled is boolean
+      - >-
+        not host_firewall_provider_ipv6_filter_enabled
+        or host_firewall_provider_ipv6_filter_evidence_reference | trim | length >= 8
     fail_msg: "Host firewall base variables are invalid."
 
 - name: Validate enabled host firewall identity and platform

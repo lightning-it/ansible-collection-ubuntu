@@ -23,10 +23,13 @@
           - /bin/sh
           - -c
           - >-
-            /usr/sbin/nft add table inet lit_host_firewall &&
-            /usr/sbin/nft --file "$1" &&
-            /usr/sbin/nft --json list table inet lit_host_firewall
+            "$1" add table "$2" "$3" &&
+            "$1" --file "$4" &&
+            "$1" --json list table "$2" "$3"
           - lit-host-firewall-preview
+          - "{{ host_firewall_nft_binary }}"
+          - "{{ host_firewall_table_family }}"
+          - "{{ host_firewall_table_name }}"
           - "{{ host_firewall_preview_file.path }}"
       register: host_firewall_preview_raw
       changed_when: false

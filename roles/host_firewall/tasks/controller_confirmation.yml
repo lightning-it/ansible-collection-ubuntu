@@ -10,9 +10,23 @@
         }[host_firewall_action]
       }}
     _host_firewall_confirmation_issued_at: >-
-      {{ lookup('ansible.builtin.pipe', '/bin/date -u +%Y-%m-%dT%H:%M:%SZ') }}
+      {{
+        lookup(
+          'ansible.builtin.pipe',
+          (ansible_playbook_python | quote)
+          ~ " -c "
+          ~ ("import time; print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()))" | quote)
+        )
+      }}
     _host_firewall_confirmation_expires_at: >-
-      {{ lookup('ansible.builtin.pipe', '/bin/date -u -v+10M +%Y-%m-%dT%H:%M:%SZ') }}
+      {{
+        lookup(
+          'ansible.builtin.pipe',
+          (ansible_playbook_python | quote)
+          ~ " -c "
+          ~ ("import time; print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(time.time()+600)))" | quote)
+        )
+      }}
   no_log: true
 
 - name: Require exact target-and-candidate confirmation
