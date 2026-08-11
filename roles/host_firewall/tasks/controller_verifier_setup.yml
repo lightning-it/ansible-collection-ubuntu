@@ -1,0 +1,17 @@
+---
+- name: Create root-owned local executable directory
+  ansible.builtin.file:
+    path: "{{ host_firewall_authorization_verifier_binary | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install root-owned candidate confirmation verifier
+  ansible.builtin.copy:
+    src: firewall_confirmation_verifier.py
+    dest: "{{ host_firewall_authorization_verifier_binary }}"
+    owner: root
+    group: root
+    mode: "0500"
+  register: host_firewall_controller_verifier_install

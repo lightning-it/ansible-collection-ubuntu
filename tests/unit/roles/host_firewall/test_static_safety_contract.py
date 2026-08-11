@@ -159,22 +159,21 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
         self.assertNotIn("{{ function.key }}_sources_v6", policy)
         self.assertNotIn("management_sources_v4", policy)
 
-    def test_ipv4_only_candidate_has_no_ipv6_or_family_agnostic_accept_rule(self) -> None:
+    def test_ipv4_only_candidate_allows_only_family_agnostic_loopback(self) -> None:
         policy = (ROLE_ROOT / "templates" / "host-firewall.nft.j2").read_text()
         self.assertNotIn("ip6 ", policy)
         self.assertNotIn("nfproto ipv6", policy)
-        self.assertNotIn('iifname "lo" accept', policy)
-        self.assertNotIn('oifname "lo" accept', policy)
+        self.assertIn('iifname "lo" accept', policy)
+        self.assertIn('oifname "lo" accept', policy)
         self.assertNotIn("\n        ct state { established, related } accept", policy)
         self.assertIn("meta nfproto ipv4 ct state { established, related } accept", policy)
 
-    def test_provider_ipv6_filter_and_cis_conflicts_block_confirmation(self) -> None:
+    def test_host_policy_and_cis_control_ipv6_without_provider_dependency(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
         egress = (ROLE_ROOT / "tasks" / "egress_assert.yml").read_text()
-        self.assertIn("host_firewall_provider_ipv6_filter_enabled", assertions)
-        self.assertIn("provider IPv6 filter", assertions)
+        self.assertNotIn("provider IPv6 filter", assertions)
         self.assertIn("host_firewall_cis_ipv6_required", egress)
-        self.assertIn("end-to-end IPv4-only", egress)
+        self.assertIn("Observed IPv6 addresses receive no allow", egress)
 
     def test_one_terminal_record_prevents_contradictory_outcomes(self) -> None:
         paths = TRANSACTION.split("def transaction_paths", maxsplit=1)[1].split("def load_active", maxsplit=1)[0]

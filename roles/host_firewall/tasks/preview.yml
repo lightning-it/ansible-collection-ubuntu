@@ -1,0 +1,67 @@
+---
+- name: Create ephemeral candidate preview file
+  ansible.builtin.tempfile:
+    state: file
+    suffix: .nft
+  register: host_firewall_preview_file
+
+- name: Preview candidate in an isolated network namespace
+  block:
+    - name: Write candidate only to ephemeral preview file
+      ansible.builtin.copy:
+        content: "{{ host_firewall_candidate_content }}"
+        dest: "{{ host_firewall_preview_file.path }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Load and read candidate inside isolated network namespace
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/unshare
+          - --net
+          - /bin/sh
+          - -c
+          - >-
+            /usr/sbin/nft add table inet lit_host_firewall &&
+            /usr/sbin/nft --file "$1" &&
+            /usr/sbin/nft --json list table inet lit_host_firewall
+          - lit-host-firewall-preview
+          - "{{ host_firewall_preview_file.path }}"
+      register: host_firewall_preview_raw
+      changed_when: false
+
+    - name: Canonicalize isolated structured readback
+      ansible.builtin.command:
+        argv: >-
+          {{
+            [
+              host_firewall_python_binary,
+              '-c',
+              lookup('ansible.builtin.file', role_path + '/files/firewall_transaction.py')
+            ]
+            + host_firewall_transaction_program_argv[1:]
+            + ['canonicalize', '--stdin-base64']
+          }}
+        stdin: "{{ host_firewall_preview_raw.stdout | b64encode }}"
+        stdin_add_newline: false
+      register: host_firewall_preview_canonical
+      changed_when: false
+
+    - name: Publish independently derived candidate readback digest
+      ansible.builtin.set_fact:
+        host_firewall_preview_readback_sha256: >-
+          {{ host_firewall_preview_canonical.stdout | hash('sha256') }}
+
+    - name: Report candidate and approved readback bindings
+      ansible.builtin.debug:
+        msg:
+          target: "{{ host_firewall_expected_inventory_hostname }}"
+          candidate_sha256: "{{ host_firewall_candidate_sha256 }}"
+          approved_readback_sha256: "{{ host_firewall_preview_readback_sha256 }}"
+      changed_when: true
+  always:
+    - name: Remove ephemeral candidate preview file
+      ansible.builtin.file:
+        path: "{{ host_firewall_preview_file.path }}"
+        state: absent

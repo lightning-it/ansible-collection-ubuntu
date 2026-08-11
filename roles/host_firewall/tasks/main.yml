@@ -27,11 +27,29 @@
 - name: Render deterministic host firewall candidate
   ansible.builtin.import_tasks: render.yml
 
+- name: Build candidate-bound controller confirmation
+  ansible.builtin.include_tasks: controller_confirmation.yml
+  when:
+    - host_firewall_authorization_mode == 'controller_confirmation'
+    - host_firewall_action in ['apply', 'confirm', 'rollback']
+    - not ansible_check_mode
+
+- name: Provision candidate confirmation verifier
+  ansible.builtin.include_tasks: controller_verifier_setup.yml
+  when:
+    - host_firewall_authorization_mode == 'controller_confirmation'
+    - host_firewall_action in ['apply', 'confirm', 'rollback']
+    - not ansible_check_mode
+
 - name: Validate productive authorization boundary
   ansible.builtin.include_tasks: authorization.yml
   when:
     - host_firewall_action in ['apply', 'confirm', 'rollback']
     - not ansible_check_mode
+
+- name: Derive structured readback in an isolated namespace
+  ansible.builtin.include_tasks: preview.yml
+  when: host_firewall_action == 'preview'
 
 - name: Verify nftables boot persistence service and include boundary
   ansible.builtin.include_tasks: persistence_preflight.yml

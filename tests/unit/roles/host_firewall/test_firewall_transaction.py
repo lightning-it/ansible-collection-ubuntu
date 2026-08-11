@@ -649,6 +649,7 @@ class AddressNormalizationTests(unittest.TestCase):
                         "sources_ipv6": ["2001:0DB8:0:0:0:0:0:20/128"],
                     }
                 },
+                "public_service_access": {},
                 "tang_access": {"port": 80, "sources_ipv4": [], "sources_ipv6": []},
             }
         )

@@ -64,6 +64,10 @@ host_firewall_tang_access:
   sources_ipv6: []
 host_firewall_expected_tang_consumer_count: 3
 
+# Public application entry points remain separate from management and recovery
+# functions. Every service declares one protocol/port and exact source hosts.
+host_firewall_public_service_access: {}
+
 # Deprecated aggregate inputs are retained only to fail closed with an actionable migration error.
 host_firewall_controller_source_cidrs: []
 host_firewall_recovery_source_cidrs: []
@@ -106,6 +110,8 @@ host_firewall_systemctl_binary: /usr/bin/systemctl
 host_firewall_python_binary: /usr/bin/python3
 host_firewall_printenv_binary: /usr/bin/printenv
 host_firewall_authorization_verifier_binary: ""
+host_firewall_authorization_mode: signed
+host_firewall_confirmation: ""
 
 host_firewall_change_id: ""
 host_firewall_approved_readback_sha256: ""
@@ -185,8 +191,16 @@ host_firewall_all_management_sources_ipv6: >-
     | unique
     | list
   }}
+host_firewall_all_public_service_sources_ipv4: >-
+  {{
+    host_firewall_public_service_access.values()
+    | map(attribute='sources_ipv4')
+    | flatten
+    | unique
+    | list
+  }}
 host_firewall_policy_material:
-  schema: lit.host_firewall.policy/v3
+  schema: lit.host_firewall.policy/v4
   mode: "{{ host_firewall_mode }}"
   target: "{{ host_firewall_expected_inventory_hostname }}"
   public_ipv4: "{{ host_firewall_expected_public_ipv4 }}"
@@ -198,12 +212,11 @@ host_firewall_policy_material:
   container_interfaces: "{{ host_firewall_container_interfaces }}"
   management_access: "{{ host_firewall_management_access }}"
   tang_access: "{{ host_firewall_tang_access }}"
+  public_service_access: "{{ host_firewall_public_service_access }}"
   input_policy: drop
   forward_policy: drop
   output_policy: drop
   ipv4_only: true
-  provider_ipv6_filter_enabled: "{{ host_firewall_provider_ipv6_filter_enabled }}"
-  provider_ipv6_filter_evidence_reference: "{{ host_firewall_provider_ipv6_filter_evidence_reference }}"
   egress_policy: "{{ host_firewall_egress_policy }}"
 host_firewall_policy_fingerprint: "{{ host_firewall_policy_material | to_json | hash('sha256') }}"
 host_firewall_egress_policy_sha256: "{{ host_firewall_egress_policy | to_json | hash('sha256') }}"

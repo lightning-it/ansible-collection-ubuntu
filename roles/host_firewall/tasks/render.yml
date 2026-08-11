@@ -32,8 +32,6 @@
       output_policy: drop
       ipv4_only: "{{ host_firewall_egress_policy.ipv4_only }}"
       ipv6_forwarding: denied
-      provider_ipv6_filter_enabled: "{{ host_firewall_provider_ipv6_filter_enabled }}"
-      provider_ipv6_filter_evidence_reference: "{{ host_firewall_provider_ipv6_filter_evidence_reference }}"
       new_container_forwarding: denied
       persistence_include: "{{ host_firewall_persistent_include_path }}"
       root_persistence_file_owned: false

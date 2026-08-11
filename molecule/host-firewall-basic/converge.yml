@@ -50,3 +50,10 @@
             - 192.0.2.22/32
             - 192.0.2.23/32
           sources_ipv6: []
+        host_firewall_public_service_access:
+          https:
+            protocol: tcp
+            port: 443
+            modes: [bootstrap, hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: []

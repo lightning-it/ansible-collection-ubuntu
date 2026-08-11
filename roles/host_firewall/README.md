@@ -8,10 +8,15 @@ outside the role boundary.
 Management access is modeled per function. `bootstrap_ssh` uses TCP 22 only in bootstrap mode, `openssh` uses TCP
 1905, and `dropbear` uses TCP 2222. Each function has an independent IPv4 `/32` source list. The same source may be
 approved for more than one function without granting access to any other port. The active target baseline is
-end-to-end IPv4-only; every IPv6 identity, observed address, source, destination, and explicit IPv6 allow path is
-rejected.
+IPv4-only; every IPv6 identity, source, destination, and explicit IPv6 allow path is rejected. IPv6 addresses observed
+on a provider interface receive no allow rule and are therefore denied by the host input, forward, and output policy.
 
-`plan` renders the candidate and its closed authorization contract. `check` executes `nft --check` even when Ansible
+Public application entry points use the separate `host_firewall_public_service_access` mapping. Each named service
+declares one TCP/UDP port, explicit bootstrap/hardened modes, and exact IPv4 `/32` sources. Public services never
+inherit management or Tang sources and never permit a broad IPv4 source range.
+
+`plan` renders the candidate and its closed authorization contract. `preview` executes the candidate in an isolated
+network namespace and verifies its canonical readback without changing the host firewall. `check` executes `nft --check` even when Ansible
 runs in global check mode. Structured readback uses `nft --json`, removes only documented runtime fields, and compares
 the resulting canonical SHA-256 with an independently approved policy artifact. Text comments are not acceptance
 evidence.
@@ -30,6 +35,12 @@ the total apply budget reserves a separate rollback budget below the watchdog ex
 failed stale-lock attempt. Evidence creates, terminal publication, watchdog disablement, and active-pointer removal
 are ordered with file and parent-directory synchronization so a reboot cannot turn one transaction into contradictory
 confirmation and rollback outcomes.
+
+For installations that do not require an external signing authority, set
+`host_firewall_authorization_mode: controller_confirmation`. The controller then requires an exact, short-lived token
+bound to action, inventory hostname, and candidate SHA-256. Apply remains protected by the rollback watchdog, and
+confirmation remains conditional on declared positive and negative test evidence. This mode does not create or deploy
+a separate private signing key.
 
 The role enforces output policy `drop`. Egress is expressed as separate fixed functions for DNS, NTP, Atlas Loki,
 temporary bootstrap HTTPS, and an optional hardened management proxy. Bootstrap HTTPS is never confirmable. Hardened
@@ -61,11 +72,15 @@ New container forwarding remains denied.
 
 See `defaults/main.yml` for the complete interface. Important inputs are:
 
-- `host_firewall_action`: `plan`, `check`, `apply`, `confirm`, `rollback`, or `readback`.
+- `host_firewall_action`: `plan`, `preview`, `check`, `apply`, `confirm`, `rollback`, or `readback`.
+- `host_firewall_authorization_mode`: `signed` (external verifier) or `controller_confirmation` (exact candidate-bound token).
+- `host_firewall_confirmation`: exact action, host, and candidate-bound controller token when using `controller_confirmation`.
 - `host_firewall_mode`: `bootstrap` or `hardened`.
 - `host_firewall_management_access`: exact mapping for `bootstrap_ssh`, `openssh`, and `dropbear`; every entry has a
   fixed port/mode contract plus independent `sources_ipv4` and `sources_ipv6` lists.
 - `host_firewall_tang_access`: fixed TCP 80 with explicit IPv4 and IPv6 consumer host lists.
+- `host_firewall_public_service_access`: independent public application functions with fixed protocol/port, explicit
+  modes, and exact source-host lists.
 - `host_firewall_expected_*` and `host_firewall_observed_*`: target identity and observed-address binding.
 - `host_firewall_control_source_address` and `host_firewall_control_destination_port`: protected live SSH tuple.
 - `host_firewall_persistent_root_config_path`: administrator-owned root file, always read-only to the role.
@@ -78,8 +93,6 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
   closed instead of granting generic network access.
 - `host_firewall_cis_ipv6_required`: binds the surrounding CIS IPv6 decision. Confirmation fails when that decision
   requires IPv6 while this target's egress baseline is IPv4-only.
-- `host_firewall_provider_ipv6_filter_enabled` and `host_firewall_provider_ipv6_filter_evidence_reference`: confirmation
-  requires an enabled provider-side IPv6 filter and a durable evidence reference.
 - `host_firewall_change_id`: immutable transaction identifier.
 - `host_firewall_watchdog_timeout_seconds`, `host_firewall_command_timeout_seconds`, and
   `host_firewall_lock_wait_timeout_seconds`: bounded transaction budgets. Validation requires command and lock limits
@@ -137,6 +150,13 @@ None.
             - 192.0.2.22/32
             - 192.0.2.23/32
           sources_ipv6: []
+        host_firewall_public_service_access:
+          https:
+            protocol: tcp
+            port: 443
+            modes: [bootstrap, hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: []
         host_firewall_egress_policy:
           schema: lit.host_firewall.egress/v1
           status: draft

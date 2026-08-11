@@ -70,6 +70,13 @@
         - 192.0.2.22/32
         - 192.0.2.23/32
       sources_ipv6: []
+    host_firewall_public_service_access:
+      https:
+        protocol: tcp
+        port: 443
+        modes: [bootstrap, hardened]
+        sources_ipv4: [198.51.100.20/32]
+        sources_ipv6: []
     host_firewall_control_source_address: 198.51.100.20
     host_firewall_control_destination_port: 1905
     host_firewall_state_directory: /tmp/wunder/lit-host-firewall-molecule/state
@@ -123,6 +130,9 @@
           - "'tcp dport 1905' in host_firewall_candidate_content"
           - "'@dropbear_sources_v4' in host_firewall_candidate_content"
           - "'tcp dport 2222' in host_firewall_candidate_content"
+          - "'set public_https_sources_v4' in host_firewall_candidate_content"
+          - "'@public_https_sources_v4' in host_firewall_candidate_content"
+          - "'tcp dport 443' in host_firewall_candidate_content"
           - "'ip6 ' not in host_firewall_candidate_content"
           - "'nfproto ipv6' not in host_firewall_candidate_content"
           - "'meta nfproto ipv4 ct state { established, related } accept' in host_firewall_candidate_content"
@@ -171,26 +181,6 @@
             that:
               - ansible_failed_result is failed
               - "'end-to-end IPv4-only' in ansible_failed_result.msg"
-
-    - name: Confirm a disabled provider IPv6 filter blocks confirmation
-      block:
-        - name: Attempt confirmation without provider IPv6 filter evidence
-          ansible.builtin.include_role:
-            name: lit.ubuntu.host_firewall
-          vars:
-            host_firewall_action: confirm
-            host_firewall_provider_ipv6_filter_enabled: false
-
-        - name: Fail when an unknown provider IPv6 filter was accepted
-          ansible.builtin.fail:
-            msg: "Confirmation unexpectedly accepted an unknown provider IPv6 filter."
-
-      rescue:
-        - name: Validate provider IPv6 filter rejection
-          ansible.builtin.assert:
-            that:
-              - ansible_failed_result is failed
-              - "'provider IPv6 filter' in ansible_failed_result.msg"
 
     - name: Confirm deprecated aggregate sources fail closed
       block:

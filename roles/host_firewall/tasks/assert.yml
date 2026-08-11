@@ -3,7 +3,7 @@
   ansible.builtin.assert:
     that:
       - host_firewall_enabled is boolean
-      - host_firewall_action in ['plan', 'check', 'apply', 'confirm', 'rollback', 'readback']
+      - host_firewall_action in ['plan', 'preview', 'check', 'apply', 'confirm', 'rollback', 'readback']
       - host_firewall_mode in ['bootstrap', 'hardened']
       - host_firewall_positive_tests_passed is boolean
       - host_firewall_negative_tests_passed is boolean
@@ -136,6 +136,66 @@
     }}
   loop_control:
     label: "{{ item.0.key }}={{ item.1 }}"
+  when: host_firewall_enabled | bool
+
+- name: Validate public service inventory
+  ansible.builtin.assert:
+    that:
+      - host_firewall_public_service_access is mapping
+      - item.key is match('^[a-z][a-z0-9_]{1,31}\Z')
+      - item.value is mapping
+      - >-
+        item.value.keys() | list | sort
+        == ['modes', 'port', 'protocol', 'sources_ipv4', 'sources_ipv6']
+      - item.value.protocol in ['tcp', 'udp']
+      - item.value.port is integer
+      - item.value.port >= 1
+      - item.value.port <= 65535
+      - item.value.modes is sequence
+      - item.value.modes is not string
+      - item.value.modes | length > 0
+      - item.value.modes | difference(['bootstrap', 'hardened']) | length == 0
+      - item.value.sources_ipv4 is sequence
+      - item.value.sources_ipv4 is not string
+      - item.value.sources_ipv6 is sequence
+      - item.value.sources_ipv6 is not string
+      - item.value.sources_ipv4 | length + item.value.sources_ipv6 | length > 0
+      - item.value.sources_ipv4 | unique | list | length == item.value.sources_ipv4 | length
+      - item.value.sources_ipv6 | unique | list | length == item.value.sources_ipv6 | length
+    fail_msg: >-
+      Public services require a safe function name, fixed TCP/UDP port,
+      explicit bootstrap/hardened modes, and unique exact-host sources.
+  loop: "{{ host_firewall_public_service_access | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: host_firewall_enabled | bool
+
+- name: Validate every public service IPv4 source as an exact host
+  ansible.builtin.assert:
+    that:
+      - item.1 is match(host_firewall_ipv4_host_cidr_pattern)
+    fail_msg: "Public service IPv4 sources must be exact /32 values."
+  loop: >-
+    {{
+      query(
+        'ansible.builtin.subelements',
+        host_firewall_public_service_access | dict2items,
+        'value.sources_ipv4',
+        {'skip_missing': false}
+      )
+    }}
+  loop_control:
+    label: "{{ item.0.key }}={{ item.1 }}"
+  when: host_firewall_enabled | bool
+
+- name: Reject IPv6 public service sources for the IPv4-only baseline
+  ansible.builtin.assert:
+    that:
+      - item.value.sources_ipv6 | length == 0
+    fail_msg: "Public service IPv6 sources violate the end-to-end IPv4-only baseline."
+  loop: "{{ host_firewall_public_service_access | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
   when: host_firewall_enabled | bool
 
 - name: Validate Tang function contract
@@ -369,22 +429,6 @@
   when:
     - host_firewall_enabled | bool
     - host_firewall_action in ['apply', 'confirm', 'rollback']
-    - not ansible_check_mode
-
-- name: Require independently evidenced provider IPv6 filtering for confirmation
-  ansible.builtin.assert:
-    that:
-      - host_firewall_provider_ipv6_filter_enabled | bool
-      - host_firewall_provider_ipv6_filter_evidence_reference | length <= 512
-      - >-
-        host_firewall_provider_ipv6_filter_evidence_reference
-        is match('^[A-Za-z0-9][A-Za-z0-9:/?&._#=@+-]{7,511}\Z')
-    fail_msg: >-
-      Confirmation requires evidence that the provider IPv6 filter is enabled. A disabled, unknown, or unevidenced
-      provider filter violates the end-to-end IPv4-only baseline.
-  when:
-    - host_firewall_enabled | bool
-    - host_firewall_action == 'confirm'
     - not ansible_check_mode
 
 - name: Validate host firewall confirmation evidence

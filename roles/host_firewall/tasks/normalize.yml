@@ -22,6 +22,7 @@
           'observed_ipv4_addresses': host_firewall_observed_ipv4_addresses,
           'observed_ipv6_addresses': host_firewall_observed_ipv6_addresses,
           'management_access': host_firewall_management_access,
+          'public_service_access': host_firewall_public_service_access,
           'tang_access': host_firewall_tang_access
         }
         | to_json
@@ -45,5 +46,6 @@
     host_firewall_observed_ipv4_addresses: "{{ host_firewall_normalized_inputs.observed_ipv4_addresses }}"
     host_firewall_observed_ipv6_addresses: "{{ host_firewall_normalized_inputs.observed_ipv6_addresses }}"
     host_firewall_management_access: "{{ host_firewall_normalized_inputs.management_access }}"
+    host_firewall_public_service_access: "{{ host_firewall_normalized_inputs.public_service_access }}"
     host_firewall_tang_access: "{{ host_firewall_normalized_inputs.tang_access }}"
     host_firewall_control_source_address: "{{ host_firewall_normalized_inputs.control_source_address }}"

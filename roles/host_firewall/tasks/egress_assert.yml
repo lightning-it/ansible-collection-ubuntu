@@ -117,18 +117,17 @@
       This target baseline is IPv4-only. IPv6 egress requires a separately approved identity, destination set, and
       policy revision; it cannot be inferred from IPv4.
 
-- name: Enforce end-to-end IPv4-only identities and sources
+- name: Enforce IPv4-only authorizations while host firewall denies observed IPv6
   ansible.builtin.assert:
     that:
       - host_firewall_expected_public_ipv6 | length == 0
       - host_firewall_expected_management_ipv6 | length == 0
-      - host_firewall_observed_ipv6_addresses | length == 0
       - host_firewall_all_management_sources_ipv6 | length == 0
       - host_firewall_tang_access.sources_ipv6 | length == 0
       - "':' not in host_firewall_control_source_address"
     fail_msg: >-
-      This target is end-to-end IPv4-only. Any IPv6 host identity, observed address, management source, Tang consumer,
-      or active control source is rejected instead of producing an IPv6 allow path.
+      This target authorizes IPv4 only. Observed IPv6 addresses receive no allow
+      rule and are denied by the host input, forward, and output policies.
 
 - name: Enforce exact DNS, NTP, and Atlas egress decisions
   ansible.builtin.assert:

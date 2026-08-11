@@ -231,6 +231,7 @@ def normalize_firewall_inputs(value: Any) -> dict[str, Any]:
         "expected_public_ipv4",
         "expected_public_ipv6",
         "management_access",
+        "public_service_access",
         "observed_ipv4_addresses",
         "observed_ipv6_addresses",
         "tang_access",
@@ -267,6 +268,19 @@ def normalize_firewall_inputs(value: Any) -> dict[str, Any]:
         normalized["sources_ipv6"] = [normalize_host_cidr(item, 6) for item in contract.get("sources_ipv6", [])]
         normalized_management[function] = normalized
     result["management_access"] = normalized_management
+
+    public_services = source["public_service_access"]
+    if not isinstance(public_services, dict):
+        raise TransactionError("public_service_access must be a mapping")
+    normalized_public_services: dict[str, Any] = {}
+    for function, contract in public_services.items():
+        if not isinstance(contract, dict):
+            raise TransactionError(f"public service function {function} must be a mapping")
+        normalized = dict(contract)
+        normalized["sources_ipv4"] = [normalize_host_cidr(item, 4) for item in contract.get("sources_ipv4", [])]
+        normalized["sources_ipv6"] = [normalize_host_cidr(item, 6) for item in contract.get("sources_ipv6", [])]
+        normalized_public_services[function] = normalized
+    result["public_service_access"] = normalized_public_services
 
     tang = source["tang_access"]
     if not isinstance(tang, dict):
