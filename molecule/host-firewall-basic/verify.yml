@@ -180,7 +180,7 @@
           ansible.builtin.assert:
             that:
               - ansible_failed_result is failed
-              - "'end-to-end IPv4-only' in ansible_failed_result.msg"
+              - "'authorizes IPv4 only' in ansible_failed_result.msg"
 
     - name: Confirm deprecated aggregate sources fail closed
       block:
