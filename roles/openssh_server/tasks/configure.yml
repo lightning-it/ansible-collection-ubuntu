@@ -89,6 +89,72 @@
     - openssh_server_validate_config | bool
     - (_openssh_server_binary.stat | default({})).executable | default(false) | bool
 
+- name: Read effective scoped OpenSSH forwarding configurations
+  ansible.builtin.command:
+    argv:
+      - "{{ openssh_server_binary }}"
+      - -T
+      - -C
+      - "user={{ item.user }},host=localhost,addr=127.0.0.1"
+  loop: "{{ openssh_server_forwarding_exceptions }}"
+  loop_control:
+    label: "{{ item.user }}"
+  register: _openssh_server_forwarding_effective
+  changed_when: false
+  check_mode: false
+  when:
+    - openssh_server_validate_config | bool
+    - (_openssh_server_binary.stat | default({})).executable | default(false) | bool
+
+- name: Require exact effective scoped OpenSSH forwarding configurations
+  ansible.builtin.assert:
+    that:
+      - "'disableforwarding no' in item.stdout_lines"
+      - "'allowtcpforwarding ' ~ item.item.allow_tcp_forwarding in item.stdout_lines"
+      - "'allowagentforwarding no' in item.stdout_lines"
+      - "'allowstreamlocalforwarding no' in item.stdout_lines"
+      - "'permitlisten none' in item.stdout_lines"
+      - >-
+        ('permitopen ' ~ (item.item.permit_open | join(' '))) in item.stdout_lines
+    fail_msg: "The effective sshd configuration does not match the declared scoped forwarding exception."
+    quiet: true
+  loop: "{{ _openssh_server_forwarding_effective.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.user }}"
+  when:
+    - openssh_server_validate_config | bool
+    - not ansible_check_mode
+
+- name: Read effective non-exempt OpenSSH forwarding configuration
+  ansible.builtin.command:
+    argv:
+      - "{{ openssh_server_binary }}"
+      - -T
+      - -C
+      - user=root,host=localhost,addr=127.0.0.1
+  register: _openssh_server_forwarding_default_effective
+  changed_when: false
+  check_mode: false
+  when:
+    - openssh_server_validate_config | bool
+    - (_openssh_server_binary.stat | default({})).executable | default(false) | bool
+    - openssh_server_forwarding_exceptions | length > 0
+
+- name: Require forwarding denial for non-exempt OpenSSH users
+  ansible.builtin.assert:
+    that:
+      - "'allowtcpforwarding no' in _openssh_server_forwarding_default_effective.stdout_lines"
+      - "'allowagentforwarding no' in _openssh_server_forwarding_default_effective.stdout_lines"
+      - "'allowstreamlocalforwarding no' in _openssh_server_forwarding_default_effective.stdout_lines"
+      - "'permitopen none' in _openssh_server_forwarding_default_effective.stdout_lines"
+      - "'permitlisten none' in _openssh_server_forwarding_default_effective.stdout_lines"
+    fail_msg: "The effective sshd configuration permits an undeclared forwarding path."
+    quiet: true
+  when:
+    - openssh_server_validate_config | bool
+    - not ansible_check_mode
+    - openssh_server_forwarding_exceptions | length > 0
+
 - name: Reconcile active OpenSSH socket lifecycle
   ansible.builtin.systemd_service:
     name: "{{ openssh_server_socket_name }}"

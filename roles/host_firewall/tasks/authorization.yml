@@ -1,0 +1,68 @@
+---
+- name: Require an exact signed productive authorization envelope
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_authorization_contract.keys() | list | sort
+        == [
+          'action',
+          'approved_readback_sha256',
+          'candidate_sha256',
+          'change_id',
+          'claim_id',
+          'egress_policy_sha256',
+          'egress_status',
+          'expires_at',
+          'issued_at',
+          'policy_fingerprint',
+          'schema',
+          'signature',
+          'target'
+        ]
+      - host_firewall_authorization_contract.schema == 'lit.host_firewall.authorization/v2'
+      - host_firewall_authorization_contract.target == host_firewall_expected_inventory_hostname
+      - host_firewall_authorization_contract.action == host_firewall_action
+      - host_firewall_authorization_contract.candidate_sha256 == host_firewall_candidate_sha256
+      - >-
+        host_firewall_authorization_contract.approved_readback_sha256
+        == host_firewall_approved_readback_sha256
+      - host_firewall_authorization_contract.policy_fingerprint == host_firewall_policy_fingerprint
+      - host_firewall_authorization_contract.change_id == host_firewall_change_id
+      - host_firewall_authorization_contract.egress_policy_sha256 == host_firewall_egress_policy_sha256
+      - host_firewall_authorization_contract.egress_status == host_firewall_egress_status
+      - host_firewall_authorization_contract.claim_id is match('^[A-Za-z0-9][A-Za-z0-9._-]{2,127}\Z')
+      - >-
+        host_firewall_authorization_contract.issued_at
+        is match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z')
+      - >-
+        host_firewall_authorization_contract.expires_at
+        is match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z')
+      - host_firewall_authorization_contract.signature is string
+      - host_firewall_authorization_contract.signature | length >= 32
+      - host_firewall_authorization_contract.signature | length <= 8192
+      - host_firewall_authorization_contract.signature is match('^[A-Za-z0-9+/]+={0,2}\Z')
+    fail_msg: >-
+      Authorization must be an exact signed v2 envelope binding target, action, candidate, approved readback,
+      policy fingerprint, change ID, one-time claim, and validity interval.
+
+- name: Inspect trusted authorization signature verifier
+  ansible.builtin.stat:
+    path: "{{ host_firewall_authorization_verifier_binary }}"
+    follow: false
+  register: host_firewall_authorization_verifier_stat
+  changed_when: false
+  when: host_firewall_authorization_verifier_binary | length > 0
+
+- name: Keep productive actions closed without a root-owned verifier
+  ansible.builtin.assert:
+    that:
+      - host_firewall_authorization_verifier_binary | length > 0
+      - host_firewall_authorization_verifier_stat.stat.exists | default(false)
+      - host_firewall_authorization_verifier_stat.stat.isreg | default(false)
+      - not host_firewall_authorization_verifier_stat.stat.islnk | default(true)
+      - host_firewall_authorization_verifier_stat.stat.uid | default(-1) == 0
+      - host_firewall_authorization_verifier_stat.stat.mode | default('0777') is match('^0[1357][0145][0145]\Z')
+    fail_msg: >-
+      Productive host-firewall actions remain fail-closed until a trusted root-owned, non-symlink signature verifier
+      is configured. The transaction routine repeats signature, expiry, binding, and one-time-claim validation while
+      holding the transaction lock.

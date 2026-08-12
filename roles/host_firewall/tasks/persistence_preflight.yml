@@ -1,0 +1,64 @@
+---
+- name: Read nftables boot persistence service state
+  ansible.builtin.command:
+    argv:
+      - "{{ host_firewall_systemctl_binary }}"
+      - is-enabled
+      - "{{ host_firewall_persistence_service_name }}"
+  register: host_firewall_persistence_service_state
+  changed_when: false
+  failed_when: false
+
+- name: Inspect nftables persistence ownership boundary
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ host_firewall_persistent_root_config_path }}"
+    - "{{ host_firewall_persistent_include_path | dirname }}"
+    - "{{ host_firewall_persistent_include_path }}"
+  register: host_firewall_persistence_boundary_stats
+  changed_when: false
+
+- name: Read administrator-owned nftables root configuration
+  ansible.builtin.slurp:
+    src: "{{ host_firewall_persistent_root_config_path }}"
+  register: host_firewall_persistent_root_content
+  changed_when: false
+  when:
+    - host_firewall_persistence_boundary_stats.results[0].stat.exists
+    - host_firewall_persistence_boundary_stats.results[0].stat.isreg
+    - not host_firewall_persistence_boundary_stats.results[0].stat.islnk
+
+- name: Require an explicit safe persistence include boundary
+  ansible.builtin.assert:
+    that:
+      - host_firewall_persistence_service_state.rc == 0
+      - host_firewall_persistence_service_state.stdout | trim == 'enabled'
+      - host_firewall_persistence_boundary_stats.results[0].stat.exists
+      - host_firewall_persistence_boundary_stats.results[0].stat.isreg
+      - not host_firewall_persistence_boundary_stats.results[0].stat.islnk
+      - host_firewall_persistence_boundary_stats.results[0].stat.uid == 0
+      - host_firewall_persistence_boundary_stats.results[1].stat.exists
+      - host_firewall_persistence_boundary_stats.results[1].stat.isdir
+      - not host_firewall_persistence_boundary_stats.results[1].stat.islnk
+      - host_firewall_persistence_boundary_stats.results[1].stat.uid == 0
+      - host_firewall_persistence_boundary_stats.results[2].stat.exists
+      - host_firewall_persistence_boundary_stats.results[2].stat.isreg
+      - not host_firewall_persistence_boundary_stats.results[2].stat.islnk
+      - host_firewall_persistence_boundary_stats.results[2].stat.uid == 0
+      - host_firewall_persistence_boundary_stats.results[2].stat.mode is match('^0[0246][04][04]\Z')
+      - >-
+        _host_firewall_root_lines
+        | select('equalto', host_firewall_persistent_include_directive)
+        | list
+        | length == 1
+    fail_msg: >-
+      Persistence is not rollback-safe: nftables.service, a preprovisioned root-owned regular include, non-symlink
+      boundaries, and exactly one administrator-provisioned exact include directive are required. The role never
+      rewrites /etc/nftables.conf and never models a dangling include as an acceptable absent state.
+  vars:
+    _host_firewall_root_lines: >-
+      {{
+        (host_firewall_persistent_root_content.content | default('') | b64decode).splitlines()
+      }}

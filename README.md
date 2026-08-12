@@ -82,6 +82,9 @@ Ubuntu-native package and repository management.
   devices.
 - `lit.ubuntu.tang_deploy`
   Install and validate a minimal systemd socket-activated Tang binding service.
+- `lit.ubuntu.host_firewall`
+  Apply a fail-closed, Podman-aware nftables policy through rollback-protected plan, check, apply, confirm, readback,
+  and rollback phases.
 - `lit.ubuntu.podman`, `lit.ubuntu.gui`, `lit.ubuntu.xrdp`,
   `lit.ubuntu.firefox`, and `lit.ubuntu.vscode`
   Provide optional workstation and remote desktop building blocks.

@@ -1,0 +1,394 @@
+---
+- name: Run global check-mode firewall validation in the standard verifier path
+  hosts: host-firewall.example.test
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Execute the dedicated firewall playbook under real global check mode
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python | dirname }}/ansible-playbook"
+          - --check
+          - --inventory
+          - "{{ ansible_inventory_sources | first }}"
+          - "{{ playbook_dir }}/check-mode.yml"
+      register: host_firewall_global_check
+      changed_when: false
+
+    - name: Validate the global check-mode subprocess
+      ansible.builtin.assert:
+        that:
+          - host_firewall_global_check.rc == 0
+          - "'failed=0' in host_firewall_global_check.stdout"
+
+- name: Verify host firewall safety contracts
+  hosts: host-firewall.example.test
+  become: false
+  gather_facts: false
+  vars_files:
+    - vars/egress.yml
+  vars:
+    host_firewall_test_directory: /tmp/wunder/lit-host-firewall-molecule
+    host_firewall_enabled: true
+    host_firewall_mode: bootstrap
+    host_firewall_expected_inventory_hostname: host-firewall.example.test
+    host_firewall_expected_public_ipv4: 192.0.2.10
+    host_firewall_expected_management_ipv4: 10.0.30.10
+    host_firewall_expected_public_ipv6: ""
+    host_firewall_expected_management_ipv6: ""
+    host_firewall_observed_ipv4_addresses:
+      - 192.0.2.10
+      - 10.0.30.10
+    host_firewall_observed_ipv6_addresses: []
+    host_firewall_platform_name: Ubuntu
+    host_firewall_platform_version: "24.04"
+    host_firewall_public_interface: enp1s0
+    host_firewall_management_interface: enp1s0.4091
+    host_firewall_container_interfaces:
+      - podman0
+      - podman1
+    host_firewall_management_access:
+      bootstrap_ssh:
+        port: 22
+        modes: [bootstrap]
+        sources_ipv4: [198.51.100.21/32]
+        sources_ipv6: []
+      openssh:
+        port: 1905
+        modes: [bootstrap, hardened]
+        sources_ipv4: [198.51.100.20/32]
+        sources_ipv6: []
+      dropbear:
+        port: 2222
+        modes: [bootstrap, hardened]
+        sources_ipv4: [198.51.100.20/32]
+        sources_ipv6: []
+    host_firewall_tang_access:
+      port: 80
+      sources_ipv4:
+        - 192.0.2.21/32
+        - 192.0.2.22/32
+        - 192.0.2.23/32
+      sources_ipv6: []
+    host_firewall_public_service_access:
+      https:
+        protocol: tcp
+        port: 443
+        modes: [bootstrap, hardened]
+        sources_ipv4: [198.51.100.20/32]
+        sources_ipv6: []
+    host_firewall_control_source_address: 198.51.100.20
+    host_firewall_control_destination_port: 1905
+    host_firewall_state_directory: /tmp/wunder/lit-host-firewall-molecule/state
+    host_firewall_persistent_root_config_path: /tmp/wunder/lit-host-firewall-molecule/nftables.conf
+    host_firewall_persistent_include_path: /tmp/wunder/lit-host-firewall-molecule/nftables.d/lit-host-firewall.nft
+    host_firewall_test_include_directive: >-
+      include "{{ host_firewall_persistent_include_path }}"
+    host_firewall_systemd_unit_directory: /tmp/wunder/lit-host-firewall-molecule/systemd
+    host_firewall_transaction_program_path: /tmp/wunder/lit-host-firewall-molecule/bin/transaction
+    host_firewall_nft_binary: /tmp/wunder/lit-host-firewall-molecule/nft
+    host_firewall_systemctl_binary: /tmp/wunder/lit-host-firewall-molecule/systemctl
+    host_firewall_python_binary: /usr/bin/python3
+    host_firewall_change_id: WBX-G2-MOLECULE
+    host_firewall_approved_readback_sha256: 586745c405ef46dbe8af5f7768deaf4b0ea7bcbcb9d9be72d712c36bd52594fa
+  pre_tasks:
+    - name: Run host firewall transaction unit and race-safety tests
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - -m
+          - unittest
+          - discover
+          - -s
+          - "{{ playbook_dir }}/../../tests/unit/roles/host_firewall"
+          - -p
+          - test_*.py
+      environment:
+        PYTHONDONTWRITEBYTECODE: "1"
+      changed_when: false
+  tasks:
+    - name: Check complete candidate with the nft command double
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: check
+
+    - name: Read nft check execution log
+      ansible.builtin.slurp:
+        src: "{{ host_firewall_test_directory }}/nft.log"
+      register: host_firewall_nft_check_log
+      changed_when: false
+
+    - name: Validate real check-mode execution and per-function policy
+      ansible.builtin.assert:
+        that:
+          - not host_firewall_check_result.skipped | default(false)
+          - "'--check --file -' in (host_firewall_nft_check_log.content | b64decode)"
+          - "'set openssh_sources_v4' in host_firewall_candidate_content"
+          - "'set dropbear_sources_v4' in host_firewall_candidate_content"
+          - "'@openssh_sources_v4' in host_firewall_candidate_content"
+          - "'tcp dport 1905' in host_firewall_candidate_content"
+          - "'@dropbear_sources_v4' in host_firewall_candidate_content"
+          - "'tcp dport 2222' in host_firewall_candidate_content"
+          - "'set public_https_sources_v4' in host_firewall_candidate_content"
+          - "'@public_https_sources_v4' in host_firewall_candidate_content"
+          - "'tcp dport 443' in host_firewall_candidate_content"
+          - "'ip6 ' not in host_firewall_candidate_content"
+          - "'nfproto ipv6' not in host_firewall_candidate_content"
+          - "'meta nfproto ipv4 ct state { established, related } accept' in host_firewall_candidate_content"
+          - "'management_sources_v4' not in host_firewall_candidate_content"
+          - "'flush ruleset' not in host_firewall_candidate_content"
+          - "'type filter hook output priority 10; policy drop;' in host_firewall_candidate_content"
+          - "'ip daddr { 1.1.1.1/32, 8.8.8.8/32 } udp dport 53' in host_firewall_candidate_content"
+          - "'ip daddr { 1.1.1.1/32, 8.8.8.8/32 } tcp dport 53' in host_firewall_candidate_content"
+          - "'ip daddr { 0.0.0.0/0 } udp dport 123' in host_firewall_candidate_content"
+          - "'ip daddr { 10.10.30.24/32 } tcp dport 3100' in host_firewall_candidate_content"
+          - "'ip daddr { 0.0.0.0/0 } tcp dport 443' in host_firewall_candidate_content"
+
+    - name: Confirm every IPv6 source fails the end-to-end IPv4-only boundary
+      block:
+        - name: Attempt plan with one IPv6 management source
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: plan
+            host_firewall_expected_public_ipv6: 2001:db8::10
+            host_firewall_observed_ipv6_addresses: [2001:db8::10]
+            host_firewall_management_access:
+              bootstrap_ssh:
+                port: 22
+                modes: [bootstrap]
+                sources_ipv4: [198.51.100.21/32]
+                sources_ipv6: []
+              openssh:
+                port: 1905
+                modes: [bootstrap, hardened]
+                sources_ipv4: [198.51.100.20/32]
+                sources_ipv6: [2001:db8::20/128]
+              dropbear:
+                port: 2222
+                modes: [bootstrap, hardened]
+                sources_ipv4: [198.51.100.20/32]
+                sources_ipv6: []
+
+        - name: Fail when an IPv6 source was accepted
+          ansible.builtin.fail:
+            msg: "An IPv6 management source unexpectedly passed the IPv4-only boundary."
+
+      rescue:
+        - name: Validate end-to-end IPv4-only source rejection
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+              - "'authorizes IPv4 only' in ansible_failed_result.msg"
+
+    - name: Confirm deprecated aggregate sources fail closed
+      block:
+        - name: Attempt plan with deprecated aggregate management source
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: plan
+            host_firewall_controller_source_cidrs:
+              - 198.51.100.20/32
+
+        - name: Fail when deprecated aggregate source was accepted
+          ansible.builtin.fail:
+            msg: "Deprecated aggregate management source unexpectedly passed."
+
+      rescue:
+        - name: Validate fail-closed aggregate-source migration boundary
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+
+    - name: Confirm broad management IPv4 sources fail closed
+      block:
+        - name: Attempt plan with unsafe address ranges
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: plan
+            host_firewall_management_access:
+              bootstrap_ssh:
+                port: 22
+                modes: [bootstrap]
+                sources_ipv4: [0.0.0.0/0]
+                sources_ipv6: []
+              openssh:
+                port: 1905
+                modes: [bootstrap, hardened]
+                sources_ipv4: [198.51.100.20/32]
+                sources_ipv6: [2001:db8::20/128]
+              dropbear:
+                port: 2222
+                modes: [bootstrap, hardened]
+                sources_ipv4: [198.51.100.20/32]
+                sources_ipv6: []
+
+        - name: Fail when unsafe address ranges were accepted
+          ansible.builtin.fail:
+            msg: "Unsafe IPv4/IPv6 source unexpectedly passed."
+
+      rescue:
+        - name: Validate exact-host management boundary
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+
+    - name: Restore canonical inputs after isolated negative tests
+      ansible.builtin.set_fact:
+        host_firewall_expected_public_ipv4: 192.0.2.10
+        host_firewall_expected_management_ipv4: 10.0.30.10
+        host_firewall_expected_public_ipv6: ""
+        host_firewall_expected_management_ipv6: ""
+        host_firewall_observed_ipv4_addresses: [192.0.2.10, 10.0.30.10]
+        host_firewall_observed_ipv6_addresses: []
+        host_firewall_control_source_address: 198.51.100.20
+        host_firewall_management_access:
+          bootstrap_ssh:
+            port: 22
+            modes: [bootstrap]
+            sources_ipv4: [198.51.100.21/32]
+            sources_ipv6: []
+          openssh:
+            port: 1905
+            modes: [bootstrap, hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: []
+          dropbear:
+            port: 2222
+            modes: [bootstrap, hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: []
+        host_firewall_tang_access:
+          port: 80
+          sources_ipv4:
+            - 192.0.2.21/32
+            - 192.0.2.22/32
+            - 192.0.2.23/32
+          sources_ipv6: []
+
+    - name: Confirm exact authorization contract still fails without trusted signature verifier
+      block:
+        - name: Attempt productive apply with exact unsigned contract
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: apply
+            host_firewall_authorization_contract:
+              schema: lit.host_firewall.authorization/v1
+              target: host-firewall.example.test
+              action: apply
+              candidate_sha256: "{{ host_firewall_candidate_sha256 }}"
+              approved_readback_sha256: "{{ host_firewall_approved_readback_sha256 }}"
+              policy_fingerprint: "{{ host_firewall_policy_fingerprint }}"
+              change_id: WBX-G2-MOLECULE
+
+        - name: Fail when unsigned productive action was accepted
+          ansible.builtin.fail:
+            msg: "Unsigned productive firewall action unexpectedly passed."
+
+      rescue:
+        - name: Validate unavailable signer blocks productive mutation
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+              - "'exact signed v2 envelope' in ansible_failed_result.msg"
+
+    - name: Read back canonical approved nftables JSON
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: readback
+
+    - name: Validate canonical approved readback
+      ansible.builtin.assert:
+        that:
+          - host_firewall_readback_sha256 == host_firewall_approved_readback_sha256
+
+    - name: Install structured readback drift fixture
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/runtime.json"
+        mode: "0600"
+        content: |
+          {{ _host_firewall_drift_fixture | to_json }}
+      vars:
+        _host_firewall_drift_fixture:
+          nftables:
+            - table:
+                family: inet
+                name: lit_host_firewall
+            - chain:
+                family: inet
+                table: lit_host_firewall
+                name: input
+                type: filter
+                hook: input
+                prio: 10
+                policy: accept
+
+    - name: Confirm structured policy drift fails closed
+      block:
+        - name: Attempt readback of drifted structured policy
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: readback
+
+        - name: Fail when structured policy drift was accepted
+          ansible.builtin.fail:
+            msg: "Drifted structured policy unexpectedly passed."
+
+      rescue:
+        - name: Validate canonical drift rejection
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+
+    - name: Install foreign-table readback fixture
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/runtime.json"
+        mode: "0600"
+        content: |
+          {{ _host_firewall_foreign_fixture | to_json }}
+      vars:
+        _host_firewall_foreign_fixture:
+          nftables:
+            - table:
+                family: inet
+                name: foreign_table
+
+    - name: Confirm foreign table cannot satisfy owned-table readback
+      block:
+        - name: Attempt readback of foreign table fixture
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: readback
+
+        - name: Fail when foreign table was accepted
+          ansible.builtin.fail:
+            msg: "Foreign table unexpectedly passed owned-table readback."
+
+      rescue:
+        - name: Validate foreign-table boundary rejection
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is failed
+
+    - name: Read administrator-owned root config after all safe checks
+      ansible.builtin.slurp:
+        src: "{{ host_firewall_persistent_root_config_path }}"
+      register: host_firewall_root_config_after_checks
+      changed_when: false
+
+    - name: Validate foreign root policy and exact include remain untouched
+      ansible.builtin.assert:
+        that:
+          - "'table inet foreign_table' in (host_firewall_root_config_after_checks.content | b64decode)"
+          - >-
+            (host_firewall_root_config_after_checks.content | b64decode).splitlines()
+            | select('equalto', host_firewall_test_include_directive)
+            | list
+            | length == 1

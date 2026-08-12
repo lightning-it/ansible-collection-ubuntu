@@ -1,0 +1,91 @@
+---
+- name: Build exact candidate-bound confirmation token
+  ansible.builtin.set_fact:
+    _host_firewall_confirmation_prefix: >-
+      {{
+        {
+          'apply': 'APPLY-HOST-FIREWALL',
+          'confirm': 'CONFIRM-HOST-FIREWALL',
+          'rollback': 'ROLLBACK-HOST-FIREWALL'
+        }[host_firewall_action]
+      }}
+    _host_firewall_confirmation_issued_at: >-
+      {{
+        lookup(
+          'ansible.builtin.pipe',
+          (ansible_playbook_python | quote)
+          ~ " -c "
+          ~ ("import time; print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()))" | quote)
+        )
+      }}
+    _host_firewall_confirmation_expires_at: >-
+      {{
+        lookup(
+          'ansible.builtin.pipe',
+          (ansible_playbook_python | quote)
+          ~ " -c "
+          ~ ("import time; print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(time.time()+600)))" | quote)
+        )
+      }}
+  no_log: true
+
+- name: Require exact target-and-candidate confirmation
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_confirmation
+        == _host_firewall_confirmation_prefix ~ ':'
+           ~ host_firewall_expected_inventory_hostname ~ ':'
+           ~ host_firewall_candidate_sha256
+    fail_msg: >-
+      Productive host-firewall execution requires the complete action, target,
+      and candidate-bound confirmation token.
+    quiet: true
+
+- name: Build short-lived one-time confirmation envelope
+  ansible.builtin.set_fact:
+    host_firewall_authorization_contract:
+      schema: lit.host_firewall.authorization/v2
+      target: "{{ host_firewall_expected_inventory_hostname }}"
+      action: "{{ host_firewall_action }}"
+      candidate_sha256: "{{ host_firewall_candidate_sha256 }}"
+      approved_readback_sha256: "{{ host_firewall_approved_readback_sha256 }}"
+      policy_fingerprint: "{{ host_firewall_policy_fingerprint }}"
+      egress_policy_sha256: "{{ host_firewall_egress_policy_sha256 }}"
+      egress_status: "{{ host_firewall_egress_status }}"
+      change_id: "{{ host_firewall_change_id }}"
+      claim_id: >-
+        {{
+          'WBX-' ~ host_firewall_action ~ '-'
+          ~ host_firewall_candidate_sha256[0:16] ~ '-'
+          ~ (_host_firewall_confirmation_issued_at | regex_replace('[^0-9]', ''))
+        }}
+      issued_at: "{{ _host_firewall_confirmation_issued_at }}"
+      expires_at: "{{ _host_firewall_confirmation_expires_at }}"
+      signature: "{{ host_firewall_confirmation | b64encode }}"
+  no_log: true
+
+- name: Rebuild transaction request with confirmed envelope
+  ansible.builtin.set_fact:
+    host_firewall_transaction_request: >-
+      {{
+        {
+          'schema': 'lit.host_firewall.transaction-request/v3',
+          'target': host_firewall_expected_inventory_hostname,
+          'action': host_firewall_action,
+          'change_id': host_firewall_change_id,
+          'mode': host_firewall_mode,
+          'candidate_sha256': host_firewall_candidate_sha256,
+          'approved_readback_sha256': host_firewall_approved_readback_sha256,
+          'policy_fingerprint': host_firewall_policy_fingerprint,
+          'egress_policy_sha256': host_firewall_egress_policy_sha256,
+          'egress_status': host_firewall_egress_status,
+          'authorization': host_firewall_authorization_contract
+        }
+        | combine(
+          {'candidate_base64': host_firewall_candidate_content | b64encode}
+          if host_firewall_action == 'apply'
+          else {}
+        )
+      }}
+  no_log: true

@@ -4,6 +4,8 @@
   become: false
   gather_facts: false
   vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
     openssh_server_test_config: /tmp/lit-openssh-server-molecule/sshd_config.d/60-lit-hardening.conf
 
   tasks:

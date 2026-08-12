@@ -1,9 +1,11 @@
 ---
 - name: Converge Ubuntu 24 CIS integration
-  hosts: localhost
+  hosts: cis_ubuntu24
   gather_facts: false
-  become: true
+  become: false
   vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
     cis_ubuntu24_profile_tag: level1-server
     cis_ubuntu24_execution_mode: remediate
     ubtu24cis_level_1: true
@@ -35,6 +37,15 @@
           - name: cis_ubuntu24_test_rule
             value: false
         audit_visibility: intentional_exception
+
+  pre_tasks:
+    - name: Ensure python3 is present
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get update && apt-get -y install python3
+        fi
+      changed_when: false
+      tags: level1-server
 
   roles:
     - role: lit.ubuntu.cis_ubuntu24

@@ -18,6 +18,8 @@
       - openssh_server_listen_addresses is not string
       - openssh_server_allow_users is sequence
       - openssh_server_allow_users is not string
+      - openssh_server_forwarding_exceptions is sequence
+      - openssh_server_forwarding_exceptions is not string
     fail_msg: "OpenSSH server control variables are invalid."
     quiet: true
 
@@ -39,6 +41,7 @@
       - openssh_server_pubkey_authentication in ['yes', 'no']
       - openssh_server_permit_empty_passwords in ['yes', 'no']
       - openssh_server_x11_forwarding in ['yes', 'no']
+      - openssh_server_disable_forwarding in ['yes', 'no']
       - openssh_server_use_pam in ['yes', 'no']
       - openssh_server_max_auth_tries is integer
       - openssh_server_max_auth_tries >= 1
@@ -49,6 +52,60 @@
       - openssh_server_client_alive_count_max is integer
       - openssh_server_client_alive_count_max >= 0
     fail_msg: "Enabled OpenSSH server variables are invalid or incomplete."
+    quiet: true
+  when: openssh_server_enabled | bool
+
+- name: Require explicit global forwarding enablement for scoped exceptions
+  ansible.builtin.assert:
+    that:
+      - openssh_server_disable_forwarding == 'no'
+    fail_msg: >-
+      Scoped forwarding exceptions require openssh_server_disable_forwarding=no;
+      every non-exempt user remains denied by the generated Match all block.
+    quiet: true
+  when:
+    - openssh_server_enabled | bool
+    - openssh_server_forwarding_exceptions | length > 0
+
+- name: Validate scoped OpenSSH forwarding exceptions
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.keys() | difference(['user', 'allow_tcp_forwarding', 'permit_open']) | length == 0
+      - item.user is string
+      - item.user is match('^[A-Za-z_][A-Za-z0-9_.-]*[$]?$')
+      - item.allow_tcp_forwarding in ['local']
+      - item.permit_open is sequence
+      - item.permit_open is not string
+      - item.permit_open | length > 0
+      - item.permit_open | unique | length == item.permit_open | length
+    fail_msg: "OpenSSH forwarding exceptions must be local-only and explicitly destination-scoped."
+    quiet: true
+  loop: "{{ openssh_server_forwarding_exceptions }}"
+  loop_control:
+    label: "{{ item.user | default('invalid forwarding exception') }}"
+  when: openssh_server_enabled | bool
+
+- name: Validate scoped OpenSSH forwarding destinations
+  ansible.builtin.assert:
+    that:
+      - item.1 is string
+      - item.1 is match('^(?:127\\.0\\.0\\.1|localhost|\\[::1\\]):[1-9][0-9]{0,4}$')
+      - item.1.rsplit(':', 1)[1] | int <= 65535
+    fail_msg: "OpenSSH forwarding destinations must name one loopback host and valid TCP port."
+    quiet: true
+  loop: "{{ openssh_server_forwarding_exceptions | subelements('permit_open') }}"
+  loop_control:
+    label: "{{ item.0.user | default('invalid') }} -> {{ item.1 | default('invalid') }}"
+  when: openssh_server_enabled | bool
+
+- name: Validate unique scoped OpenSSH forwarding users
+  ansible.builtin.assert:
+    that:
+      - >-
+        openssh_server_forwarding_exceptions | map(attribute='user') | unique | length
+        == openssh_server_forwarding_exceptions | length
+    fail_msg: "Each OpenSSH forwarding exception user may be declared only once."
     quiet: true
   when: openssh_server_enabled | bool
 

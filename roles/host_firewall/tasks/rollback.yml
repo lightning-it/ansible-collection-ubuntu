@@ -1,0 +1,81 @@
+---
+- name: Execute explicit signed host firewall rollback under the transaction lock
+  ansible.builtin.command:
+    argv: "{{ host_firewall_transaction_program_argv + ['rollback'] }}"
+    stdin: "{{ host_firewall_transaction_request | to_json | b64encode }}"
+    stdin_add_newline: false
+  register: host_firewall_rollback_command
+  changed_when: true
+
+- name: Reset protected remote control connection after firewall rollback
+  ansible.builtin.include_tasks: reset_connection.yml
+  when: ansible_connection | default('ssh') != 'local'
+
+- name: Wait for protected control connection after firewall rollback
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 2
+    timeout: 45
+  when: ansible_connection | default('ssh') != 'local'
+
+- name: Parse explicit host firewall rollback record
+  ansible.builtin.set_fact:
+    host_firewall_rollback_record: "{{ host_firewall_rollback_command.stdout | from_json }}"
+
+- name: Require exact explicit host firewall rollback completion evidence
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_rollback_record.keys() | list | sort
+        == [
+          'action',
+          'approved_readback_sha256',
+          'authorization_claim_id',
+          'authorization_sha256',
+          'authorization_verification_sha256',
+          'candidate_sha256',
+          'change_id',
+          'egress_policy_sha256',
+          'egress_status',
+          'mode',
+          'policy_fingerprint',
+          'restored_persistent_sha256',
+          'restored_persistent_state',
+          'restored_readback_sha256',
+          'restored_runtime_state',
+          'rolled_back_at',
+          'schema',
+          'source',
+          'target',
+          'transaction_id'
+        ]
+      - host_firewall_rollback_record.schema == 'lit.host_firewall.rollback/v3'
+      - host_firewall_rollback_record.source == 'explicit'
+      - host_firewall_rollback_record.action == 'apply'
+      - host_firewall_rollback_record.mode == host_firewall_mode
+      - host_firewall_rollback_record.target == host_firewall_expected_inventory_hostname
+      - host_firewall_rollback_record.change_id == host_firewall_change_id
+      - host_firewall_rollback_record.candidate_sha256 == host_firewall_candidate_sha256
+      - host_firewall_rollback_record.approved_readback_sha256 == host_firewall_approved_readback_sha256
+      - host_firewall_rollback_record.policy_fingerprint == host_firewall_policy_fingerprint
+      - host_firewall_rollback_record.egress_policy_sha256 == host_firewall_egress_policy_sha256
+      - host_firewall_rollback_record.egress_status == host_firewall_egress_status
+      - host_firewall_rollback_record.authorization_claim_id == host_firewall_authorization_contract.claim_id
+      - host_firewall_rollback_record.authorization_sha256 is match('^[a-f0-9]{64}\\Z')
+      - host_firewall_rollback_record.authorization_verification_sha256 is match('^[a-f0-9]{64}\\Z')
+      - host_firewall_rollback_record.restored_runtime_state in ['present', 'absent']
+      - >-
+        (
+          host_firewall_rollback_record.restored_runtime_state == 'present'
+          and host_firewall_rollback_record.restored_readback_sha256 is match('^[a-f0-9]{64}\\Z')
+        )
+        or (
+          host_firewall_rollback_record.restored_runtime_state == 'absent'
+          and host_firewall_rollback_record.restored_readback_sha256 == ''
+        )
+      - host_firewall_rollback_record.restored_persistent_state == 'present'
+      - host_firewall_rollback_record.restored_persistent_sha256 is match('^[a-f0-9]{64}\\Z')
+      - >-
+        host_firewall_rollback_record.rolled_back_at
+        is match('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\\Z')
+    fail_msg: "The locked rollback routine returned without exact closed completion evidence."
