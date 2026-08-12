@@ -11,14 +11,10 @@
     developer_tools_python_venv_commands:
       - ansible
     developer_tools_nodejs_enabled: false
-    developer_tools_workspace_enabled: true
-    developer_tools_workspace_users:
-      - root
-    developer_tools_workspace_directories:
-      - .cache/lit-molecule-developer-tools
+    developer_tools_workspace_enabled: false
     developer_tools_release_binaries: []
   tasks:
-    - name: Execute lit.ubuntu.developer_tools with non-mutating inputs
+    - name: Execute lit.ubuntu.developer_tools validation without host mutations
       ansible.builtin.import_role:
         name: lit.ubuntu.developer_tools
       when: developer_tools_molecule_execute_role | bool

@@ -23,6 +23,22 @@
       - luks_unlock_update_grub_command is not string
       - luks_unlock_update_initramfs_command is sequence
       - luks_unlock_update_initramfs_command is not string
+      - >-
+        luks_unlock_managed_owner is none
+        or
+        (
+          luks_unlock_managed_owner is string
+          and luks_unlock_managed_owner
+          is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
+        )
+      - >-
+        luks_unlock_managed_group is none
+        or
+        (
+          luks_unlock_managed_group is string
+          and luks_unlock_managed_group
+          is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
+        )
     fail_msg: "Common luks_unlock variables are invalid."
 
 - name: Validate enabled LUKS unlock inputs

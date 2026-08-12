@@ -3,6 +3,9 @@ cis_ubuntu24_profile_tag: ""
 cis_ubuntu24_execution_mode: remediate
 cis_ubuntu24_audit_log_directory: /var/log/audit
 cis_ubuntu24_network_sysctl_file: /etc/sysctl.d/60-lit-cis-network.conf
+cis_ubuntu24_network_sysctl_owner: root
+cis_ubuntu24_network_sysctl_group: root
+cis_ubuntu24_aide_service_path: /etc/systemd/system/dailyaidecheck.service
 
 cis_ubuntu24_remediation_dependency:
   repository: https://github.com/ansible-lockdown/UBUNTU24-CIS

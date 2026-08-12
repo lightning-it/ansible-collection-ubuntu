@@ -5,7 +5,7 @@
     - ubtu24cis_config_aide | default(false) | bool
     - ubtu24cis_rule_6_3_2 | default(true) | bool
   ansible.builtin.stat:
-    path: /etc/systemd/system/dailyaidecheck.service
+    path: "{{ cis_ubuntu24_aide_service_path }}"
     follow: false
   register: cis_ubuntu24_aide_service_override
 
@@ -26,7 +26,7 @@
       )
   ansible.builtin.file:
     src: /dev/null
-    dest: /etc/systemd/system/dailyaidecheck.service
+    dest: "{{ cis_ubuntu24_aide_service_path }}"
     state: link
     force: false
 
@@ -41,5 +41,5 @@
       cis_ubuntu24_aide_service_override.stat.lnk_source | default('')
       == '/dev/null'
   ansible.builtin.file:
-    path: /etc/systemd/system/dailyaidecheck.service
+    path: "{{ cis_ubuntu24_aide_service_path }}"
     state: absent

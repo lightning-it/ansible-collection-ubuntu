@@ -1,0 +1,22 @@
+---
+minor_changes:
+  - >-
+    cis_ubuntu24 - make the AIDE systemd service path configurable so isolated
+    integration tests can run without root privileges, and allow those tests
+    to preserve ownership on an isolated network-control file, while
+    production keeps the existing system path and root ownership by default.
+  - >-
+    openssh_server - allow isolated unprivileged validation paths to preserve
+    existing directory and file ownership, while retaining root ownership as
+    the production default.
+  - >-
+    luks_unlock - allow isolated unprivileged validation paths to preserve
+    existing directory and file ownership, while retaining root ownership as
+    the production default.
+  - >-
+    tang_deploy - allow isolated unprivileged validation paths to preserve
+    existing directory and file ownership, while retaining root ownership as
+    the production default.
+  - >-
+    users - keep the local Molecule scenario unprivileged while preserving
+    syntax coverage and positive and fail-closed input validation.

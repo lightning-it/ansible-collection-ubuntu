@@ -3,16 +3,20 @@
   ansible.builtin.file:
     path: "{{ luks_unlock_grub_dropin_path | dirname }}"
     state: directory
-    owner: root
-    group: root
+    owner: >-
+      {{ luks_unlock_managed_owner if luks_unlock_managed_owner is not none else omit }}
+    group: >-
+      {{ luks_unlock_managed_group if luks_unlock_managed_group is not none else omit }}
     mode: "0755"
 
 - name: Render initramfs network kernel argument
   ansible.builtin.template:
     src: grub-initramfs-network.cfg.j2
     dest: "{{ luks_unlock_grub_dropin_path }}"
-    owner: root
-    group: root
+    owner: >-
+      {{ luks_unlock_managed_owner if luks_unlock_managed_owner is not none else omit }}
+    group: >-
+      {{ luks_unlock_managed_group if luks_unlock_managed_group is not none else omit }}
     mode: "0644"
   notify: LUKS unlock | Update GRUB configuration
 
@@ -20,8 +24,10 @@
   ansible.builtin.file:
     path: "{{ luks_unlock_initramfs_modules_path | dirname }}"
     state: directory
-    owner: root
-    group: root
+    owner: >-
+      {{ luks_unlock_managed_owner if luks_unlock_managed_owner is not none else omit }}
+    group: >-
+      {{ luks_unlock_managed_group if luks_unlock_managed_group is not none else omit }}
     mode: "0755"
 
 - name: Include early-boot network drivers in initramfs
@@ -29,8 +35,10 @@
     path: "{{ luks_unlock_initramfs_modules_path }}"
     line: "{{ item }}"
     create: true
-    owner: root
-    group: root
+    owner: >-
+      {{ luks_unlock_managed_owner if luks_unlock_managed_owner is not none else omit }}
+    group: >-
+      {{ luks_unlock_managed_group if luks_unlock_managed_group is not none else omit }}
     mode: "0644"
   loop: "{{ luks_unlock_network_modules }}"
   notify: LUKS unlock | Rebuild initramfs

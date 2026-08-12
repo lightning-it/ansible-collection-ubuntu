@@ -1,11 +1,8 @@
 ---
 - name: Verify Ubuntu 24 CIS integration
-  hosts: cis_ubuntu24
+  hosts: localhost
   gather_facts: false
   become: false
-  vars:
-    ansible_user: root
-    ansible_python_interpreter: /usr/bin/python3
   tasks:
     - name: Verify missing profile booleans fail closed
       tags: level1-server
@@ -111,7 +108,7 @@
 
     - name: Inspect the AIDE cron service mask
       ansible.builtin.stat:
-        path: /etc/systemd/system/dailyaidecheck.service
+        path: "{{ cis_ubuntu24_aide_service_path }}"
         follow: false
       register: cis_ubuntu24_aide_service_mask
       tags: level1-server
