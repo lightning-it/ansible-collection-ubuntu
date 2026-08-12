@@ -28,10 +28,20 @@
     that:
       - openssh_server_config_path is string
       - openssh_server_config_path is match('^/[^\x00\r\n]+$')
-      - openssh_server_config_owner is string
-      - openssh_server_config_owner is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
-      - openssh_server_config_group is string
-      - openssh_server_config_group is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
+      - >-
+        openssh_server_config_owner is none
+        or
+        (
+          openssh_server_config_owner is string
+          and openssh_server_config_owner is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
+        )
+      - >-
+        openssh_server_config_group is none
+        or
+        (
+          openssh_server_config_group is string
+          and openssh_server_config_group is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
+        )
       - openssh_server_config_mode is string
       - openssh_server_config_mode is match('^0[0-7]{3}$')
       - openssh_server_ports | length > 0

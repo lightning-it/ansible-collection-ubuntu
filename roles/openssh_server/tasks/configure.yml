@@ -10,8 +10,18 @@
   ansible.builtin.file:
     path: "{{ openssh_server_config_path | dirname }}"
     state: directory
-    owner: root
-    group: root
+    owner: >-
+      {{
+        openssh_server_config_owner
+        if openssh_server_config_owner is not none
+        else omit
+      }}
+    group: >-
+      {{
+        openssh_server_config_group
+        if openssh_server_config_group is not none
+        else omit
+      }}
     mode: "0755"
 
 - name: Inspect OpenSSH validation binary
@@ -64,8 +74,18 @@
   ansible.builtin.template:
     src: hardening.conf.j2
     dest: "{{ openssh_server_config_path }}"
-    owner: "{{ openssh_server_config_owner }}"
-    group: "{{ openssh_server_config_group }}"
+    owner: >-
+      {{
+        openssh_server_config_owner
+        if openssh_server_config_owner is not none
+        else omit
+      }}
+    group: >-
+      {{
+        openssh_server_config_group
+        if openssh_server_config_group is not none
+        else omit
+      }}
     mode: "{{ openssh_server_config_mode }}"
     validate: >-
       {{

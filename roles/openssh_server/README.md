@@ -31,6 +31,10 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `openssh_server_allow_users`: optional exact local-account allowlist. Entries are validated before templating.
 - `openssh_server_config_path`: managed drop-in path; defaults to
   `/etc/ssh/sshd_config.d/60-lit-hardening.conf`.
+- `openssh_server_config_owner` and `openssh_server_config_group`: ownership for
+  the managed directory and drop-in; both default to `root`. Setting either to
+  `null` preserves the current ownership, which is useful for isolated,
+  unprivileged validation paths.
 - `openssh_server_manage_packages` and `openssh_server_manage_service`: independently control package and service
   lifecycle management.
 - `openssh_server_validate_config`: validate the candidate drop-in and the effective server configuration with
