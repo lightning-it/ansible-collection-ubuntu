@@ -42,6 +42,8 @@ luks_unlock_kernel_ip_argument_effective: >-
 
 luks_unlock_grub_dropin_path: /etc/default/grub.d/80-lit-initramfs-network.cfg
 luks_unlock_initramfs_modules_path: /etc/initramfs-tools/modules
+luks_unlock_managed_owner: root
+luks_unlock_managed_group: root
 luks_unlock_update_grub: true
 luks_unlock_update_grub_command:
   - update-grub

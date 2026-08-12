@@ -9,3 +9,11 @@ minor_changes:
     openssh_server - allow isolated unprivileged validation paths to preserve
     existing directory and file ownership, while retaining root ownership as
     the production default.
+  - >-
+    luks_unlock - allow isolated unprivileged validation paths to preserve
+    existing directory and file ownership, while retaining root ownership as
+    the production default.
+  - >-
+    tang_deploy - allow isolated unprivileged validation paths to preserve
+    existing directory and file ownership, while retaining root ownership as
+    the production default.

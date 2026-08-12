@@ -21,6 +21,10 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `tang_deploy_manage_packages`: install the `tang` package.
 - `tang_deploy_manage_service`: enable and start `tangd.socket`.
 - `tang_deploy_manage_socket_override`: render a systemd socket override for `tang_deploy_listen_port`.
+- `tang_deploy_managed_owner` and `tang_deploy_managed_group`: ownership for
+  managed socket override paths; both default to `root`. Setting either to
+  `null` preserves current ownership for isolated, unprivileged validation
+  paths.
 - `tang_deploy_validate`: validate the local advertisement and obtain public signing thumbprints.
 - `tang_deploy_public_thumbprints`: public thumbprints recorded after validation.
 
@@ -50,4 +54,3 @@ MIT
 ## Author
 
 Lightning IT
-

@@ -11,23 +11,29 @@
   ansible.builtin.file:
     path: "{{ luks_unlock_dropbear_config_path | dirname }}"
     state: directory
-    owner: root
-    group: root
+    owner: >-
+      {{ luks_unlock_managed_owner if luks_unlock_managed_owner is not none else omit }}
+    group: >-
+      {{ luks_unlock_managed_group if luks_unlock_managed_group is not none else omit }}
     mode: "0700"
 
 - name: Render Dropbear initramfs configuration
   ansible.builtin.template:
     src: dropbear.conf.j2
     dest: "{{ luks_unlock_dropbear_config_path }}"
-    owner: root
-    group: root
+    owner: >-
+      {{ luks_unlock_managed_owner if luks_unlock_managed_owner is not none else omit }}
+    group: >-
+      {{ luks_unlock_managed_group if luks_unlock_managed_group is not none else omit }}
     mode: "0600"
   notify: LUKS unlock | Rebuild initramfs
 - name: Render restricted Dropbear authorized keys
   ansible.builtin.template:
     src: authorized_keys.j2
     dest: "{{ luks_unlock_dropbear_authorized_keys_path }}"
-    owner: root
-    group: root
+    owner: >-
+      {{ luks_unlock_managed_owner if luks_unlock_managed_owner is not none else omit }}
+    group: >-
+      {{ luks_unlock_managed_group if luks_unlock_managed_group is not none else omit }}
     mode: "0600"
   notify: LUKS unlock | Rebuild initramfs

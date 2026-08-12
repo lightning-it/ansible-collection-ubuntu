@@ -22,4 +22,6 @@
         tang_deploy_manage_socket_override: true
         tang_deploy_listen_port: 18080
         tang_deploy_socket_override_path: "{{ tang_deploy_test_dir }}/tangd.socket.d/80-lit-listen.conf"
+        tang_deploy_managed_owner: null
+        tang_deploy_managed_group: null
         tang_deploy_validate: false
