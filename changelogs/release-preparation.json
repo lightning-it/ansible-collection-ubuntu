@@ -1,0 +1,12 @@
+{
+  "base_sha": "5ba269646cffeb24b886d75723568ed73449d21a",
+  "next_version": "1.11.0",
+  "preparer": {
+    "login": "lightning-it-release-automation[bot]"
+  },
+  "repository": "lightning-it/ansible-collection-ubuntu",
+  "schema_version": 1,
+  "workflow": {
+    "source_sha": "5ba269646cffeb24b886d75723568ed73449d21a"
+  }
+}

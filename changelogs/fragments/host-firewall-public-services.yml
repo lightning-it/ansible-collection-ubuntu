@@ -1,5 +1,0 @@
----
-minor_changes:
-  - >-
-    host_firewall - add a fail-closed public service access contract with
-    per-service protocol, port, mode, and exact-host source authorization.
