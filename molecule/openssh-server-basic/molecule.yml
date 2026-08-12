@@ -2,9 +2,13 @@
 dependency:
   name: galaxy
 driver:
-  name: default
+  name: docker
 platforms:
   - name: openssh_server
+    image: ubuntu:24.04
+    pre_build_image: true
+    command: sleep infinity
+    network_mode: host
 provisioner:
   name: ansible
   playbooks:
@@ -15,7 +19,6 @@ provisioner:
       all:
         hosts:
           openssh_server:
-            ansible_connection: local
-            ansible_python_interpreter: "{{ ansible_playbook_python }}"
+            ansible_connection: docker
 verifier:
   name: ansible

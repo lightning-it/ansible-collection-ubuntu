@@ -4,18 +4,23 @@ dependency:
   command: ":"
 
 driver:
-  name: default
+  name: docker
 
 platforms:
-  - name: localhost
-    managed: false
+  - name: users
+    image: ubuntu:24.04
+    pre_build_image: true
+    command: sleep infinity
+    network_mode: host
 
 provisioner:
   name: ansible
   inventory:
-    host_vars:
-      localhost:
-        ansible_connection: local
+    hosts:
+      all:
+        hosts:
+          users:
+            ansible_connection: docker
   playbooks:
     converge: converge.yml
     verify: verify.yml
@@ -25,9 +30,11 @@ scenario:
   test_sequence:
     - dependency
     - syntax
+    - create
     - converge
     - idempotence
     - verify
+    - destroy
 
 verifier:
   name: ansible

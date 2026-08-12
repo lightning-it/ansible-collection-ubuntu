@@ -1,12 +1,14 @@
 ---
 - name: Verify users role execution
-  hosts: localhost
-  connection: local
+  hosts: users
   gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
   tasks:
     - name: Check lit.ubuntu.users coverage marker
       ansible.builtin.stat:
-        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/users-syntax-coverage"
+        path: /tmp/lit-users-molecule-execution
       register: users_molecule_coverage_marker
 
     - name: Read Molecule user supplementary groups

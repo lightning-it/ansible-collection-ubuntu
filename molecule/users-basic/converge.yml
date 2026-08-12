@@ -1,9 +1,10 @@
 ---
 - name: Converge users role execution
-  hosts: localhost
-  connection: local
+  hosts: users
   gather_facts: false
   vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
     users_molecule_execute_role: true
     users_molecule_stale_key: >-
       ssh-ed25519
@@ -37,6 +38,13 @@
         passwordless_sudo: true
         sudoers_name: 90-lit-molecule-global-user
   pre_tasks:
+    - name: Ensure python3 is present
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get update && apt-get -y install python3
+        fi
+      changed_when: false
+
     - name: Install sudo for sudoers validation in the minimal test image
       ansible.builtin.package:
         name: sudo
@@ -88,6 +96,6 @@
 
     - name: Record lit.ubuntu.users Molecule execution marker
       ansible.builtin.copy:
-        dest: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/users-syntax-coverage"
+        dest: /tmp/lit-users-molecule-execution
         content: "role_executed\n"
         mode: "0644"
