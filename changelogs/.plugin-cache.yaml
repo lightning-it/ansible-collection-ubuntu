@@ -29,6 +29,10 @@ objects:
       description: Install a GUI stack (GNOME or XFCE) on Ubuntu.
       name: gui
       version_added: null
+    host_firewall:
+      description: Manage a transactional nftables host firewall.
+      name: host_firewall
+      version_added: null
     incus:
       description: Install and configure Incus on Ubuntu
       name: incus
@@ -77,4 +81,4 @@ plugins:
   strategy: {}
   test: {}
   vars: {}
-version: 1.10.0
+version: 1.11.0
