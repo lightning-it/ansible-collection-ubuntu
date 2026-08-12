@@ -5,8 +5,6 @@
   gather_facts: false
   vars:
     openssh_server_test_dir: /tmp/lit-openssh-server-molecule
-    openssh_server_config_owner: null
-    openssh_server_config_group: null
 
   pre_tasks:
     - name: Create OpenSSH server test directory

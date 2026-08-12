@@ -8,22 +8,6 @@
       - cis_ubuntu24_network_sysctl_file is string
       - cis_ubuntu24_network_sysctl_file is match('^/')
       - >-
-        cis_ubuntu24_network_sysctl_owner is none
-        or
-        (
-          cis_ubuntu24_network_sysctl_owner is string
-          and cis_ubuntu24_network_sysctl_owner | length > 0
-        )
-      - >-
-        cis_ubuntu24_network_sysctl_group is none
-        or
-        (
-          cis_ubuntu24_network_sysctl_group is string
-          and cis_ubuntu24_network_sysctl_group | length > 0
-        )
-      - cis_ubuntu24_aide_service_path is string
-      - cis_ubuntu24_aide_service_path is match('^/')
-      - >-
         cis_ubuntu24_profile_tag
         in [
           'level1-server',

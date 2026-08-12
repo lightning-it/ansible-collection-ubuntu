@@ -10,8 +10,6 @@
     luks_unlock_test_tang_url: http://tang.example.invalid
     luks_unlock_test_tang_thumbprint: molecule-tang-signing-thumbprint
     luks_unlock_rebuild_initramfs: false
-    luks_unlock_managed_owner: null
-    luks_unlock_managed_group: null
     luks_unlock_test_public_key: >-
       ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoleculeDocumentationKeyOnly000000000 molecule@example.invalid
     luks_unlock_test_network:

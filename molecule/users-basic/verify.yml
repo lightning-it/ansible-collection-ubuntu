@@ -1,5 +1,5 @@
 ---
-- name: Verify users validation coverage
+- name: Verify users role execution
   hosts: localhost
   connection: local
   gather_facts: false
@@ -9,38 +9,46 @@
         path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/users-syntax-coverage"
       register: users_molecule_coverage_marker
 
-    - name: Assert lit.ubuntu.users syntax coverage completed
+    - name: Read Molecule user supplementary groups
+      ansible.builtin.command:
+        argv:
+          - id
+          - -nG
+          - lit-molecule-user
+      register: users_molecule_groups
+      changed_when: false
+
+    - name: Read Molecule user authorized keys
+      ansible.builtin.slurp:
+        src: /home/lit-molecule-user/.ssh/authorized_keys
+      register: users_molecule_authorized_keys
+
+    - name: Read mandatory global user sudo policy
+      ansible.builtin.slurp:
+        src: /etc/sudoers.d/90-lit-molecule-global-user
+      register: users_molecule_global_sudo
+
+    - name: Assert lit.ubuntu.users reconciled exact access
       ansible.builtin.assert:
         that:
           - users_molecule_coverage_marker.stat.exists
-          - users_molecule_coverage_marker.stat.size == 12
+          - users_molecule_coverage_marker.stat.size == 14
+          - >-
+            (users_molecule_groups.stdout.split() | sort)
+            == (['lit-molecule-group', 'lit-molecule-user'] | sort)
+          - >-
+            (users_molecule_authorized_keys.content | b64decode | trim)
+            == (users_molecule_desired_key | trim)
+          - "'stale@molecule.invalid' not in (users_molecule_authorized_keys.content | b64decode)"
+          - >-
+            (users_molecule_global_sudo.content | b64decode | trim)
+            == 'lit-molecule-global-user ALL=(ALL) NOPASSWD:ALL'
         quiet: true
-
-    - name: Validate representative user definitions without system mutation
-      ansible.builtin.include_role:
-        name: lit.ubuntu.users
-        tasks_from: assert.yml
       vars:
-        users_accounts:
-          - name: lit-molecule-user
-            groups:
-              - lit-molecule-group
-            groups_append: false
-            shell: /bin/bash
-            create_home: true
-            password_lock: true
-            ssh_keys:
-              - >-
-                ssh-ed25519
-                AAAAC3NzaC1lZDI1NTE5AAAAIEjzifs06betrcygee7kUrE1IMhU4p0M3P5ZsaMVsEbo
-                desired@molecule.invalid
-            ssh_keys_exclusive: true
-        users_accounts_extra: []
-        users_accounts_global:
-          - name: lit-molecule-global-user
-            passwordless_sudo: true
-            sudoers_name: 90-lit-molecule-global-user
-        users_manage_groups: true
+        users_molecule_desired_key: >-
+          ssh-ed25519
+          AAAAC3NzaC1lZDI1NTE5AAAAIEjzifs06betrcygee7kUrE1IMhU4p0M3P5ZsaMVsEbo
+          desired@molecule.invalid
 
     - name: Verify whitespace-only SSH keys fail closed
       block:

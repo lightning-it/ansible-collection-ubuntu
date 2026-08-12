@@ -1,18 +1,93 @@
 ---
-- name: Converge users syntax coverage
+- name: Converge users role execution
   hosts: localhost
   connection: local
   gather_facts: false
   vars:
-    users_molecule_execute_role: false
+    users_molecule_execute_role: true
+    users_molecule_stale_key: >-
+      ssh-ed25519
+      AAAAC3NzaC1lZDI1NTE5AAAAIIlru1j13wIZWwh0wFwG+fSXmOoOStO1Sds6KM3LISAb
+      stale@molecule.invalid
+    users_molecule_desired_key: >-
+      ssh-ed25519
+      AAAAC3NzaC1lZDI1NTE5AAAAIEjzifs06betrcygee7kUrE1IMhU4p0M3P5ZsaMVsEbo
+      desired@molecule.invalid
+    users_accounts:
+      - name: lit-molecule-global-user
+        state: present
+        passwordless_sudo: false
+        sudoers_name: 90-lit-molecule-global-user
+      - name: lit-molecule-user
+        state: present
+        groups:
+          - lit-molecule-group
+        groups_append: false
+        shell: /bin/bash
+        create_home: true
+        password_lock: true
+        ssh_keys:
+          - "{{ users_molecule_desired_key }}"
+        ssh_keys_exclusive: true
+    users_accounts_global:
+      - name: lit-molecule-global-user
+        state: present
+        create_home: true
+        password_lock: true
+        passwordless_sudo: true
+        sudoers_name: 90-lit-molecule-global-user
+  pre_tasks:
+    - name: Install sudo for sudoers validation in the minimal test image
+      ansible.builtin.package:
+        name: sudo
+        state: present
+
+    - name: Create sudoers include directory for the minimal test image
+      ansible.builtin.file:
+        path: /etc/sudoers.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0750"
+
+    - name: Create Molecule supplementary group
+      ansible.builtin.group:
+        name: lit-molecule-group
+        state: present
+
+    - name: Create Molecule user before stale-key fixture
+      ansible.builtin.user:
+        name: lit-molecule-user
+        groups:
+          - lit-molecule-group
+        append: true
+        shell: /bin/bash
+        create_home: true
+
+    - name: Create Molecule SSH directory
+      ansible.builtin.file:
+        path: /home/lit-molecule-user/.ssh
+        state: directory
+        owner: lit-molecule-user
+        group: lit-molecule-user
+        mode: "0700"
+
+    - name: Seed one stale authorized key only once
+      ansible.builtin.copy:
+        dest: /home/lit-molecule-user/.ssh/authorized_keys
+        content: "{{ users_molecule_stale_key }}\n"
+        owner: lit-molecule-user
+        group: lit-molecule-user
+        mode: "0600"
+        force: false
   tasks:
-    - name: Import lit.ubuntu.users for syntax coverage
+    - name: Execute lit.ubuntu.users with exact account inputs
       ansible.builtin.import_role:
         name: lit.ubuntu.users
       when: users_molecule_execute_role | bool
 
-    - name: Record lit.ubuntu.users Molecule coverage marker
+    - name: Record lit.ubuntu.users Molecule execution marker
       ansible.builtin.copy:
         dest: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/users-syntax-coverage"
-        content: "syntax_stub\n"
+        content: "role_executed\n"
         mode: "0644"
