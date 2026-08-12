@@ -35,7 +35,10 @@ masks the unused package-provided `dailyaidecheck.service`. This preserves the
 cron job while preventing the upstream role from repeatedly attempting to
 disable a static systemd unit. Selecting the upstream timer scheduler removes
 only that wrapper-owned `/dev/null` mask before the upstream role configures
-the timer units.
+the timer units. The absolute path defaults to
+`/etc/systemd/system/dailyaidecheck.service`; override
+`cis_ubuntu24_aide_service_path` only when the target uses another systemd unit
+directory or for an isolated integration test.
 
 The upstream 6.2.4.1 remediation recursively applies a file-only mode to the
 audit log directory. When inventory explicitly disables that defective
@@ -44,6 +47,11 @@ traversable mode-0750 directory. Inventory must separately document the
 6.2.4.1 exception and its audit-log-file compensating control.
 Override `cis_ubuntu24_audit_log_directory` only when auditd uses a different
 absolute log directory.
+
+The persistent network-control file remains `root:root` by default. Setting
+`cis_ubuntu24_network_sysctl_owner` and
+`cis_ubuntu24_network_sysctl_group` to null preserves the current ownership;
+this is intended for an isolated, non-root integration-test path only.
 
 ## Dependencies
 

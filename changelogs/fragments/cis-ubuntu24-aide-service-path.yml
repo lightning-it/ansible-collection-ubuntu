@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - >-
+    cis_ubuntu24 - make the AIDE systemd service path configurable so isolated
+    integration tests can run without root privileges, and allow those tests
+    to preserve ownership on an isolated network-control file, while
+    production keeps the existing system path and root ownership by default.

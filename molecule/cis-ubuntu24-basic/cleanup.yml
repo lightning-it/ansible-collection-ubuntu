@@ -1,15 +1,12 @@
 ---
 - name: Clean up the Ubuntu 24 CIS integration fixture
-  hosts: cis_ubuntu24
+  hosts: localhost
   gather_facts: false
   become: false
-  vars:
-    ansible_user: root
-    ansible_python_interpreter: /usr/bin/python3
   tasks:
     - name: Inspect the AIDE cron service mask
       ansible.builtin.stat:
-        path: /etc/systemd/system/dailyaidecheck.service
+        path: "{{ cis_ubuntu24_aide_service_path }}"
         follow: false
       register: cis_ubuntu24_aide_service_mask
       tags: always
@@ -22,7 +19,7 @@
           | default('')
           == '/dev/null'
       ansible.builtin.file:
-        path: /etc/systemd/system/dailyaidecheck.service
+        path: "{{ cis_ubuntu24_aide_service_path }}"
         state: absent
       tags: always
 
@@ -49,5 +46,4 @@
             lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY')
           }}/roles/ansible-lockdown.ubuntu24_cis
         state: absent
-      delegate_to: localhost
       tags: always
