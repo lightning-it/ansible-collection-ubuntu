@@ -17,3 +17,6 @@ minor_changes:
     tang_deploy - allow isolated unprivileged validation paths to preserve
     existing directory and file ownership, while retaining root ownership as
     the production default.
+  - >-
+    users - keep the local Molecule scenario unprivileged while preserving
+    syntax coverage and positive and fail-closed input validation.
