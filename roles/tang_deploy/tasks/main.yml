@@ -16,10 +16,8 @@
   ansible.builtin.file:
     path: "{{ tang_deploy_socket_override_path | dirname }}"
     state: directory
-    owner: >-
-      {{ tang_deploy_managed_owner if tang_deploy_managed_owner is not none else omit }}
-    group: >-
-      {{ tang_deploy_managed_group if tang_deploy_managed_group is not none else omit }}
+    owner: root
+    group: root
     mode: "0755"
   when:
     - tang_deploy_enabled | bool
@@ -29,10 +27,8 @@
   ansible.builtin.template:
     src: tangd.socket.conf.j2
     dest: "{{ tang_deploy_socket_override_path }}"
-    owner: >-
-      {{ tang_deploy_managed_owner if tang_deploy_managed_owner is not none else omit }}
-    group: >-
-      {{ tang_deploy_managed_group if tang_deploy_managed_group is not none else omit }}
+    owner: root
+    group: root
     mode: "0644"
   notify:
     - Tang deploy | Reload systemd

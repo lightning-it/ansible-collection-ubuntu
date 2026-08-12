@@ -7,23 +7,25 @@ dependency:
     "${MOLECULE_SCENARIO_DIRECTORY}/roles/ansible-lockdown.ubuntu24_cis/tasks/main.yml"
 
 driver:
-  name: default
+  name: docker
 
 platforms:
-  - name: localhost
-    managed: false
+  - name: cis_ubuntu24
+    image: ubuntu:24.04
+    pre_build_image: true
+    command: sleep infinity
+    network_mode: host
 
 provisioner:
   name: ansible
   options:
     tags: level1-server
   inventory:
-    host_vars:
-      localhost:
-        ansible_connection: local
-        cis_ubuntu24_aide_service_path: /tmp/lit-ubuntu-cis-dailyaidecheck.service
-        cis_ubuntu24_network_sysctl_owner: null
-        cis_ubuntu24_network_sysctl_group: null
+    hosts:
+      all:
+        hosts:
+          cis_ubuntu24:
+            ansible_connection: docker
   playbooks:
     cleanup: cleanup.yml
     converge: converge.yml
@@ -34,10 +36,12 @@ scenario:
   test_sequence:
     - dependency
     - syntax
+    - create
     - converge
     - idempotence
     - verify
     - cleanup
+    - destroy
 
 verifier:
   name: ansible

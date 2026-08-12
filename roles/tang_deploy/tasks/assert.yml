@@ -12,22 +12,6 @@
       - tang_deploy_packages is sequence
       - tang_deploy_packages is not string
       - tang_deploy_socket_state in ['started', 'stopped']
-      - >-
-        tang_deploy_managed_owner is none
-        or
-        (
-          tang_deploy_managed_owner is string
-          and tang_deploy_managed_owner
-          is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
-        )
-      - >-
-        tang_deploy_managed_group is none
-        or
-        (
-          tang_deploy_managed_group is string
-          and tang_deploy_managed_group
-          is match('^(?:[A-Za-z_][A-Za-z0-9_.-]*[$]?|[0-9]+)$')
-        )
     fail_msg: "Tang deployment variables are invalid."
 
 - name: Validate enabled Tang deployment inputs

@@ -1,17 +1,25 @@
 ---
 - name: Verify developer tools role execution
-  hosts: localhost
-  connection: local
+  hosts: developer_tools
   gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
   tasks:
     - name: Check lit.ubuntu.developer_tools coverage marker
       ansible.builtin.stat:
-        path: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/developer_tools-syntax-coverage"
+        path: /tmp/lit-developer-tools-molecule-execution
       register: developer_tools_molecule_coverage_marker
+
+    - name: Check isolated developer workspace
+      ansible.builtin.stat:
+        path: /root/.cache/lit-molecule-developer-tools
+      register: developer_tools_molecule_workspace
 
     - name: Assert lit.ubuntu.developer_tools executed safely
       ansible.builtin.assert:
         that:
           - developer_tools_molecule_coverage_marker.stat.exists
           - developer_tools_molecule_coverage_marker.stat.size == 14
+          - developer_tools_molecule_workspace.stat.isdir
         quiet: true

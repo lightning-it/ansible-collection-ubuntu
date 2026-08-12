@@ -31,10 +31,6 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `luks_unlock_early_network`: structured static or DHCP early-boot network configuration. Static bootstrap currently
   accepts IPv4 addresses only.
 - `luks_unlock_network_modules`: NIC drivers to force into the initramfs, for example `igb`.
-- `luks_unlock_managed_owner` and `luks_unlock_managed_group`: ownership for
-  managed installed-system directories and files; both default to `root`.
-  Setting either to `null` preserves current ownership for isolated,
-  unprivileged validation paths.
 - `luks_unlock_dropbear_authorized_keys`: raw public SSH keys. The role adds a forced `cryptroot-unlock` command and
   disables forwarding.
 - `luks_unlock_rescue_stage_path`: secret-free executable rendered on the Rescue host.

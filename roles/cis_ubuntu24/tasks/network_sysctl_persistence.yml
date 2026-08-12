@@ -48,18 +48,8 @@
           net.ipv6.conf.all.accept_ra = 0
           net.ipv6.conf.default.accept_ra = 0
           {% endif %}
-        owner: >-
-          {{
-            cis_ubuntu24_network_sysctl_owner
-            if cis_ubuntu24_network_sysctl_owner is not none
-            else omit
-          }}
-        group: >-
-          {{
-            cis_ubuntu24_network_sysctl_group
-            if cis_ubuntu24_network_sysctl_group is not none
-            else omit
-          }}
+        owner: root
+        group: root
         mode: '0644'
 
     - name: Remove stale independently audited network kernel controls
