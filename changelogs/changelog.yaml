@@ -85,6 +85,11 @@ releases:
       - host-firewall-transaction.yml
       - shared-assets-sync.yml
     release_date: '2026-08-12'
+  1.12.0:
+    changes: {}
+    fragments:
+      - shared-assets-sync.yml
+    release_date: '2026-08-13'
   1.2.0:
     changes:
       bugfixes:
