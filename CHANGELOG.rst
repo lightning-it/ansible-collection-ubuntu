@@ -4,6 +4,9 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.12.0
+=======
+
 v1.11.0
 =======
 
