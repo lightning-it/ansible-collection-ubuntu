@@ -42,6 +42,11 @@ Important inputs include:
   only below a revalidated parent and is checked again before a privileged write.
 - `forward_proxy_client_render_root`: the single non-root, non-systemd test/render
   tree allowed below `/tmp`; root-owned runs can never use it.
+- `forward_proxy_client_lock_path` and `forward_proxy_client_lock_timeout`:
+  bounded per-host mutual exclusion for the complete inspect, transition,
+  render, activation, disable, and finalize sequence. A competing run fails
+  closed after the timeout; an interrupted stale lock requires explicit
+  operator inspection before removal.
 
 Disabling a previously managed adapter always requires the controlled systemd
 cutover. Any service restart recorded by an earlier staged or failed activation

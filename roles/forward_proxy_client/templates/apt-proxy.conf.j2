@@ -1,4 +1,4 @@
-// Managed by lit.ubuntu.forward_proxy_client. Local changes are overwritten.
+// Managed by lit.ubuntu.forward_proxy_client. Out-of-band changes are rejected.
 Acquire::http::Proxy "{{ forward_proxy_client_proxy_url_internal }}";
 Acquire::https::Proxy "{{ forward_proxy_client_proxy_url_internal }}";
 {% for host in forward_proxy_client_apt_direct_hosts %}

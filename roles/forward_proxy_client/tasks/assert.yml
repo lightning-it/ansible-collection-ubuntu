@@ -53,8 +53,21 @@
           )
         )
       - forward_proxy_client_systemd_scope == 'system'
-      - forward_proxy_client_proxy_port | int >= 1024
-      - forward_proxy_client_proxy_port | int <= 65535
+      - forward_proxy_client_lock_timeout is integer
+      - forward_proxy_client_lock_timeout >= 1
+      - forward_proxy_client_lock_timeout <= 300
+      - forward_proxy_client_lock_path is match('^/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\.lock\Z')
+      - >-
+        forward_proxy_client_lock_path.startswith('/run/lock/')
+        or forward_proxy_client_lock_path.startswith(forward_proxy_client_render_root.rstrip('/') ~ '/')
+      - >-
+        forward_proxy_client_file_owner not in ['root', '0']
+        or forward_proxy_client_lock_path.startswith('/run/lock/')
+      - forward_proxy_client_lock_path not in forward_proxy_client_all_managed_paths_internal
+      - forward_proxy_client_lock_path != forward_proxy_client_state_marker_path
+      - forward_proxy_client_proxy_port is integer
+      - forward_proxy_client_proxy_port >= 1024
+      - forward_proxy_client_proxy_port <= 65535
       - forward_proxy_client_listen_addresses is sequence
       - forward_proxy_client_listen_addresses is not string
       - forward_proxy_client_listen_addresses | length > 0

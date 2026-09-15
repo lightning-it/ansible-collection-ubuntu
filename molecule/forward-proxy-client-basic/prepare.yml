@@ -10,3 +10,9 @@
         path: /tmp/wunder/lit-forward-proxy-client-molecule
         state: absent
       check_mode: false
+
+    - name: Remove only the scenario-owned stale proxy-client lock
+      ansible.builtin.file:
+        path: /tmp/wunder/lit-forward-proxy-client-molecule.lock
+        state: absent
+      check_mode: false

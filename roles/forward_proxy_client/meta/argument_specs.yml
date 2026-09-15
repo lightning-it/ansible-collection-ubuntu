@@ -10,6 +10,8 @@ argument_specs:
       forward_proxy_client_file_owner: {type: str, default: root}
       forward_proxy_client_file_group: {type: str, default: root}
       forward_proxy_client_systemd_scope: {type: str, default: system}
+      forward_proxy_client_lock_path: {type: path, default: /run/lock/lit-ubuntu-forward-proxy-client.lock}
+      forward_proxy_client_lock_timeout: {type: int, default: 30}
       forward_proxy_client_proxy_port: {type: int, default: 3128}
       forward_proxy_client_listen_addresses: {type: list, elements: str}
       forward_proxy_client_allowed_clients: {type: list, elements: str}

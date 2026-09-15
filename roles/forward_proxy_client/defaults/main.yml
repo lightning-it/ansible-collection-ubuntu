@@ -6,6 +6,8 @@ forward_proxy_client_restart_now: false
 forward_proxy_client_file_owner: root
 forward_proxy_client_file_group: root
 forward_proxy_client_systemd_scope: system
+forward_proxy_client_lock_path: /run/lock/lit-ubuntu-forward-proxy-client.lock
+forward_proxy_client_lock_timeout: 30
 
 # Map the distribution-neutral service interface without creating a collection
 # dependency. Consumer automation invokes lit.supplementary.forward_proxy and

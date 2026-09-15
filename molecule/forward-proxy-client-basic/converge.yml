@@ -46,6 +46,7 @@
       forward_proxy_client_manage_systemd: false
       forward_proxy_client_file_owner: "{{ forward_proxy_client_test_uid.stdout }}"
       forward_proxy_client_file_group: "{{ forward_proxy_client_test_gid.stdout }}"
+      forward_proxy_client_lock_path: /tmp/wunder/lit-forward-proxy-client-molecule.lock
       forward_proxy_client_container_enabled: true
       forward_proxy_client_listen_addresses:
         - 127.0.0.1

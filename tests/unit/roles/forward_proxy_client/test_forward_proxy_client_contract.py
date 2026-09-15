@@ -19,6 +19,71 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertNotIn("squid-pod", role_text)
         self.assertNotIn("ansible.builtin.apt", role_text)
 
+    def test_complete_state_transition_has_bounded_per_host_mutual_exclusion(
+        self,
+    ) -> None:
+        wrapper = yaml.safe_load((ROLE_ROOT / "tasks" / "main.yml").read_text())
+        by_name = {task["name"]: task for task in wrapper}
+        acquire = by_name["Acquire the bounded per-host proxy-client transition lock"]
+        command = acquire["ansible.builtin.command"]
+        self.assertEqual(
+            command["argv"],
+            [
+                "/usr/bin/mkdir",
+                "--mode=0700",
+                "{{ forward_proxy_client_lock_path }}",
+            ],
+        )
+        self.assertEqual(
+            acquire["until"], "forward_proxy_client_lock_acquisition.rc == 0"
+        )
+        self.assertEqual(acquire["delay"], 1)
+        self.assertEqual(acquire["retries"], "{{ forward_proxy_client_lock_timeout }}")
+        locked = by_name[
+            "Apply the complete proxy-client transition under one host lock"
+        ]
+        self.assertEqual(
+            locked["block"][0]["ansible.builtin.include_tasks"], "transition.yml"
+        )
+        release = locked["always"][0]
+        self.assertEqual(
+            release["ansible.builtin.file"]["path"],
+            "{{ forward_proxy_client_lock_path }}",
+        )
+        self.assertEqual(release["ansible.builtin.file"]["state"], "absent")
+        self.assertIn(
+            "forward_proxy_client_lock_acquisition.rc | default(1) == 0",
+            release["when"],
+        )
+        defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
+        assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
+        readme = (ROLE_ROOT / "README.md").read_text()
+        self.assertIn("forward_proxy_client_lock_timeout: 30", defaults)
+        self.assertIn("forward_proxy_client_lock_timeout <= 300", assertions)
+        self.assertIn("/run/lock/", assertions)
+        self.assertIn(
+            "forward_proxy_client_file_owner not in ['root', '0']", assertions
+        )
+        self.assertIn("interrupted stale lock requires explicit", readme)
+
+    def test_proxy_port_is_a_canonical_integer_and_headers_match_fail_closed_state(
+        self,
+    ) -> None:
+        assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
+        self.assertIn("forward_proxy_client_proxy_port is integer", assertions)
+        self.assertIn("forward_proxy_client_proxy_port >= 1024", assertions)
+        self.assertIn("forward_proxy_client_proxy_port <= 65535", assertions)
+        self.assertNotIn("forward_proxy_client_proxy_port | int", assertions)
+        for template in (
+            "apt-proxy.conf.j2",
+            "containers-proxy.conf.j2",
+            "proxy-environment.conf.j2",
+            "proxy-environment.sh.j2",
+        ):
+            header = (ROLE_ROOT / "templates" / template).read_text().splitlines()[0]
+            self.assertIn("Out-of-band changes are rejected", header)
+            self.assertNotIn("overwritten", header)
+
     def test_apt_override_wins_and_encodes_exact_direct_hosts(self) -> None:
         defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
         template = (ROLE_ROOT / "templates" / "apt-proxy.conf.j2").read_text()
@@ -55,7 +120,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("| difference(", tasks)
 
     def test_owned_updates_follow_out_of_band_tamper_check(self) -> None:
-        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "main.yml").read_text())
+        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "transition.yml").read_text())
         names = [task["name"] for task in tasks]
         ownership_name = (
             "Verify previously managed files were not changed outside the role"
@@ -258,7 +323,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("Root-owned runs reject every", readme)
 
     def test_interrupted_file_transition_is_exactly_recoverable(self) -> None:
-        main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        main = (ROLE_ROOT / "tasks" / "transition.yml").read_text()
         enabled = (ROLE_ROOT / "tasks" / "enabled.yml").read_text()
         readme = (ROLE_ROOT / "README.md").read_text()
         self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v6", main)
@@ -307,7 +372,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
 
     def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
-        main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        main = (ROLE_ROOT / "tasks" / "transition.yml").read_text()
         self.assertIn("forward_proxy_client_trusted_parent_paths", assertions)
         self.assertIn(
             "item | dirname in forward_proxy_client_trusted_parent_paths", assertions
@@ -405,7 +470,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
 
     def test_existing_directories_keep_tighter_permissions(self) -> None:
-        main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        main = (ROLE_ROOT / "tasks" / "transition.yml").read_text()
         ensure = (ROLE_ROOT / "tasks" / "ensure_directory.yml").read_text()
         enabled = (ROLE_ROOT / "tasks" / "enabled.yml").read_text()
         self.assertIn(
@@ -427,7 +492,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertNotIn("Create forward proxy client managed directories", enabled)
 
     def test_previous_container_paths_retain_a_validated_cleanup_chain(self) -> None:
-        tasks = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        tasks = (ROLE_ROOT / "tasks" / "transition.yml").read_text()
         self.assertIn(
             "Bind previously managed proxy-client paths to the trusted parent chain",
             tasks,
@@ -452,7 +517,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("'--check --file -'", verify)
 
     def test_disable_is_check_mode_safe_and_requires_service_cutover(self) -> None:
-        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "main.yml").read_text())
+        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "transition.yml").read_text())
         by_name = {task["name"]: task for task in tasks}
         reload_task = by_name[
             "Reload systemd manager after removing proxy client defaults"
