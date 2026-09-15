@@ -365,7 +365,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             cutover_task["ansible.builtin.assert"]["that"][1],
         )
         self.assertIn(
-            "forward_proxy_client_previous_state_manifest.systemd_activation_pending",
+            "forward_proxy_client_systemd_environment_path",
             cutover_task["ansible.builtin.assert"]["that"][0],
         )
         self.assertEqual(
@@ -378,7 +378,13 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         ensure = (ROLE_ROOT / "tasks" / "ensure_directory.yml").read_text()
         self.assertEqual(ensure.count("not ansible_check_mode"), 2)
         self.assertEqual(
-            ensure.count("forward_proxy_client_directory_before.stat.exists"), 4
+            ensure.count("forward_proxy_client_directory_before.stat.exists"), 5
+        )
+        self.assertIn(
+            "forward_proxy_client_planned_directories_internal", ensure
+        )
+        self.assertIn(
+            "Initialize the check-mode proxy-client directory plan", by_name
         )
 
     def test_root_documentation_and_molecule_cover_public_adapter_modes(self) -> None:

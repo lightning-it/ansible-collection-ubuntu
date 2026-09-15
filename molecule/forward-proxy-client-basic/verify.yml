@@ -102,12 +102,21 @@
         src: "{{ forward_proxy_client_test_root }}/etc/apt/99-lit-forward-proxy"
       register: forward_proxy_client_upstream_apt_config
 
+    - name: Inspect intentionally disabled container client propagation
+      ansible.builtin.stat:
+        path: >-
+          {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
+        follow: false
+      register: forward_proxy_client_upstream_container_config
+
     - name: Assert upstream mode keeps every Ubuntu client on the local proxy
       ansible.builtin.assert:
         that:
           - >-
             'Acquire::https::Proxy "http://127.0.0.1:3128";'
             in (forward_proxy_client_upstream_apt_config.content | b64decode)
+          - not forward_proxy_client_upstream_container_config.stat.exists
+          - not forward_proxy_client_upstream_container_config.stat.islnk | default(false)
         quiet: true
 
     - name: Verify staged state refuses disable without the systemd cutover
@@ -153,8 +162,6 @@
         - "{{ forward_proxy_client_test_root }}/etc/profile.d/90-lit-forward-proxy.sh"
         - "{{ forward_proxy_client_test_root }}/etc/environment.d/90-lit-forward-proxy.conf"
         - "{{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d/90-lit-forward-proxy.conf"
-        - >-
-          {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
         - >-
           {{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client/managed.json
       register: forward_proxy_client_staged_paths

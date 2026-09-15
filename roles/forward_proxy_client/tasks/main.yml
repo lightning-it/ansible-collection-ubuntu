@@ -205,6 +205,10 @@
         ) | map('dirname') | unique | list
       }}
 
+- name: Initialize the check-mode proxy-client directory plan
+  ansible.builtin.set_fact:
+    forward_proxy_client_planned_directories_internal: []
+
 - name: Create and revalidate each required proxy-client directory boundary
   ansible.builtin.include_tasks: ensure_directory.yml
   loop: "{{ forward_proxy_client_trusted_parent_paths }}"
@@ -301,7 +305,8 @@
   ansible.builtin.assert:
     that:
       - >-
-        not forward_proxy_client_previous_state_manifest.systemd_activation_pending
+        forward_proxy_client_systemd_environment_path
+        not in forward_proxy_client_previous_state_manifest.managed_paths
         or forward_proxy_client_manage_systemd | bool
       - >-
         forward_proxy_client_disable_restart_services_internal | length == 0
@@ -310,10 +315,9 @@
           and forward_proxy_client_restart_now | bool
         )
     fail_msg: >-
-      Disabling proxy client state with pending manager activation requires a
-      systemd reexec, and pending opted-in services require the explicit
-      restart cutover, so no current or newly started service keeps stale
-      proxy variables.
+      Removing managed systemd defaults requires a manager reexec, and pending
+      opted-in services require the explicit restart cutover, so no current or
+      newly started service keeps stale proxy variables.
   when:
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists

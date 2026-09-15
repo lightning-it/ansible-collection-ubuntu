@@ -8,30 +8,41 @@
 - name: Require a validated parent before creating the proxy-client directory
   ansible.builtin.assert:
     that:
-      - forward_proxy_client_directory_parent.stat.exists
-      - forward_proxy_client_directory_parent.stat.isdir | default(false)
-      - not forward_proxy_client_directory_parent.stat.islnk | default(false)
       - >-
-        forward_proxy_client_directory_parent.stat.mode
-        is match('^0[0-7][0145][0145]\Z')
-        or (
-          forward_proxy_client_directory_path | dirname == '/tmp'
-          and forward_proxy_client_directory_parent.stat.mode == '1777'
-          and forward_proxy_client_directory_parent.stat.uid == 0
-          and forward_proxy_client_directory_parent.stat.gid == 0
+        (
+          forward_proxy_client_directory_parent.stat.exists
+          and forward_proxy_client_directory_parent.stat.isdir | default(false)
+          and not forward_proxy_client_directory_parent.stat.islnk | default(false)
+          and (
+            forward_proxy_client_directory_parent.stat.mode
+            is match('^0[0-7][0145][0145]\Z')
+            or (
+              forward_proxy_client_directory_path | dirname == '/tmp'
+              and forward_proxy_client_directory_parent.stat.mode == '1777'
+              and forward_proxy_client_directory_parent.stat.uid == 0
+              and forward_proxy_client_directory_parent.stat.gid == 0
+            )
+          )
+          and (
+            forward_proxy_client_directory_parent.stat.uid == 0
+            or forward_proxy_client_directory_parent.stat.pw_name | default('')
+              == forward_proxy_client_file_owner | string
+            or forward_proxy_client_directory_parent.stat.uid | string
+              == forward_proxy_client_file_owner | string
+          )
+          and (
+            forward_proxy_client_directory_parent.stat.gid == 0
+            or forward_proxy_client_directory_parent.stat.gr_name | default('')
+              == forward_proxy_client_file_group | string
+            or forward_proxy_client_directory_parent.stat.gid | string
+              == forward_proxy_client_file_group | string
+          )
         )
-      - >-
-        forward_proxy_client_directory_parent.stat.uid == 0
-        or forward_proxy_client_directory_parent.stat.pw_name | default('')
-          == forward_proxy_client_file_owner | string
-        or forward_proxy_client_directory_parent.stat.uid | string
-          == forward_proxy_client_file_owner | string
-      - >-
-        forward_proxy_client_directory_parent.stat.gid == 0
-        or forward_proxy_client_directory_parent.stat.gr_name | default('')
-          == forward_proxy_client_file_group | string
-        or forward_proxy_client_directory_parent.stat.gid | string
-          == forward_proxy_client_file_group | string
+        or (
+          ansible_check_mode
+          and forward_proxy_client_directory_path | dirname
+            in forward_proxy_client_planned_directories_internal
+        )
     fail_msg: >-
       The immediate parent of a required proxy-client directory must already
       exist as a validated non-symlink directory. Trusted paths must therefore
@@ -88,6 +99,17 @@
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0755"
   when: not forward_proxy_client_directory_before.stat.exists
+
+- name: Carry the planned proxy-client directory through check mode
+  ansible.builtin.set_fact:
+    forward_proxy_client_planned_directories_internal: >-
+      {{
+        forward_proxy_client_planned_directories_internal
+        + [forward_proxy_client_directory_path]
+      }}
+  when:
+    - ansible_check_mode
+    - not forward_proxy_client_directory_before.stat.exists
 
 - name: Reinspect the required proxy-client directory before rendering
   ansible.builtin.stat:
