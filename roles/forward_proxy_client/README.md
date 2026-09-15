@@ -48,7 +48,12 @@ rejects out-of-band tampering; it does not reject desired variable or template
 changes, which are rendered only after that ownership check. A service newly
 added to `forward_proxy_client_restart_services` becomes pending even when the
 rendered files are otherwise unchanged, so its first explicit cutover cannot be
-silently skipped.
+silently skipped. Before changing the managed file set, the role records the
+exact desired checksums as a pending transition. If a later file operation is
+interrupted, the next run accepts only the old checksum or that exact pending
+checksum and can safely finish the same transition. Root-owned runs reject every
+managed path below the world-writable `/tmp` tree; `/tmp` is limited to the
+non-root, non-systemd test/render boundary.
 
 The role writes APT, interactive shell, process, systemd-manager, and optional
 Podman client defaults. Existing containers are not recreated automatically.

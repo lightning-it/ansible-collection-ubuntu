@@ -13,6 +13,15 @@
       - forward_proxy_client_file_owner is match('^(?:[a-z_][a-z0-9_-]{0,31}|[0-9]{1,10})\Z')
       - forward_proxy_client_file_group is match('^(?:[a-z_][a-z0-9_-]{0,31}|[0-9]{1,10})\Z')
       - >-
+        forward_proxy_client_file_owner not in ['root', '0']
+        or (
+          (
+            forward_proxy_client_all_managed_paths_internal
+            + [forward_proxy_client_state_marker_path]
+          )
+          | select('match', '^/tmp(?:/|$)') | list | length == 0
+        )
+      - >-
         forward_proxy_client_file_owner in ['root', '0']
         or (
           not forward_proxy_client_manage_systemd

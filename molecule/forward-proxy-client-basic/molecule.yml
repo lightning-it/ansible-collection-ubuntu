@@ -17,6 +17,7 @@ provisioner:
       localhost:
         ansible_connection: local
   playbooks:
+    check: check.yml
     converge: converge.yml
     verify: verify.yml
 
@@ -25,6 +26,7 @@ scenario:
   test_sequence:
     - dependency
     - syntax
+    - check
     - converge
     - idempotence
     - verify

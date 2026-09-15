@@ -69,7 +69,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         verify = (
             REPOSITORY_ROOT / "molecule" / "forward-proxy-client-basic" / "verify.yml"
         ).read_text()
-        self.assertIn("Reconcile the Ubuntu adapter through an exact upstream proxy", verify)
+        self.assertIn(
+            "Reconcile the Ubuntu adapter through an exact upstream proxy", verify
+        )
         self.assertIn("Read the upstream-mode apt client policy", verify)
 
     def test_container_boundary_matches_the_host_firewall(self) -> None:
@@ -107,7 +109,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "forward_proxy_client_previous_state_manifest.managed_paths", tasks
         )
-        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v5", tasks)
+        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v6", tasks)
         self.assertNotIn("managed-state/v1", variables)
         self.assertIn("checksum_algorithm: sha256", tasks)
         self.assertIn("item.stat.isreg", tasks)
@@ -243,6 +245,40 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_container_url_internal", templates)
         self.assertIn("cannot be overridden", readme)
 
+    def test_root_owned_state_cannot_be_redirected_below_tmp(self) -> None:
+        assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
+        readme = (ROLE_ROOT / "README.md").read_text()
+        self.assertIn(
+            "forward_proxy_client_file_owner not in ['root', '0']", assertions
+        )
+        self.assertIn("select('match', '^/tmp(?:/|$)')", assertions)
+        self.assertIn("Root-owned runs reject every", readme)
+
+    def test_interrupted_file_transition_is_exactly_recoverable(self) -> None:
+        main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        enabled = (ROLE_ROOT / "tasks" / "enabled.yml").read_text()
+        readme = (ROLE_ROOT / "README.md").read_text()
+        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v6", main)
+        self.assertIn("write_state in ['stable', 'pending']", main)
+        self.assertIn("forward_proxy_client_desired_checksum_map_internal", main)
+        self.assertIn(
+            "forward_proxy_client_previous_state_manifest.pending_managed_paths", main
+        )
+        self.assertIn(
+            "Record recoverable pending proxy-client file transition", enabled
+        )
+        self.assertIn("'write_state': 'pending'", enabled)
+        self.assertEqual(enabled.count("'write_state': 'stable'"), 2)
+        self.assertIn("the old checksum or that exact pending", readme)
+
+    def test_molecule_runs_fresh_tree_check_mode_before_converge(self) -> None:
+        scenario = REPOSITORY_ROOT / "molecule" / "forward-proxy-client-basic"
+        molecule = yaml.safe_load((scenario / "molecule.yml").read_text())
+        check = (scenario / "check.yml").read_text()
+        sequence = molecule["scenario"]["test_sequence"]
+        self.assertLess(sequence.index("check"), sequence.index("converge"))
+        self.assertIn("not forward_proxy_client_check_root_state.stat.exists", check)
+
     def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
         main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
@@ -350,7 +386,8 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             "Create and revalidate each required proxy-client directory boundary", main
         )
         self.assertIn(
-            "Trusted paths must therefore\n      be ordered from parent to child", ensure
+            "Trusted paths must therefore\n      be ordered from parent to child",
+            ensure,
         )
         self.assertIn(
             "Create only the validated proxy-client directory component", ensure
@@ -429,12 +466,8 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertEqual(
             ensure.count("forward_proxy_client_directory_before.stat.exists"), 5
         )
-        self.assertIn(
-            "forward_proxy_client_planned_directories_internal", ensure
-        )
-        self.assertIn(
-            "Initialize the check-mode proxy-client directory plan", by_name
-        )
+        self.assertIn("forward_proxy_client_planned_directories_internal", ensure)
+        self.assertIn("Initialize the check-mode proxy-client directory plan", by_name)
 
     def test_root_documentation_and_molecule_cover_public_adapter_modes(self) -> None:
         root_readme = (REPOSITORY_ROOT / "README.md").read_text()

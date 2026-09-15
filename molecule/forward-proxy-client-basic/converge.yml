@@ -32,11 +32,13 @@
     - name: Read rootless test UID
       ansible.builtin.command: id -u
       register: forward_proxy_client_test_uid
+      check_mode: false
       changed_when: false
 
     - name: Read rootless test GID
       ansible.builtin.command: id -g
       register: forward_proxy_client_test_gid
+      check_mode: false
       changed_when: false
   roles:
     - role: lit.ubuntu.forward_proxy_client

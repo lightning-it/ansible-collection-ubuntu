@@ -105,13 +105,50 @@
 - name: Initialize empty previous forward proxy client state
   ansible.builtin.set_fact:
     forward_proxy_client_previous_state_manifest:
+      schema: lit.ubuntu.forward_proxy_client.managed-state/v6
+      owner: lit.ubuntu.forward_proxy_client
+      write_state: stable
       managed_paths: []
       managed_checksums: []
       managed_modes: []
+      pending_managed_paths: []
+      pending_managed_checksums: []
+      pending_managed_modes: []
       systemd_activation_pending: false
       restart_pending_services: []
       restart_activated_services: []
   when: not forward_proxy_client_state_marker.stat.exists
+
+- name: Materialize exact desired proxy-client content checksums
+  ansible.builtin.set_fact:
+    forward_proxy_client_desired_checksums_internal: >-
+      {{
+        (
+          [
+            lookup('ansible.builtin.template', role_path ~ '/templates/apt-proxy.conf.j2'),
+            lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.sh.j2'),
+            lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.conf.j2'),
+            lookup('ansible.builtin.template', role_path ~ '/templates/systemd-environment.conf.j2')
+          ]
+          + (
+              [lookup('ansible.builtin.template', role_path ~ '/templates/containers-proxy.conf.j2')]
+              if forward_proxy_client_container_enabled | bool
+              else []
+            )
+        ) | map('hash', 'sha256') | list
+      }}
+  when: forward_proxy_client_enabled | bool
+
+- name: Bind desired proxy-client checksums to their exact paths
+  ansible.builtin.set_fact:
+    forward_proxy_client_desired_checksum_map_internal: >-
+      {{
+        dict(
+          forward_proxy_client_managed_paths_effective_internal
+          | zip(forward_proxy_client_desired_checksums_internal)
+        )
+      }}
+  when: forward_proxy_client_enabled | bool
 
 - name: Validate the exact previous forward proxy client ownership manifest
   ansible.builtin.assert:
@@ -124,21 +161,32 @@
           'managed_modes',
           'managed_paths',
           'owner',
+          'pending_managed_checksums',
+          'pending_managed_modes',
+          'pending_managed_paths',
           'restart_activated_services',
           'restart_pending_services',
           'schema',
-          'systemd_activation_pending'
+          'systemd_activation_pending',
+          'write_state'
         ]
       - >-
         forward_proxy_client_previous_state_manifest.schema
-        == 'lit.ubuntu.forward_proxy_client.managed-state/v5'
+        == 'lit.ubuntu.forward_proxy_client.managed-state/v6'
       - forward_proxy_client_previous_state_manifest.owner == 'lit.ubuntu.forward_proxy_client'
+      - forward_proxy_client_previous_state_manifest.write_state in ['stable', 'pending']
       - forward_proxy_client_previous_state_manifest.managed_paths is sequence
       - forward_proxy_client_previous_state_manifest.managed_paths is not string
       - forward_proxy_client_previous_state_manifest.managed_checksums is sequence
       - forward_proxy_client_previous_state_manifest.managed_checksums is not string
       - forward_proxy_client_previous_state_manifest.managed_modes is sequence
       - forward_proxy_client_previous_state_manifest.managed_modes is not string
+      - forward_proxy_client_previous_state_manifest.pending_managed_paths is sequence
+      - forward_proxy_client_previous_state_manifest.pending_managed_paths is not string
+      - forward_proxy_client_previous_state_manifest.pending_managed_checksums is sequence
+      - forward_proxy_client_previous_state_manifest.pending_managed_checksums is not string
+      - forward_proxy_client_previous_state_manifest.pending_managed_modes is sequence
+      - forward_proxy_client_previous_state_manifest.pending_managed_modes is not string
       - forward_proxy_client_previous_state_manifest.systemd_activation_pending is boolean
       - forward_proxy_client_previous_state_manifest.restart_pending_services is sequence
       - forward_proxy_client_previous_state_manifest.restart_pending_services is not string
@@ -170,11 +218,48 @@
         forward_proxy_client_previous_state_manifest.managed_checksums
         | reject('match', '^[a-f0-9]{64}\Z') | list | length == 0
       - >-
+        forward_proxy_client_previous_state_manifest.pending_managed_checksums | length
+        == forward_proxy_client_previous_state_manifest.pending_managed_paths | length
+      - >-
+        forward_proxy_client_previous_state_manifest.pending_managed_modes | length
+        == forward_proxy_client_previous_state_manifest.pending_managed_paths | length
+      - >-
+        forward_proxy_client_previous_state_manifest.pending_managed_paths
+        | unique | list | length
+        == forward_proxy_client_previous_state_manifest.pending_managed_paths | length
+      - >-
+        forward_proxy_client_previous_state_manifest.pending_managed_checksums
+        | reject('match', '^[a-f0-9]{64}\Z') | list | length == 0
+      - >-
+        forward_proxy_client_previous_state_manifest.pending_managed_modes
+        | reject('match', '^0[0-7]{3}\Z') | list | length == 0
+      - >-
+        forward_proxy_client_previous_state_manifest.write_state == 'pending'
+        or forward_proxy_client_previous_state_manifest.pending_managed_paths | length == 0
+      - >-
+        forward_proxy_client_previous_state_manifest.write_state == 'stable'
+        or (
+          forward_proxy_client_enabled | bool
+          and forward_proxy_client_previous_state_manifest.pending_managed_paths
+            == forward_proxy_client_managed_paths_effective_internal
+          and forward_proxy_client_previous_state_manifest.pending_managed_checksums
+            == forward_proxy_client_desired_checksums_internal
+          and forward_proxy_client_previous_state_manifest.pending_managed_modes
+            == forward_proxy_client_managed_modes_effective_internal
+        )
+      - >-
         forward_proxy_client_previous_state_manifest.managed_paths | unique | list | length
         == forward_proxy_client_previous_state_manifest.managed_paths | length
       - >-
         forward_proxy_client_base_managed_paths_internal
-        | difference(forward_proxy_client_previous_state_manifest.managed_paths)
+        | difference(
+            forward_proxy_client_previous_state_manifest.managed_paths
+            + (
+                forward_proxy_client_previous_state_manifest.pending_managed_paths
+                if forward_proxy_client_previous_state_manifest.write_state == 'pending'
+                else []
+              )
+          )
         | length == 0
       - >-
         forward_proxy_client_previous_state_manifest.managed_paths
@@ -261,7 +346,15 @@
         or (
           item.stat.isreg | default(false)
           and not item.stat.islnk | default(false)
-          and item.stat.checksum == item.item.0.1
+          and (
+            item.stat.checksum == item.item.0.1
+            or (
+              forward_proxy_client_previous_state_manifest.write_state == 'pending'
+              and item.item.0.0 in forward_proxy_client_desired_checksum_map_internal
+              and item.stat.checksum
+                == forward_proxy_client_desired_checksum_map_internal[item.item.0.0]
+            )
+          )
           and item.stat.mode == item.item.1
           and (
             item.stat.pw_name | default('') == forward_proxy_client_file_owner | string
@@ -283,6 +376,7 @@
   ansible.builtin.stat:
     path: "{{ item }}"
     follow: false
+    checksum_algorithm: sha256
   loop: >-
     {{
       forward_proxy_client_managed_paths_effective_internal
@@ -294,7 +388,28 @@
 - name: Refuse to adopt new unowned forward proxy client target paths
   ansible.builtin.assert:
     that:
-      - not item.stat.exists
+      - >-
+        not item.stat.exists
+        or (
+          forward_proxy_client_previous_state_manifest.write_state == 'pending'
+          and item.item in forward_proxy_client_desired_checksum_map_internal
+          and item.stat.isreg | default(false)
+          and not item.stat.islnk | default(false)
+          and item.stat.checksum
+            == forward_proxy_client_desired_checksum_map_internal[item.item]
+          and item.stat.mode
+            == forward_proxy_client_managed_modes_effective_internal[
+              forward_proxy_client_managed_paths_effective_internal.index(item.item)
+            ]
+          and (
+            item.stat.pw_name | default('') == forward_proxy_client_file_owner | string
+            or item.stat.uid | string == forward_proxy_client_file_owner | string
+          )
+          and (
+            item.stat.gr_name | default('') == forward_proxy_client_file_group | string
+            or item.stat.gid | string == forward_proxy_client_file_group | string
+          )
+        )
     fail_msg: >-
       A newly enabled proxy-client target already exists outside the ownership
       manifest. Stop before overwriting a potentially foreign file.

@@ -1,0 +1,23 @@
+---
+- name: Exercise the forward proxy client on a fresh tree in check mode
+  ansible.builtin.import_playbook: converge.yml
+
+- name: Verify check mode did not create proxy-client state
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    forward_proxy_client_check_root: /tmp/wunder/lit-forward-proxy-client-molecule
+  tasks:
+    - name: Inspect the fresh-tree proxy-client root after check mode
+      ansible.builtin.stat:
+        path: "{{ forward_proxy_client_check_root }}"
+        follow: false
+      register: forward_proxy_client_check_root_state
+
+    - name: Require check mode to leave the fresh tree absent
+      ansible.builtin.assert:
+        that:
+          - not forward_proxy_client_check_root_state.stat.exists
+        fail_msg: "Fresh-tree check mode must not create directories or managed files."
