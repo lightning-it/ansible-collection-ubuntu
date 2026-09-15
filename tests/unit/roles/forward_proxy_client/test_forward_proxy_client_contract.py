@@ -34,7 +34,10 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_restart_now: false", defaults)
         self.assertIn("Reload systemd manager after changing proxy client defaults", tasks)
         self.assertIn("forward_proxy_client_systemd_environment_result.changed", tasks)
-        self.assertIn('loop: "{{ forward_proxy_client_restart_services }}"', tasks)
+        self.assertIn(
+            'loop: "{{ forward_proxy_client_restart_pending_services_internal }}"',
+            tasks,
+        )
         self.assertIn("forward_proxy_client_restart_now | bool", tasks)
         self.assertIn("forward_proxy_client_managed_state_changed_internal | bool", tasks)
 
@@ -57,7 +60,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         variables = (ROLE_ROOT / "vars" / "main.yml").read_text()
         self.assertIn("Inspect the forward proxy client managed-state marker", tasks)
         self.assertIn("forward_proxy_client_previous_state_manifest.managed_paths", tasks)
-        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v3", tasks)
+        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v4", tasks)
         self.assertNotIn("managed-state/v1", variables)
         self.assertIn("checksum_algorithm: sha256", tasks)
         self.assertIn("item.stat.isreg", tasks)
@@ -70,6 +73,8 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("not item.stat.exists", tasks)
         self.assertIn("Refuse unsafe forward proxy client managed directories", tasks)
         self.assertIn("Initialize empty previous forward proxy client state", tasks)
+        self.assertIn("systemd_activation_pending", tasks)
+        self.assertIn("restart_pending_services", tasks)
         self.assertNotIn("_forward_proxy_client_", tasks)
 
     def test_firewall_mode_and_ports_match_service_upstream_mode(self) -> None:
@@ -86,6 +91,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml"
         ).read_text()
         self.assertIn("residual | trim | length >= 20", firewall_assertions)
+        self.assertNotIn("(?:[0-9]{1,3}\\.){2}[0-9]{1,3}", firewall_assertions)
 
     def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
@@ -111,16 +117,14 @@ class ForwardProxyClientContractTests(unittest.TestCase):
                 "forward_proxy_client_manage_systemd | bool": bool(
                     context["forward_proxy_client_manage_systemd"]
                 ),
-                "forward_proxy_client_systemd_environment_result.changed": bool(
-                    context.get("forward_proxy_client_systemd_environment_result", {}).get(
-                        "changed", False
-                    )
+                "forward_proxy_client_systemd_activation_pending_internal | bool": bool(
+                    context.get("forward_proxy_client_systemd_activation_pending_internal", False)
                 ),
                 "forward_proxy_client_restart_now | bool": bool(
                     context.get("forward_proxy_client_restart_now", False)
                 ),
-                "forward_proxy_client_managed_state_changed_internal | bool": bool(
-                    context.get("forward_proxy_client_managed_state_changed_internal", False)
+                "forward_proxy_client_restart_pending_services_internal | length > 0": bool(
+                    context.get("forward_proxy_client_restart_pending_services_internal", [])
                 ),
             }
             return all(condition_values[condition] for condition in task["when"])
@@ -129,7 +133,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             for changed in (False, True):
                 context = {
                     "forward_proxy_client_manage_systemd": manage_systemd,
-                    "forward_proxy_client_systemd_environment_result": {"changed": changed},
+                    "forward_proxy_client_systemd_activation_pending_internal": changed,
                 }
                 self.assertEqual(enabled(reload_task, **context), manage_systemd and changed)
 
@@ -139,7 +143,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
                     context = {
                         "forward_proxy_client_manage_systemd": manage_systemd,
                         "forward_proxy_client_restart_now": restart_now,
-                        "forward_proxy_client_managed_state_changed_internal": changed,
+                        "forward_proxy_client_restart_pending_services_internal": (
+                            ["podman.service"] if changed else []
+                        ),
                     }
                     self.assertEqual(
                         enabled(restart_task, **context),
@@ -149,6 +155,27 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             restart_task["ansible.builtin.systemd"]["state"],
             "restarted",
         )
+
+    def test_existing_directories_keep_tighter_permissions(self) -> None:
+        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "enabled.yml").read_text())
+        create_task = next(
+            task
+            for task in tasks
+            if task["name"] == "Create forward proxy client managed directories"
+        )
+        self.assertIn("not item.stat.exists", create_task["when"])
+        self.assertEqual(create_task["ansible.builtin.file"]["path"], "{{ item.item }}")
+
+    def test_proxy_owner_rule_reaches_grammar_validating_nft_check(self) -> None:
+        fixture = (
+            REPOSITORY_ROOT / "molecule" / "host-firewall-basic" / "prepare.yml"
+        ).read_text()
+        verify = (
+            REPOSITORY_ROOT / "molecule" / "host-firewall-basic" / "verify.yml"
+        ).read_text()
+        self.assertIn("grammar-validating nft command double", fixture)
+        self.assertIn("proxy_rule_pattern", fixture)
+        self.assertIn("'--check --file -'", verify)
 
 
 if __name__ == "__main__":
