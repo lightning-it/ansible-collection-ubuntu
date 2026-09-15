@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - >-
+    Add a closed host-local forward proxy role with explicit destination ACLs,
+    host and Podman environment integration, and optional upstream chaining.

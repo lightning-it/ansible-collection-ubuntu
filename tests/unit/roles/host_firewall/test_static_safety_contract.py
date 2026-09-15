@@ -136,6 +136,9 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
             self.assertIn(f"  {function}:", defaults)
         self.assertIn("temporary, never-confirmable public exception", egress_assert)
         self.assertIn("CIS baseline requires IPv6", egress_assert)
+        self.assertIn("meta skuid {{ host_firewall_forward_proxy_egress.owner_username }}", policy)
+        self.assertIn("not host_firewall_egress_policy.functions.bootstrap_https.enabled", egress_assert)
+        self.assertIn("not host_firewall_egress_policy.functions.https_proxy.enabled", egress_assert)
 
     def test_closed_metadata_binds_action_mode_readback_policy_and_egress(self) -> None:
         for field in (

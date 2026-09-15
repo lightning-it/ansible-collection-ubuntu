@@ -1,0 +1,30 @@
+---
+argument_specs:
+  main:
+    short_description: Configure the standard LIT Squid forward proxy.
+    options:
+      forward_proxy_enabled: {type: bool, default: false}
+      forward_proxy_manage_package: {type: bool, default: true}
+      forward_proxy_manage_service: {type: bool, default: true}
+      forward_proxy_package_name: {type: str, default: squid}
+      forward_proxy_service_name: {type: str, default: squid}
+      forward_proxy_file_owner: {type: str, default: root}
+      forward_proxy_file_group: {type: str, default: root}
+      forward_proxy_listen_addresses: {type: list, elements: str}
+      forward_proxy_port: {type: int, default: 3128}
+      forward_proxy_allowed_clients: {type: list, elements: str}
+      forward_proxy_allowed_destination_domains: {type: list, elements: str}
+      forward_proxy_allowed_destination_ports: {type: list, elements: int}
+      forward_proxy_upstream_enabled: {type: bool, default: false}
+      forward_proxy_upstream_host: {type: str, default: ""}
+      forward_proxy_upstream_port: {type: int, default: 3128}
+      forward_proxy_no_proxy: {type: list, elements: str}
+      forward_proxy_url: {type: str}
+      forward_proxy_container_url: {type: str}
+      forward_proxy_container_enabled: {type: bool, default: false}
+      forward_proxy_config_path: {type: path}
+      forward_proxy_apt_config_path: {type: path}
+      forward_proxy_profile_path: {type: path}
+      forward_proxy_environment_path: {type: path}
+      forward_proxy_systemd_environment_path: {type: path}
+      forward_proxy_containers_config_path: {type: path}

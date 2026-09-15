@@ -1,0 +1,95 @@
+---
+- name: Prechecks
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Stop when the forward proxy is disabled
+  ansible.builtin.meta: end_role
+  when: not forward_proxy_enabled | bool
+
+- name: Install the forward proxy package
+  ansible.builtin.apt:
+    name: "{{ forward_proxy_package_name }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: forward_proxy_manage_package | bool
+
+- name: Create forward proxy configuration directories
+  ansible.builtin.file:
+    path: "{{ item | dirname }}"
+    state: directory
+    owner: "{{ forward_proxy_file_owner }}"
+    group: "{{ forward_proxy_file_group }}"
+    mode: "0755"
+  loop:
+    - "{{ forward_proxy_config_path }}"
+    - "{{ forward_proxy_apt_config_path }}"
+    - "{{ forward_proxy_profile_path }}"
+    - "{{ forward_proxy_environment_path }}"
+    - "{{ forward_proxy_systemd_environment_path }}"
+    - "{{ forward_proxy_containers_config_path }}"
+
+- name: Render the closed forward proxy policy
+  ansible.builtin.template:
+    src: squid.conf.j2
+    dest: "{{ forward_proxy_config_path }}"
+    owner: "{{ forward_proxy_file_owner }}"
+    group: "{{ forward_proxy_file_group }}"
+    mode: "0640"
+  notify: Restart forward proxy
+
+- name: Configure apt to use only the local forward proxy
+  ansible.builtin.template:
+    src: apt-proxy.conf.j2
+    dest: "{{ forward_proxy_apt_config_path }}"
+    owner: "{{ forward_proxy_file_owner }}"
+    group: "{{ forward_proxy_file_group }}"
+    mode: "0644"
+
+- name: Configure interactive process proxy environment
+  ansible.builtin.template:
+    src: proxy-environment.sh.j2
+    dest: "{{ forward_proxy_profile_path }}"
+    owner: "{{ forward_proxy_file_owner }}"
+    group: "{{ forward_proxy_file_group }}"
+    mode: "0644"
+
+- name: Configure environment generator proxy policy
+  ansible.builtin.template:
+    src: proxy-environment.conf.j2
+    dest: "{{ forward_proxy_environment_path }}"
+    owner: "{{ forward_proxy_file_owner }}"
+    group: "{{ forward_proxy_file_group }}"
+    mode: "0644"
+
+- name: Configure system service proxy defaults
+  ansible.builtin.template:
+    src: systemd-environment.conf.j2
+    dest: "{{ forward_proxy_systemd_environment_path }}"
+    owner: "{{ forward_proxy_file_owner }}"
+    group: "{{ forward_proxy_file_group }}"
+    mode: "0644"
+  notify: Reload systemd configuration
+
+- name: Configure Podman container proxy defaults
+  ansible.builtin.template:
+    src: containers-proxy.conf.j2
+    dest: "{{ forward_proxy_containers_config_path }}"
+    owner: "{{ forward_proxy_file_owner }}"
+    group: "{{ forward_proxy_file_group }}"
+    mode: "0644"
+  when: forward_proxy_container_enabled | bool
+
+- name: Remove Podman proxy defaults while container access is closed
+  ansible.builtin.file:
+    path: "{{ forward_proxy_containers_config_path }}"
+    state: absent
+  when: not forward_proxy_container_enabled | bool
+
+- name: Enable and start the forward proxy
+  ansible.builtin.systemd_service:
+    name: "{{ forward_proxy_service_name }}"
+    enabled: true
+    state: started
+  when: forward_proxy_manage_service | bool

@@ -123,6 +123,27 @@ host_firewall_test_evidence_reference: ""
 # The complete egress policy is mandatory when the role is enabled. Keeping the default empty prevents a generic
 # collection default from silently authorizing target-specific DNS, NTP, observability, proxy, or Internet flows.
 host_firewall_egress_policy: {}
+# Optional host-local LIT forward-proxy boundary. In hardened mode this is the
+# only rule that may grant public HTTP(S), and it is bound to the proxy service
+# socket owner. Application processes still reach the proxy over loopback.
+host_firewall_forward_proxy_egress:
+  enabled: false
+  status: disabled
+  mode: direct
+  owner_username: proxy
+  interface: ""
+  destinations_ipv4: []
+  ports: []
+  residual: ""
+
+# Container clients may reach the host-local proxy only through explicitly
+# named container interfaces and source networks. Loopback needs no rule.
+host_firewall_forward_proxy_access:
+  enabled: false
+  port: 3128
+  interfaces: []
+  sources_ipv4: []
+  destination_ipv4: ""
 host_firewall_cis_ipv6_required: "{{ ubtu24cis_ipv6_required | default(false) }}"
 host_firewall_provider_ipv6_filter_enabled: false
 host_firewall_provider_ipv6_filter_evidence_reference: ""
@@ -218,6 +239,8 @@ host_firewall_policy_material:
   output_policy: drop
   ipv4_only: true
   egress_policy: "{{ host_firewall_egress_policy }}"
+  forward_proxy_egress: "{{ host_firewall_forward_proxy_egress }}"
+  forward_proxy_access: "{{ host_firewall_forward_proxy_access }}"
 host_firewall_policy_fingerprint: "{{ host_firewall_policy_material | to_json | hash('sha256') }}"
 host_firewall_egress_policy_sha256: "{{ host_firewall_egress_policy | to_json | hash('sha256') }}"
 host_firewall_egress_status: "{{ host_firewall_egress_policy.get('status', 'draft') }}"
