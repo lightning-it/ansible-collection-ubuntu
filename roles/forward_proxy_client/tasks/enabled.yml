@@ -86,7 +86,13 @@
           + (
               forward_proxy_client_restart_services
               if forward_proxy_client_managed_state_changed_internal | bool
-              else []
+              else (
+                forward_proxy_client_restart_services
+                | difference(
+                    forward_proxy_client_previous_state_manifest.restart_activated_services
+                    | default([])
+                  )
+              )
             )
         ) | unique | list
       }}

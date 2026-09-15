@@ -42,6 +42,14 @@ Disabling a previously managed adapter always requires the controlled systemd
 cutover. Any service restart recorded by an earlier staged or failed activation
 is preserved and must be completed before the ownership marker is removed.
 
+Before an enabled update, every existing managed file must still match the
+checksum and metadata recorded by the preceding successful role run. This
+rejects out-of-band tampering; it does not reject desired variable or template
+changes, which are rendered only after that ownership check. A service newly
+added to `forward_proxy_client_restart_services` becomes pending even when the
+rendered files are otherwise unchanged, so its first explicit cutover cannot be
+silently skipped.
+
 The role writes APT, interactive shell, process, systemd-manager, and optional
 Podman client defaults. Existing containers are not recreated automatically.
 Podman image pulls are not affected automatically and remain a separate,

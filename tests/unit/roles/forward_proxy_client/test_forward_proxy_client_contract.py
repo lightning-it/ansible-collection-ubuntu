@@ -48,6 +48,29 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "forward_proxy_client_managed_state_changed_internal | bool", tasks
         )
+        self.assertIn(
+            "forward_proxy_client_previous_state_manifest.restart_activated_services",
+            tasks,
+        )
+        self.assertIn("| difference(", tasks)
+
+    def test_owned_updates_follow_out_of_band_tamper_check(self) -> None:
+        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "main.yml").read_text())
+        names = [task["name"] for task in tasks]
+        ownership_name = (
+            "Verify previously managed files were not changed outside the role"
+        )
+        self.assertLess(
+            names.index(ownership_name),
+            names.index("Apply enabled Ubuntu forward proxy client state"),
+        )
+        ownership = tasks[names.index(ownership_name)]["ansible.builtin.assert"]
+        self.assertIn("out-of-band changes", ownership["fail_msg"])
+        verify = (
+            REPOSITORY_ROOT / "molecule" / "forward-proxy-client-basic" / "verify.yml"
+        ).read_text()
+        self.assertIn("Reconcile the Ubuntu adapter through an exact upstream proxy", verify)
+        self.assertIn("Read the upstream-mode apt client policy", verify)
 
     def test_container_boundary_matches_the_host_firewall(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()

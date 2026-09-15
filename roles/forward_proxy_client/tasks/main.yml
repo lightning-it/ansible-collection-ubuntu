@@ -253,7 +253,7 @@
   register: forward_proxy_client_previous_asset_stats
   when: forward_proxy_client_state_marker.stat.exists
 
-- name: Verify previously managed forward proxy client file ownership
+- name: Verify previously managed files were not changed outside the role
   ansible.builtin.assert:
     that:
       - >-
@@ -273,8 +273,10 @@
           )
         )
     fail_msg: >-
-      A previously managed proxy-client path changed type or content. Stop
-      before overwriting or deleting it.
+      A previously managed proxy-client path no longer matches the checksum,
+      type, owner, group, and mode recorded by the last successful role run.
+      Stop before overwriting out-of-band changes. Desired role input or
+      template updates are rendered only after this ownership check succeeds.
   loop: "{{ forward_proxy_client_previous_asset_stats.results | default([]) }}"
 
 - name: Inspect newly managed forward proxy client target paths
