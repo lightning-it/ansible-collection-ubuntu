@@ -17,7 +17,6 @@ argument_specs:
       forward_proxy_client_container_url: {type: str}
       forward_proxy_client_container_enabled: {type: bool, default: false}
       forward_proxy_client_upstream_enabled: {type: bool, default: false}
-      forward_proxy_client_upstream_host: {type: str, default: ""}
       forward_proxy_client_upstream_ipv4: {type: str, default: ""}
       forward_proxy_client_upstream_port: {type: int, default: 3128}
       forward_proxy_client_no_proxy: {type: list, elements: str}

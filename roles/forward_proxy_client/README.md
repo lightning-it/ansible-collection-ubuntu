@@ -26,8 +26,10 @@ Important inputs include:
 - `forward_proxy_client_apt_direct_hosts`: restricted to host loopback.
 - `forward_proxy_client_container_enabled`: opt in only after live network readback.
 - `forward_proxy_client_restart_services`: exact existing systemd services for a controlled cutover.
-- `forward_proxy_client_restart_now`: permits one restart only when this run actually changes managed client state;
-  unchanged runs remain idempotent even if the switch remains true.
+- `forward_proxy_client_restart_now`: flushes the exact pending restart set,
+  including work recorded by an earlier staged or failed activation. After a
+  successful cutover the pending set is cleared, so unchanged runs remain
+  idempotent even if the switch remains true.
 - `forward_proxy_client_upstream_ipv4`: exact resolved parent-proxy IPv4 identity used to bind upstream mode to the
   firewall's single `/32` destination.
 - `forward_proxy_client_trusted_parent_paths`: complete, explicit parent chain for every managed file; every component

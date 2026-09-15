@@ -54,6 +54,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("172\\.(?:1[6-9]|2[0-9]|3[01])\\.", firewall_assertions)
         self.assertIn("/(?:[89]|[12][0-9]|3[0-2])\\Z", assertions)
         self.assertIn("/(?:1[6-9]|2[0-9]|3[0-2])$", firewall_assertions)
+        self.assertIn("2 ** (32 - (item.split('/')[1] | int))", assertions)
+        self.assertIn("2 ** (32 - (item.split('/')[1] | int))", firewall_assertions)
+        self.assertNotIn("[1-9]?[0-9]", assertions)
 
     def test_disabled_state_cleans_only_adapter_owned_state(self) -> None:
         tasks = "".join(path.read_text() for path in sorted((ROLE_ROOT / "tasks").glob("*.yml")))
@@ -87,11 +90,53 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("else ['0.0.0.0/0']", assertions)
         self.assertIn("get('interface', '')", assertions)
         self.assertIn("{1,15}", assertions)
+        self.assertNotIn("forward_proxy_client_upstream_host", assertions)
         firewall_assertions = (
             REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml"
         ).read_text()
         self.assertIn("residual | trim | length >= 20", firewall_assertions)
         self.assertNotIn("(?:[0-9]{1,3}\\.){2}[0-9]{1,3}", firewall_assertions)
+
+    def test_disabled_adapter_does_not_require_live_container_firewall_state(self) -> None:
+        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "assert.yml").read_text())
+        container_tasks = [
+            task
+            for task in tasks
+            if task["name"]
+            in {
+                "Require the client-container firewall contract",
+                "Validate the client-container firewall contract",
+            }
+        ]
+        self.assertEqual(len(container_tasks), 2)
+        for task in container_tasks:
+            self.assertEqual(
+                task["when"],
+                [
+                    "forward_proxy_client_enabled | bool",
+                    "forward_proxy_client_container_enabled | bool",
+                ],
+            )
+
+    def test_proxy_networks_are_unique_and_canonical(self) -> None:
+        firewall_assertions = (
+            REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml"
+        ).read_text()
+        firewall_defaults = (
+            REPOSITORY_ROOT / "roles" / "host_firewall" / "defaults" / "main.yml"
+        ).read_text()
+        self.assertIn(
+            "host_firewall_forward_proxy_access.sources_ipv4 | unique | list | length",
+            firewall_assertions,
+        )
+        self.assertIn("2 ** (32 - (item.split('/')[1] | int))", firewall_assertions)
+        self.assertNotIn("[1-9]?[0-9]", firewall_assertions)
+        self.assertNotIn("[1-9]?[0-9]", firewall_defaults)
+
+    def test_restart_documentation_discloses_deferred_pending_work(self) -> None:
+        readme = (ROLE_ROOT / "README.md").read_text()
+        self.assertIn("including work recorded by an earlier staged or failed activation", readme)
+        self.assertIn("pending set is cleared", readme)
 
     def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
