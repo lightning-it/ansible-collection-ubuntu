@@ -11,7 +11,9 @@ ROLE_ROOT = REPOSITORY_ROOT / "roles" / "forward_proxy_client"
 
 class ForwardProxyClientContractTests(unittest.TestCase):
     def test_adapter_contains_no_squid_runtime(self) -> None:
-        role_text = "".join(path.read_text() for path in sorted(ROLE_ROOT.rglob("*")) if path.is_file())
+        role_text = "".join(
+            path.read_text() for path in sorted(ROLE_ROOT.rglob("*")) if path.is_file()
+        )
         self.assertNotIn("ubuntu/squid@sha256", role_text)
         self.assertNotIn("podman_systemd", role_text)
         self.assertNotIn("squid-pod", role_text)
@@ -24,7 +26,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("/etc/apt/apt.conf.d/99-lit-forward-proxy", defaults)
         self.assertIn('Acquire::http::Proxy::{{ host }} "DIRECT";', template)
         self.assertIn('Acquire::https::Proxy::{{ host }} "DIRECT";', template)
-        self.assertIn("APT DIRECT exceptions are restricted to host-local loopback", assertions)
+        self.assertIn(
+            "APT DIRECT exceptions are restricted to host-local loopback", assertions
+        )
         self.assertIn("difference(['localhost', '127.0.0.1'])", assertions)
 
     def test_existing_systemd_clients_have_explicit_idempotent_cutover(self) -> None:
@@ -32,37 +36,54 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         tasks = (ROLE_ROOT / "tasks" / "enabled.yml").read_text()
         self.assertIn("forward_proxy_client_restart_services: []", defaults)
         self.assertIn("forward_proxy_client_restart_now: false", defaults)
-        self.assertIn("Reload systemd manager after changing proxy client defaults", tasks)
+        self.assertIn(
+            "Reload systemd manager after changing proxy client defaults", tasks
+        )
         self.assertIn("forward_proxy_client_systemd_environment_result.changed", tasks)
         self.assertIn(
             'loop: "{{ forward_proxy_client_restart_pending_services_internal }}"',
             tasks,
         )
         self.assertIn("forward_proxy_client_restart_now | bool", tasks)
-        self.assertIn("forward_proxy_client_managed_state_changed_internal | bool", tasks)
+        self.assertIn(
+            "forward_proxy_client_managed_state_changed_internal | bool", tasks
+        )
 
     def test_container_boundary_matches_the_host_firewall(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
         firewall_assertions = (
             REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml"
         ).read_text()
-        self.assertIn("forward_proxy_client_container_firewall_access.interfaces | length > 0", assertions)
-        self.assertIn("forward_proxy_client_container_firewall_access.sources_ipv4 | length > 0", assertions)
-        self.assertIn("not forward_proxy_client_container_firewall_access.destination_ipv4.startswith('127.')", assertions)
+        self.assertIn(
+            "forward_proxy_client_container_firewall_access.interfaces | length > 0",
+            assertions,
+        )
+        self.assertIn(
+            "forward_proxy_client_container_firewall_access.sources_ipv4 | length > 0",
+            assertions,
+        )
+        self.assertIn(
+            "not forward_proxy_client_container_firewall_access.destination_ipv4.startswith('127.')",
+            assertions,
+        )
         self.assertIn("192\\.168\\.", assertions)
         self.assertIn("192\\.168\\.", firewall_assertions)
         self.assertIn("172\\.(?:1[6-9]|2[0-9]|3[01])\\.", firewall_assertions)
         self.assertIn("/(?:[89]|[12][0-9]|3[0-2])\\Z", assertions)
-        self.assertIn("/(?:1[6-9]|2[0-9]|3[0-2])$", firewall_assertions)
+        self.assertIn("/(?:1[6-9]|2[0-9]|3[0-2])\\Z", firewall_assertions)
         self.assertIn("2 ** (32 - (item.split('/')[1] | int))", assertions)
         self.assertIn("2 ** (32 - (item.split('/')[1] | int))", firewall_assertions)
         self.assertNotIn("[1-9]?[0-9]", assertions)
 
     def test_disabled_state_cleans_only_adapter_owned_state(self) -> None:
-        tasks = "".join(path.read_text() for path in sorted((ROLE_ROOT / "tasks").glob("*.yml")))
+        tasks = "".join(
+            path.read_text() for path in sorted((ROLE_ROOT / "tasks").glob("*.yml"))
+        )
         variables = (ROLE_ROOT / "vars" / "main.yml").read_text()
         self.assertIn("Inspect the forward proxy client managed-state marker", tasks)
-        self.assertIn("forward_proxy_client_previous_state_manifest.managed_paths", tasks)
+        self.assertIn(
+            "forward_proxy_client_previous_state_manifest.managed_paths", tasks
+        )
         self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v4", tasks)
         self.assertNotIn("managed-state/v1", variables)
         self.assertIn("checksum_algorithm: sha256", tasks)
@@ -71,8 +92,12 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("item.stat.mode", tasks)
         self.assertIn("item.stat.pw_name", tasks)
         self.assertIn("item.stat.gr_name", tasks)
-        self.assertIn("Refuse to adopt unowned forward proxy client target paths", tasks)
-        self.assertIn("Refuse to adopt new unowned forward proxy client target paths", tasks)
+        self.assertIn(
+            "Refuse to adopt unowned forward proxy client target paths", tasks
+        )
+        self.assertIn(
+            "Refuse to adopt new unowned forward proxy client target paths", tasks
+        )
         self.assertIn("not item.stat.exists", tasks)
         self.assertIn("Refuse unsafe forward proxy client managed directories", tasks)
         self.assertIn("Initialize empty previous forward proxy client state", tasks)
@@ -82,8 +107,12 @@ class ForwardProxyClientContractTests(unittest.TestCase):
 
     def test_firewall_mode_and_ports_match_service_upstream_mode(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
-        self.assertIn("forward_proxy_client_firewall_egress.get('mode', '')", assertions)
-        self.assertIn("forward_proxy_client_firewall_egress.get('ports', [])", assertions)
+        self.assertIn(
+            "forward_proxy_client_firewall_egress.get('mode', '')", assertions
+        )
+        self.assertIn(
+            "forward_proxy_client_firewall_egress.get('ports', [])", assertions
+        )
         self.assertIn("if forward_proxy_client_upstream_enabled", assertions)
         self.assertIn("get('status', '') == 'approved'", assertions)
         self.assertIn("[forward_proxy_client_upstream_ipv4 ~ '/32']", assertions)
@@ -97,7 +126,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("residual | trim | length >= 20", firewall_assertions)
         self.assertNotIn("(?:[0-9]{1,3}\\.){2}[0-9]{1,3}", firewall_assertions)
 
-    def test_disabled_adapter_does_not_require_live_container_firewall_state(self) -> None:
+    def test_disabled_adapter_does_not_require_live_container_firewall_state(
+        self,
+    ) -> None:
         tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "assert.yml").read_text())
         container_tasks = [
             task
@@ -129,47 +160,69 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             "host_firewall_forward_proxy_access.sources_ipv4 | unique | list | length",
             firewall_assertions,
         )
+        self.assertIn(
+            "or host_firewall_forward_proxy_egress.status == 'approved'",
+            firewall_assertions,
+        )
+        self.assertNotIn("3[0-2])$'", firewall_assertions)
         self.assertIn("2 ** (32 - (item.split('/')[1] | int))", firewall_assertions)
         self.assertNotIn("[1-9]?[0-9]", firewall_assertions)
         self.assertNotIn("[1-9]?[0-9]", firewall_defaults)
 
     def test_restart_documentation_discloses_deferred_pending_work(self) -> None:
         readme = (ROLE_ROOT / "README.md").read_text()
-        self.assertIn("including work recorded by an earlier staged or failed activation", readme)
+        self.assertIn(
+            "including work recorded by an earlier staged or failed activation", readme
+        )
         self.assertIn("pending set is cleared", readme)
 
     def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
         main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
         self.assertIn("forward_proxy_client_trusted_parent_paths", assertions)
-        self.assertIn("item | dirname in forward_proxy_client_trusted_parent_paths", assertions)
+        self.assertIn(
+            "item | dirname in forward_proxy_client_trusted_parent_paths", assertions
+        )
         self.assertIn('loop: "{{ forward_proxy_client_trusted_parent_paths }}"', main)
         self.assertIn("forward_proxy_client_approved_no_proxy_domains", assertions)
         self.assertIn("(?:/(?:[89]|[12][0-9]|3[0-2]))?", assertions)
         self.assertNotIn("(?:/[0-9]{1,3})?", assertions)
+        self.assertIn("'/' not in item", assertions)
         argument_spec = (ROLE_ROOT / "meta" / "argument_specs.yml").read_text()
         self.assertIn("forward_proxy_client_trusted_parent_paths", argument_spec)
         self.assertIn("forward_proxy_client_approved_no_proxy_domains", argument_spec)
 
-    def test_systemd_change_and_restart_conditions_have_complete_truth_table(self) -> None:
+    def test_systemd_change_and_restart_conditions_have_complete_truth_table(
+        self,
+    ) -> None:
         tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "enabled.yml").read_text())
         by_name = {task["name"]: task for task in tasks}
-        reload_task = by_name["Reload systemd manager after changing proxy client defaults"]
+        reload_task = by_name[
+            "Reload systemd manager after changing proxy client defaults"
+        ]
         restart_task = by_name["Restart opted-in proxy client services"]
 
         def enabled(task: dict[str, object], **context: object) -> bool:
             condition_values = {
+                "not ansible_check_mode": not bool(
+                    context.get("ansible_check_mode", False)
+                ),
                 "forward_proxy_client_manage_systemd | bool": bool(
                     context["forward_proxy_client_manage_systemd"]
                 ),
                 "forward_proxy_client_systemd_activation_pending_internal | bool": bool(
-                    context.get("forward_proxy_client_systemd_activation_pending_internal", False)
+                    context.get(
+                        "forward_proxy_client_systemd_activation_pending_internal",
+                        False,
+                    )
                 ),
                 "forward_proxy_client_restart_now | bool": bool(
                     context.get("forward_proxy_client_restart_now", False)
                 ),
                 "forward_proxy_client_restart_pending_services_internal | length > 0": bool(
-                    context.get("forward_proxy_client_restart_pending_services_internal", [])
+                    context.get(
+                        "forward_proxy_client_restart_pending_services_internal", []
+                    )
                 ),
             }
             return all(condition_values[condition] for condition in task["when"])
@@ -180,7 +233,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
                     "forward_proxy_client_manage_systemd": manage_systemd,
                     "forward_proxy_client_systemd_activation_pending_internal": changed,
                 }
-                self.assertEqual(enabled(reload_task, **context), manage_systemd and changed)
+                self.assertEqual(
+                    enabled(reload_task, **context), manage_systemd and changed
+                )
 
         for manage_systemd in (False, True):
             for restart_now in (False, True):
@@ -196,6 +251,25 @@ class ForwardProxyClientContractTests(unittest.TestCase):
                         enabled(restart_task, **context),
                         manage_systemd and restart_now and changed,
                     )
+        self.assertFalse(
+            enabled(
+                reload_task,
+                ansible_check_mode=True,
+                forward_proxy_client_manage_systemd=True,
+                forward_proxy_client_systemd_activation_pending_internal=True,
+            )
+        )
+        self.assertFalse(
+            enabled(
+                restart_task,
+                ansible_check_mode=True,
+                forward_proxy_client_manage_systemd=True,
+                forward_proxy_client_restart_now=True,
+                forward_proxy_client_restart_pending_services_internal=[
+                    "podman.service"
+                ],
+            )
+        )
         self.assertEqual(
             restart_task["ansible.builtin.systemd"]["state"],
             "restarted",
@@ -221,6 +295,35 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("grammar-validating nft command double", fixture)
         self.assertIn("proxy_rule_pattern", fixture)
         self.assertIn("'--check --file -'", verify)
+
+    def test_disable_is_check_mode_safe_and_requires_service_cutover(self) -> None:
+        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "main.yml").read_text())
+        by_name = {task["name"]: task for task in tasks}
+        reload_task = by_name[
+            "Reload systemd manager after removing proxy client defaults"
+        ]
+        restart_task = by_name[
+            "Restart opted-in services after disabling the proxy client"
+        ]
+        cutover_task = by_name[
+            "Require explicit service cutover before disabling proxy client state"
+        ]
+        self.assertIn("not ansible_check_mode", reload_task["when"])
+        self.assertIn("not ansible_check_mode", restart_task["when"])
+        self.assertIn(
+            "forward_proxy_client_restart_services | length == 0",
+            cutover_task["ansible.builtin.assert"]["that"][0],
+        )
+
+    def test_root_documentation_and_molecule_cover_public_adapter_modes(self) -> None:
+        root_readme = (REPOSITORY_ROOT / "README.md").read_text()
+        verify = (
+            REPOSITORY_ROOT / "molecule" / "forward-proxy-client-basic" / "verify.yml"
+        ).read_text()
+        self.assertIn("lit.ubuntu.forward_proxy_client", root_readme)
+        self.assertIn("forward_proxy_client_upstream_enabled: true", verify)
+        self.assertIn("192.0.2.10/32", verify)
+        self.assertIn("forward_proxy_client_upstream_port: 8080", verify)
 
 
 if __name__ == "__main__":

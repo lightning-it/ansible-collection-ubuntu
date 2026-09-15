@@ -85,6 +85,9 @@ Ubuntu-native package and repository management.
 - `lit.ubuntu.host_firewall`
   Apply a fail-closed, Podman-aware nftables policy through rollback-protected plan, check, apply, confirm, readback,
   and rollback phases.
+- `lit.ubuntu.forward_proxy_client`
+  Configure Ubuntu APT, process, systemd, and optional Podman clients for the
+  separately deployed portable forward proxy.
 - `lit.ubuntu.podman`, `lit.ubuntu.gui`, `lit.ubuntu.xrdp`,
   `lit.ubuntu.firefox`, and `lit.ubuntu.vscode`
   Provide optional workstation and remote desktop building blocks.

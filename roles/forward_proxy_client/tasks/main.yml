@@ -235,6 +235,22 @@
   loop: "{{ forward_proxy_client_new_target_stats.results | default([]) }}"
   when: forward_proxy_client_state_marker.stat.exists
 
+- name: Require explicit service cutover before disabling proxy client state
+  ansible.builtin.assert:
+    that:
+      - >-
+        forward_proxy_client_restart_services | length == 0
+        or (
+          forward_proxy_client_manage_systemd | bool
+          and forward_proxy_client_restart_now | bool
+        )
+    fail_msg: >-
+      Disabling proxy client state with opted-in services requires the
+      explicit restart cutover so no service keeps stale proxy variables.
+  when:
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+
 - name: Remove forward proxy client configuration when disabled
   ansible.builtin.file:
     path: "{{ item.item.0.0 }}"
@@ -250,6 +266,7 @@
     daemon_reexec: true
     scope: "{{ forward_proxy_client_systemd_scope }}"
   when:
+    - not ansible_check_mode
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists
     - forward_proxy_client_manage_systemd | bool
@@ -261,6 +278,7 @@
     scope: "{{ forward_proxy_client_systemd_scope }}"
   loop: "{{ forward_proxy_client_restart_services }}"
   when:
+    - not ansible_check_mode
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists
     - forward_proxy_client_manage_systemd | bool

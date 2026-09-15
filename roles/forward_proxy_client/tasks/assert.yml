@@ -204,6 +204,13 @@
       - forward_proxy_client_container_firewall_access.interfaces | length > 0
       - forward_proxy_client_container_firewall_access.sources_ipv4 | length > 0
       - >-
+        forward_proxy_client_container_firewall_access.sources_ipv4
+        | unique | list | length
+        == forward_proxy_client_container_firewall_access.sources_ipv4 | length
+      - >-
+        forward_proxy_client_container_firewall_access.sources_ipv4
+        | intersect(['127.0.0.1/32']) | length == 0
+      - >-
         forward_proxy_client_container_firewall_access.interfaces
         | difference(forward_proxy_client_container_firewall_interfaces) | length == 0
       - >-
@@ -240,6 +247,16 @@
           '(?:/(?:1[6-9]|2[0-9]|3[0-2]))?\Z'
         )
         or item in forward_proxy_client_approved_no_proxy_domains
+      - >-
+        '/' not in item
+        or (
+          (
+            (item.split('/')[0].split('.')[0] | int) * 16777216
+            + (item.split('/')[0].split('.')[1] | int) * 65536
+            + (item.split('/')[0].split('.')[2] | int) * 256
+            + (item.split('/')[0].split('.')[3] | int)
+          ) % (2 ** (32 - (item.split('/')[1] | int))) == 0
+        )
       - "',' not in item"
       - "'\n' not in item"
       - "'\r' not in item"
