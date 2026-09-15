@@ -150,7 +150,7 @@
           ansible.builtin.assert:
             that:
               - >-
-                'pending manager activation requires a systemd reexec'
+                'Removing managed systemd defaults requires a manager reexec'
                 in ansible_failed_result.msg
             quiet: true
 

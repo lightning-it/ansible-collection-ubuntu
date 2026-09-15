@@ -1,4 +1,7 @@
 ---
+forward_proxy_client_proxy_url_internal: "http://127.0.0.1:{{ forward_proxy_client_proxy_port }}"
+forward_proxy_client_container_url_internal: >-
+  http://host.containers.internal:{{ forward_proxy_client_proxy_port }}
 forward_proxy_client_base_managed_paths_internal:
   - "{{ forward_proxy_client_apt_config_path }}"
   - "{{ forward_proxy_client_profile_path }}"

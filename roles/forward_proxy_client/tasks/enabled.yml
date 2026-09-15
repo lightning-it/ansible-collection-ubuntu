@@ -90,6 +90,8 @@
             )
         ) | unique | list
       }}
+    forward_proxy_client_restart_activated_services_internal: >-
+      {{ forward_proxy_client_previous_state_manifest.restart_activated_services | default([]) }}
 
 - name: Inspect rendered forward proxy client files
   ansible.builtin.stat:
@@ -130,10 +132,11 @@
     content: >-
       {{
         {
-          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v4',
+          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v5',
           'owner': 'lit.ubuntu.forward_proxy_client',
           'systemd_activation_pending': forward_proxy_client_systemd_activation_pending_internal | bool,
           'restart_pending_services': forward_proxy_client_restart_pending_services_internal,
+          'restart_activated_services': forward_proxy_client_restart_activated_services_internal,
           'managed_paths': forward_proxy_client_managed_paths_effective_internal,
           'managed_checksums': (
             forward_proxy_client_managed_asset_stats.results
@@ -186,6 +189,18 @@
         )
         else forward_proxy_client_restart_pending_services_internal
       }}
+    forward_proxy_client_restart_activated_services_internal: >-
+      {{
+        (
+          forward_proxy_client_restart_activated_services_internal
+          + forward_proxy_client_restart_pending_services_internal
+        ) | unique | list
+        if (
+          forward_proxy_client_manage_systemd | bool
+          and forward_proxy_client_restart_now | bool
+        )
+        else forward_proxy_client_restart_activated_services_internal
+      }}
   when: not ansible_check_mode
 
 - name: Record completed forward proxy client activation state
@@ -193,10 +208,11 @@
     content: >-
       {{
         {
-          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v4',
+          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v5',
           'owner': 'lit.ubuntu.forward_proxy_client',
           'systemd_activation_pending': forward_proxy_client_systemd_activation_pending_internal | bool,
           'restart_pending_services': forward_proxy_client_restart_pending_services_internal,
+          'restart_activated_services': forward_proxy_client_restart_activated_services_internal,
           'managed_paths': forward_proxy_client_managed_paths_effective_internal,
           'managed_checksums': (
             forward_proxy_client_managed_asset_stats.results

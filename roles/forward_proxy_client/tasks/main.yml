@@ -110,6 +110,7 @@
       managed_modes: []
       systemd_activation_pending: false
       restart_pending_services: []
+      restart_activated_services: []
   when: not forward_proxy_client_state_marker.stat.exists
 
 - name: Validate the exact previous forward proxy client ownership manifest
@@ -123,13 +124,14 @@
           'managed_modes',
           'managed_paths',
           'owner',
+          'restart_activated_services',
           'restart_pending_services',
           'schema',
           'systemd_activation_pending'
         ]
       - >-
         forward_proxy_client_previous_state_manifest.schema
-        == 'lit.ubuntu.forward_proxy_client.managed-state/v4'
+        == 'lit.ubuntu.forward_proxy_client.managed-state/v5'
       - forward_proxy_client_previous_state_manifest.owner == 'lit.ubuntu.forward_proxy_client'
       - forward_proxy_client_previous_state_manifest.managed_paths is sequence
       - forward_proxy_client_previous_state_manifest.managed_paths is not string
@@ -140,11 +142,20 @@
       - forward_proxy_client_previous_state_manifest.systemd_activation_pending is boolean
       - forward_proxy_client_previous_state_manifest.restart_pending_services is sequence
       - forward_proxy_client_previous_state_manifest.restart_pending_services is not string
+      - forward_proxy_client_previous_state_manifest.restart_activated_services is sequence
+      - forward_proxy_client_previous_state_manifest.restart_activated_services is not string
       - >-
         forward_proxy_client_previous_state_manifest.restart_pending_services
         | difference(forward_proxy_client_restart_services) | length == 0
       - >-
         forward_proxy_client_previous_state_manifest.restart_pending_services
+        | reject('match', '^[A-Za-z0-9_.@-]{1,128}\Z') | list | length == 0
+      - >-
+        forward_proxy_client_previous_state_manifest.restart_activated_services
+        | unique | list | length
+        == forward_proxy_client_previous_state_manifest.restart_activated_services | length
+      - >-
+        forward_proxy_client_previous_state_manifest.restart_activated_services
         | reject('match', '^[A-Za-z0-9_.@-]{1,128}\Z') | list | length == 0
       - >-
         forward_proxy_client_previous_state_manifest.managed_checksums | length
@@ -294,6 +305,7 @@
       {{
         (
           forward_proxy_client_previous_state_manifest.restart_pending_services
+          + forward_proxy_client_previous_state_manifest.restart_activated_services
           + forward_proxy_client_restart_services
         ) | unique | list
       }}

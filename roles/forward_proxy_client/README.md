@@ -19,7 +19,8 @@ See `roles/forward_proxy_client/defaults/main.yml`.
 Important inputs include:
 
 - `forward_proxy_client_enabled`: render or safely remove Ubuntu client state.
-- `forward_proxy_client_proxy_url`: local host proxy URL.
+- `forward_proxy_client_proxy_port`: local host proxy port. The loopback and
+  `host.containers.internal` URLs are derived internally and cannot be overridden.
 - `forward_proxy_client_no_proxy`: exact local/internal bypass tokens.
 - `forward_proxy_client_approved_no_proxy_domains`: reviewed internal DNS
   names/suffixes that may appear in `NO_PROXY`; public destinations remain forbidden.
@@ -27,8 +28,9 @@ Important inputs include:
 - `forward_proxy_client_container_enabled`: opt in only after live network readback.
 - `forward_proxy_client_restart_services`: exact existing systemd services for a controlled cutover.
 - `forward_proxy_client_restart_now`: flushes the exact pending restart set,
-  including work recorded by an earlier staged or failed activation. After a
-  successful cutover the pending set is cleared, so unchanged runs remain
+  including work recorded by an earlier staged or failed activation. Services
+  successfully activated under proxy defaults remain recorded so disabling the
+  adapter requires their explicit reverse cutover. Unchanged enabled runs remain
   idempotent even if the switch remains true.
 - `forward_proxy_client_upstream_ipv4`: exact resolved parent-proxy IPv4 identity used to bind upstream mode to the
   firewall's single `/32` destination.

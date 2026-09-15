@@ -13,8 +13,6 @@ forward_proxy_client_systemd_scope: system
 forward_proxy_client_proxy_port: "{{ forward_proxy_port | default(3128) }}"
 forward_proxy_client_listen_addresses: "{{ forward_proxy_listen_addresses | default(['127.0.0.1']) }}"
 forward_proxy_client_allowed_clients: "{{ forward_proxy_allowed_clients | default(['127.0.0.1/32']) }}"
-forward_proxy_client_proxy_url: "http://127.0.0.1:{{ forward_proxy_client_proxy_port }}"
-forward_proxy_client_container_url: "http://host.containers.internal:{{ forward_proxy_client_proxy_port }}"
 forward_proxy_client_container_enabled: false
 forward_proxy_client_upstream_enabled: "{{ forward_proxy_upstream_enabled | default(false) }}"
 forward_proxy_client_upstream_ipv4: "{{ forward_proxy_upstream_ipv4 | default('') }}"

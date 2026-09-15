@@ -84,7 +84,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "forward_proxy_client_previous_state_manifest.managed_paths", tasks
         )
-        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v4", tasks)
+        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v5", tasks)
         self.assertNotIn("managed-state/v1", variables)
         self.assertIn("checksum_algorithm: sha256", tasks)
         self.assertIn("item.stat.isreg", tasks)
@@ -103,6 +103,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("Initialize empty previous forward proxy client state", tasks)
         self.assertIn("systemd_activation_pending", tasks)
         self.assertIn("restart_pending_services", tasks)
+        self.assertIn("restart_activated_services", tasks)
         self.assertNotIn("_forward_proxy_client_", tasks)
 
     def test_firewall_mode_and_ports_match_service_upstream_mode(self) -> None:
@@ -199,7 +200,25 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "including work recorded by an earlier staged or failed activation", readme
         )
-        self.assertIn("pending set is cleared", readme)
+        self.assertIn("remain recorded", readme)
+
+    def test_proxy_urls_are_derived_internal_values(self) -> None:
+        defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
+        variables = (ROLE_ROOT / "vars" / "main.yml").read_text()
+        argument_spec = (ROLE_ROOT / "meta" / "argument_specs.yml").read_text()
+        readme = (ROLE_ROOT / "README.md").read_text()
+        templates = "".join(
+            path.read_text() for path in sorted((ROLE_ROOT / "templates").glob("*.j2"))
+        )
+        self.assertNotIn("forward_proxy_client_proxy_url:", defaults)
+        self.assertNotIn("forward_proxy_client_container_url:", defaults)
+        self.assertNotIn("forward_proxy_client_proxy_url:", argument_spec)
+        self.assertNotIn("forward_proxy_client_container_url:", argument_spec)
+        self.assertIn("forward_proxy_client_proxy_url_internal:", variables)
+        self.assertIn("forward_proxy_client_container_url_internal:", variables)
+        self.assertIn("forward_proxy_client_proxy_url_internal", templates)
+        self.assertIn("forward_proxy_client_container_url_internal", templates)
+        self.assertIn("cannot be overridden", readme)
 
     def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
@@ -374,6 +393,13 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         self.assertIn(
             "Preserve every pending service across proxy-client disable", by_name
+        )
+        preserve = by_name[
+            "Preserve every pending service across proxy-client disable"
+        ]["ansible.builtin.set_fact"]
+        self.assertIn(
+            "restart_activated_services",
+            preserve["forward_proxy_client_disable_restart_services_internal"],
         )
         ensure = (ROLE_ROOT / "tasks" / "ensure_directory.yml").read_text()
         self.assertEqual(ensure.count("not ansible_check_mode"), 2)
