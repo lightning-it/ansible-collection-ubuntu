@@ -1,16 +1,4 @@
 ---
-- name: Create forward proxy client managed directories
-  ansible.builtin.file:
-    path: "{{ item.item }}"
-    state: directory
-    owner: "{{ forward_proxy_client_file_owner }}"
-    group: "{{ forward_proxy_client_file_group }}"
-    mode: "0755"
-  loop: "{{ forward_proxy_client_managed_directory_stats.results }}"
-  when:
-    - item.item in forward_proxy_client_managed_directories_internal
-    - not item.stat.exists
-
 - name: Render apt proxy policy
   ansible.builtin.template:
     src: apt-proxy.conf.j2

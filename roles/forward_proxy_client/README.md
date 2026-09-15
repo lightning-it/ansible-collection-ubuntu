@@ -32,8 +32,13 @@ Important inputs include:
   idempotent even if the switch remains true.
 - `forward_proxy_client_upstream_ipv4`: exact resolved parent-proxy IPv4 identity used to bind upstream mode to the
   firewall's single `/32` destination.
-- `forward_proxy_client_trusted_parent_paths`: complete, explicit parent chain for every managed file; every component
-  is checked as a safe, non-symlink directory before a privileged write.
+- `forward_proxy_client_trusted_parent_paths`: complete, explicit parent chain for every current or previously managed
+  file, ordered from parent to child. Every component is created individually
+  only below a revalidated parent and is checked again before a privileged write.
+
+Disabling a previously managed adapter always requires the controlled systemd
+cutover. Any service restart recorded by an earlier staged or failed activation
+is preserved and must be completed before the ownership marker is removed.
 
 The role writes APT, interactive shell, process, systemd-manager, and optional
 Podman client defaults. Existing containers are not recreated automatically.

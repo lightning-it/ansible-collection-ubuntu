@@ -154,6 +154,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             )
 
     def test_proxy_networks_are_unique_and_canonical(self) -> None:
+        assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
         firewall_assertions = (
             REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml"
         ).read_text()
@@ -163,6 +164,15 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "host_firewall_forward_proxy_access.sources_ipv4 | unique | list | length",
             firewall_assertions,
+        )
+        self.assertIn(
+            "host_firewall_forward_proxy_access.interfaces | unique | list | length",
+            firewall_assertions,
+        )
+        self.assertIn(
+            "forward_proxy_client_container_firewall_access.interfaces\n"
+            "        | unique | list | length",
+            assertions,
         )
         self.assertIn(
             "or host_firewall_forward_proxy_egress.status == 'approved'",
@@ -280,14 +290,39 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
 
     def test_existing_directories_keep_tighter_permissions(self) -> None:
-        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "enabled.yml").read_text())
-        create_task = next(
-            task
-            for task in tasks
-            if task["name"] == "Create forward proxy client managed directories"
+        main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        ensure = (ROLE_ROOT / "tasks" / "ensure_directory.yml").read_text()
+        enabled = (ROLE_ROOT / "tasks" / "enabled.yml").read_text()
+        self.assertIn(
+            "Create and revalidate each required proxy-client directory boundary", main
         )
-        self.assertIn("not item.stat.exists", create_task["when"])
-        self.assertEqual(create_task["ansible.builtin.file"]["path"], "{{ item.item }}")
+        self.assertIn(
+            "Trusted paths must therefore\n      be ordered from parent to child", ensure
+        )
+        self.assertIn(
+            "Create only the validated proxy-client directory component", ensure
+        )
+        self.assertIn(
+            "Reinspect the required proxy-client directory before rendering", ensure
+        )
+        self.assertIn(
+            "when: not forward_proxy_client_directory_before.stat.exists", ensure
+        )
+        self.assertNotIn("Create forward proxy client managed directories", enabled)
+
+    def test_previous_container_paths_retain_a_validated_cleanup_chain(self) -> None:
+        tasks = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        self.assertIn(
+            "Bind previously managed proxy-client paths to the trusted parent chain",
+            tasks,
+        )
+        self.assertIn(
+            "forward_proxy_client_previous_state_manifest.managed_paths",
+            tasks,
+        )
+        self.assertIn(
+            "item | dirname in forward_proxy_client_trusted_parent_paths", tasks
+        )
 
     def test_proxy_owner_rule_reaches_grammar_validating_nft_check(self) -> None:
         fixture = (
@@ -315,16 +350,19 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("not ansible_check_mode", reload_task["when"])
         self.assertIn("not ansible_check_mode", restart_task["when"])
         self.assertIn(
-            "forward_proxy_client_restart_services | length == 0",
+            "forward_proxy_client_disable_restart_services_internal | length == 0",
             cutover_task["ansible.builtin.assert"]["that"][1],
         )
-        self.assertIn(
-            "forward_proxy_client_previous_state_manifest.systemd_activation_pending",
+        self.assertEqual(
             cutover_task["ansible.builtin.assert"]["that"][0],
+            "forward_proxy_client_manage_systemd | bool",
+        )
+        self.assertEqual(
+            restart_task["loop"],
+            "{{ forward_proxy_client_disable_restart_services_internal | default([]) }}",
         )
         self.assertIn(
-            "forward_proxy_client_manage_systemd | bool",
-            cutover_task["ansible.builtin.assert"]["that"][0],
+            "Preserve every pending service across proxy-client disable", by_name
         )
 
     def test_root_documentation_and_molecule_cover_public_adapter_modes(self) -> None:

@@ -117,6 +117,9 @@
       - host_firewall_forward_proxy_access.port <= 65535
       - host_firewall_forward_proxy_access.interfaces is sequence
       - host_firewall_forward_proxy_access.interfaces is not string
+      - >-
+        host_firewall_forward_proxy_access.interfaces | unique | list | length
+        == host_firewall_forward_proxy_access.interfaces | length
       - host_firewall_forward_proxy_access.sources_ipv4 is sequence
       - host_firewall_forward_proxy_access.sources_ipv4 is not string
       - >-

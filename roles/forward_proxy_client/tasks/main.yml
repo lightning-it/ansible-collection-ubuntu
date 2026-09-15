@@ -174,6 +174,55 @@
       set. Stop before removing or replacing any file.
   when: forward_proxy_client_state_marker.stat.exists
 
+- name: Bind previously managed proxy-client paths to the trusted parent chain
+  ansible.builtin.assert:
+    that:
+      - item | dirname in forward_proxy_client_trusted_parent_paths
+    fail_msg: >-
+      Every previously managed proxy-client path must retain an immediate
+      directory in the complete trusted parent chain before cleanup.
+  loop: "{{ forward_proxy_client_previous_state_manifest.managed_paths }}"
+  when: forward_proxy_client_state_marker.stat.exists
+
+- name: Determine the exact proxy-client directories required by this transition
+  ansible.builtin.set_fact:
+    forward_proxy_client_required_directories_internal: >-
+      {{
+        (
+          (
+            forward_proxy_client_managed_paths_effective_internal
+            + [forward_proxy_client_state_marker_path]
+          )
+          if forward_proxy_client_enabled | bool
+          else (
+            forward_proxy_client_previous_state_manifest.managed_paths
+            + (
+                [forward_proxy_client_state_marker_path]
+                if forward_proxy_client_state_marker.stat.exists
+                else []
+              )
+          )
+        ) | map('dirname') | unique | list
+      }}
+
+- name: Create and revalidate each required proxy-client directory boundary
+  ansible.builtin.include_tasks: ensure_directory.yml
+  loop: "{{ forward_proxy_client_trusted_parent_paths }}"
+  loop_control:
+    loop_var: forward_proxy_client_directory_path
+  when:
+    - >-
+      forward_proxy_client_directory_path
+      in forward_proxy_client_required_directories_internal
+      or (
+        forward_proxy_client_required_directories_internal
+        | select(
+            'match',
+            '^' ~ (forward_proxy_client_directory_path | regex_escape) ~ '/'
+          )
+        | list | length > 0
+      )
+
 - name: Inspect previously managed forward proxy client files
   ansible.builtin.stat:
     path: "{{ item.0.0 }}"
@@ -235,14 +284,25 @@
   loop: "{{ forward_proxy_client_new_target_stats.results | default([]) }}"
   when: forward_proxy_client_state_marker.stat.exists
 
+- name: Preserve every pending service across proxy-client disable
+  ansible.builtin.set_fact:
+    forward_proxy_client_disable_restart_services_internal: >-
+      {{
+        (
+          forward_proxy_client_previous_state_manifest.restart_pending_services
+          + forward_proxy_client_restart_services
+        ) | unique | list
+      }}
+  when:
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+
 - name: Require explicit service cutover before disabling proxy client state
   ansible.builtin.assert:
     that:
+      - forward_proxy_client_manage_systemd | bool
       - >-
-        forward_proxy_client_previous_state_manifest.systemd_activation_pending
-        or forward_proxy_client_manage_systemd | bool
-      - >-
-        forward_proxy_client_restart_services | length == 0
+        forward_proxy_client_disable_restart_services_internal | length == 0
         or (
           forward_proxy_client_manage_systemd | bool
           and forward_proxy_client_restart_now | bool
@@ -280,7 +340,7 @@
     name: "{{ item }}"
     state: restarted
     scope: "{{ forward_proxy_client_systemd_scope }}"
-  loop: "{{ forward_proxy_client_restart_services }}"
+  loop: "{{ forward_proxy_client_disable_restart_services_internal | default([]) }}"
   when:
     - not ansible_check_mode
     - not forward_proxy_client_enabled | bool

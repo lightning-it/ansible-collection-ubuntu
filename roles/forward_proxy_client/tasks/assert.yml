@@ -202,6 +202,10 @@
       - >-
         not forward_proxy_client_container_firewall_access.destination_ipv4.startswith('127.')
       - forward_proxy_client_container_firewall_access.interfaces | length > 0
+      - >-
+        forward_proxy_client_container_firewall_access.interfaces
+        | unique | list | length
+        == forward_proxy_client_container_firewall_access.interfaces | length
       - forward_proxy_client_container_firewall_access.sources_ipv4 | length > 0
       - >-
         forward_proxy_client_container_firewall_access.sources_ipv4
