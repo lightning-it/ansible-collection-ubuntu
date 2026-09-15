@@ -6,6 +6,21 @@
   gather_facts: false
   vars:
     forward_proxy_client_test_root: /tmp/wunder/lit-forward-proxy-client-molecule
+    forward_proxy_client_trusted_parent_paths:
+      - /tmp
+      - /tmp/wunder
+      - "{{ forward_proxy_client_test_root }}"
+      - "{{ forward_proxy_client_test_root }}/etc"
+      - "{{ forward_proxy_client_test_root }}/etc/apt"
+      - "{{ forward_proxy_client_test_root }}/etc/profile.d"
+      - "{{ forward_proxy_client_test_root }}/etc/environment.d"
+      - "{{ forward_proxy_client_test_root }}/etc/systemd"
+      - "{{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d"
+      - "{{ forward_proxy_client_test_root }}/etc/containers"
+      - "{{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d"
+      - "{{ forward_proxy_client_test_root }}/var"
+      - "{{ forward_proxy_client_test_root }}/var/lib"
+      - "{{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client"
   pre_tasks:
     - name: Read rootless verification UID
       ansible.builtin.command: id -u

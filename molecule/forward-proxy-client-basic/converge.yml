@@ -13,6 +13,9 @@
       status: approved
       owner_username: proxy
       mode: direct
+      interface: eth0
+      destinations_ipv4:
+        - 0.0.0.0/0
       ports:
         - 80
         - 443
@@ -67,3 +70,18 @@
         {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
       forward_proxy_client_state_marker_path: >-
         {{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client/managed.json
+      forward_proxy_client_trusted_parent_paths:
+        - /tmp
+        - /tmp/wunder
+        - "{{ forward_proxy_client_test_root }}"
+        - "{{ forward_proxy_client_test_root }}/etc"
+        - "{{ forward_proxy_client_test_root }}/etc/apt"
+        - "{{ forward_proxy_client_test_root }}/etc/profile.d"
+        - "{{ forward_proxy_client_test_root }}/etc/environment.d"
+        - "{{ forward_proxy_client_test_root }}/etc/systemd"
+        - "{{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d"
+        - "{{ forward_proxy_client_test_root }}/etc/containers"
+        - "{{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d"
+        - "{{ forward_proxy_client_test_root }}/var"
+        - "{{ forward_proxy_client_test_root }}/var/lib"
+        - "{{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client"

@@ -32,7 +32,7 @@
   ansible.builtin.stat:
     path: "{{ item }}"
     follow: false
-  loop: "{{ forward_proxy_client_managed_directories_internal }}"
+  loop: "{{ forward_proxy_client_trusted_parent_paths }}"
   register: forward_proxy_client_managed_directory_stats
 
 - name: Refuse unsafe forward proxy client managed directories
@@ -43,15 +43,25 @@
         or (
           item.stat.isdir | default(false)
           and not item.stat.islnk | default(false)
-          and item.stat.mode == '0755'
           and (
-            item.stat.pw_name | default('')
+            item.stat.mode is match('^0[0-7][0145][0145]\Z')
+            or (
+              item.item == '/tmp'
+              and item.stat.mode == '1777'
+              and item.stat.uid == 0
+              and item.stat.gid == 0
+            )
+          )
+          and (
+            item.stat.uid == 0
+            or item.stat.pw_name | default('')
               == forward_proxy_client_file_owner | string
             or item.stat.uid | string
               == forward_proxy_client_file_owner | string
           )
           and (
-            item.stat.gr_name | default('')
+            item.stat.gid == 0
+            or item.stat.gr_name | default('')
               == forward_proxy_client_file_group | string
             or item.stat.gid | string
               == forward_proxy_client_file_group | string

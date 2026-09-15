@@ -43,3 +43,19 @@ forward_proxy_client_environment_path: /etc/environment.d/90-lit-forward-proxy.c
 forward_proxy_client_systemd_environment_path: /etc/systemd/system.conf.d/90-lit-forward-proxy.conf
 forward_proxy_client_containers_config_path: /etc/containers/containers.conf.d/90-lit-forward-proxy.conf
 forward_proxy_client_state_marker_path: /var/lib/lit-forward-proxy-client/managed.json
+
+# Every parent between / and a managed target must be enumerated. The closed
+# chain is lstat-validated before the adapter writes as root.
+forward_proxy_client_trusted_parent_paths:
+  - /etc
+  - /etc/apt
+  - /etc/apt/apt.conf.d
+  - /etc/profile.d
+  - /etc/environment.d
+  - /etc/systemd
+  - /etc/systemd/system.conf.d
+  - /etc/containers
+  - /etc/containers/containers.conf.d
+  - /var
+  - /var/lib
+  - /var/lib/lit-forward-proxy-client

@@ -77,6 +77,17 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("if forward_proxy_client_upstream_enabled", assertions)
         self.assertIn("get('status', '') == 'approved'", assertions)
         self.assertIn("[forward_proxy_client_upstream_ipv4 ~ '/32']", assertions)
+        self.assertIn("else ['0.0.0.0/0']", assertions)
+        self.assertIn("get('interface', '')", assertions)
+
+    def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
+        assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
+        main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        self.assertIn("forward_proxy_client_trusted_parent_paths", assertions)
+        self.assertIn("item | dirname in forward_proxy_client_trusted_parent_paths", assertions)
+        self.assertIn('loop: "{{ forward_proxy_client_trusted_parent_paths }}"', main)
+        self.assertIn("(?:/(?:[0-9]|[12][0-9]|3[0-2]))?", assertions)
+        self.assertNotIn("(?:/[0-9]{1,3})?", assertions)
 
 
 if __name__ == "__main__":

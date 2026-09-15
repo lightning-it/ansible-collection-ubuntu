@@ -28,6 +28,8 @@ Important inputs include:
   unchanged runs remain idempotent even if the switch remains true.
 - `forward_proxy_client_upstream_ipv4`: exact resolved parent-proxy IPv4 identity used to bind upstream mode to the
   firewall's single `/32` destination.
+- `forward_proxy_client_trusted_parent_paths`: complete, explicit parent chain for every managed file; every component
+  is checked as a safe, non-symlink directory before a privileged write.
 
 The role writes APT, interactive shell, process, systemd-manager, and optional
 Podman client defaults. Existing containers are not recreated automatically.
