@@ -1,3 +1,7 @@
 // Managed by lit.ubuntu.forward_proxy. Local changes are overwritten.
 Acquire::http::Proxy "{{ forward_proxy_url }}";
 Acquire::https::Proxy "{{ forward_proxy_url }}";
+{% for host in forward_proxy_apt_direct_hosts %}
+Acquire::http::Proxy::{{ host }} "DIRECT";
+Acquire::https::Proxy::{{ host }} "DIRECT";
+{% endfor %}

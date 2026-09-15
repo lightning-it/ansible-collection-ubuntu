@@ -3,6 +3,7 @@
   ansible.builtin.systemd_service:
     name: "{{ forward_proxy_service_name }}"
     state: restarted
+    masked: false
   when: forward_proxy_manage_service | bool
 
 - name: Reload systemd configuration

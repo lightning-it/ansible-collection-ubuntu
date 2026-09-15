@@ -218,6 +218,18 @@ None.
               mtls_required: true
               status: approved
               residual: ""
+            bootstrap_http:
+              enabled: true
+              protocol: tcp
+              port: 80
+              modes: [bootstrap]
+              interface: enp1s0
+              destinations_ipv4: [0.0.0.0/0]
+              destinations_ipv6: []
+              declared_fqdns: []
+              mtls_required: false
+              status: temporary-maintenance
+              residual: "Must be removed before hardened confirmation."
             bootstrap_https:
               enabled: true
               protocol: tcp

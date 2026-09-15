@@ -3,10 +3,12 @@ forward_proxy_enabled: false
 forward_proxy_manage_package: false
 forward_proxy_bootstrap_package_only: false
 forward_proxy_manage_service: true
+forward_proxy_restart_services: []
 forward_proxy_package_name: squid
 forward_proxy_service_name: squid
 forward_proxy_file_owner: root
 forward_proxy_file_group: root
+forward_proxy_ss_binary: /usr/bin/ss
 
 forward_proxy_listen_addresses:
   - 127.0.0.1
@@ -29,12 +31,15 @@ forward_proxy_no_proxy:
   - localhost
   - 127.0.0.1
   - ::1
+forward_proxy_apt_direct_hosts:
+  - localhost
+  - 127.0.0.1
 forward_proxy_url: "http://127.0.0.1:{{ forward_proxy_port }}"
 forward_proxy_container_url: "http://host.containers.internal:{{ forward_proxy_port }}"
 forward_proxy_container_enabled: false
 
 forward_proxy_config_path: /etc/squid/squid.conf
-forward_proxy_apt_config_path: /etc/apt/apt.conf.d/90-lit-forward-proxy
+forward_proxy_apt_config_path: /etc/apt/apt.conf.d/99-lit-forward-proxy
 forward_proxy_profile_path: /etc/profile.d/90-lit-forward-proxy.sh
 forward_proxy_environment_path: /etc/environment.d/90-lit-forward-proxy.conf
 forward_proxy_systemd_environment_path: /etc/systemd/system.conf.d/90-lit-forward-proxy.conf

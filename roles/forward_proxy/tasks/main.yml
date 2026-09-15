@@ -13,6 +13,29 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+    policy_rc_d: 101
+  when: forward_proxy_manage_package | bool
+
+- name: Keep the package-bootstrap proxy service stopped and masked
+  ansible.builtin.systemd_service:
+    name: "{{ forward_proxy_service_name }}"
+    enabled: false
+    state: stopped
+    masked: true
+  when: forward_proxy_manage_package | bool
+
+- name: Read back the package-bootstrap proxy listener state
+  ansible.builtin.command:
+    argv:
+      - "{{ forward_proxy_ss_binary }}"
+      - -H
+      - -ltn
+      - "sport = :{{ forward_proxy_port }}"
+  register: forward_proxy_bootstrap_listener_readback
+  changed_when: false
+  failed_when: >-
+    forward_proxy_bootstrap_listener_readback.rc != 0
+    or forward_proxy_bootstrap_listener_readback.stdout | trim | length > 0
   when: forward_proxy_manage_package | bool
 
 - name: Stop after the explicitly authorized bootstrap package phase
@@ -74,7 +97,20 @@
     owner: "{{ forward_proxy_file_owner }}"
     group: "{{ forward_proxy_file_group }}"
     mode: "0644"
+  register: forward_proxy_systemd_environment_result
   notify: Reload systemd configuration
+
+- name: Apply proxy defaults before restarting opted-in clients
+  ansible.builtin.meta: flush_handlers
+
+- name: Restart opted-in services to activate the proxy environment
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ forward_proxy_restart_services }}"
+  when:
+    - forward_proxy_manage_service | bool
+    - forward_proxy_systemd_environment_result.changed
 
 - name: Configure Podman container proxy defaults
   ansible.builtin.template:
@@ -96,4 +132,5 @@
     name: "{{ forward_proxy_service_name }}"
     enabled: true
     state: started
+    masked: false
   when: forward_proxy_manage_service | bool

@@ -6,6 +6,9 @@
       - forward_proxy_manage_package is boolean
       - forward_proxy_bootstrap_package_only is boolean
       - forward_proxy_manage_service is boolean
+      - forward_proxy_restart_services is sequence
+      - forward_proxy_restart_services is not string
+      - forward_proxy_restart_services | unique | list | length == forward_proxy_restart_services | length
       - forward_proxy_package_name is match('^[a-z0-9][a-z0-9+.-]{1,63}$')
       - forward_proxy_service_name is match('^[A-Za-z0-9_.@-]{1,128}$')
       - forward_proxy_file_owner is match('^(?:[a-z_][a-z0-9_-]{0,31}|[0-9]{1,10})$')
@@ -14,12 +17,14 @@
       - forward_proxy_listen_addresses is not string
       - forward_proxy_listen_addresses | length > 0
       - forward_proxy_listen_addresses | unique | list | length == forward_proxy_listen_addresses | length
+      - "'127.0.0.1' in forward_proxy_listen_addresses"
       - forward_proxy_port | int >= 1024
       - forward_proxy_port | int <= 65535
       - forward_proxy_allowed_clients is sequence
       - forward_proxy_allowed_clients is not string
       - forward_proxy_allowed_clients | length > 0
       - forward_proxy_allowed_clients | unique | list | length == forward_proxy_allowed_clients | length
+      - "'127.0.0.1/32' in forward_proxy_allowed_clients"
       - forward_proxy_allowed_destination_domains is sequence
       - forward_proxy_allowed_destination_domains is not string
       - >-
@@ -35,11 +40,20 @@
       - forward_proxy_upstream_enabled is boolean
       - >-
         not forward_proxy_upstream_enabled
-        or forward_proxy_upstream_host is match('^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$')
+        or (
+          forward_proxy_upstream_host | length >= 1
+          and forward_proxy_upstream_host | length <= 253
+          and not forward_proxy_upstream_host.startswith('.')
+          and not forward_proxy_upstream_host.endswith('.')
+        )
       - forward_proxy_upstream_port | int >= 1
       - forward_proxy_upstream_port | int <= 65535
       - forward_proxy_no_proxy is sequence
       - forward_proxy_no_proxy is not string
+      - forward_proxy_apt_direct_hosts is sequence
+      - forward_proxy_apt_direct_hosts is not string
+      - forward_proxy_apt_direct_hosts | unique | list | length == forward_proxy_apt_direct_hosts | length
+      - forward_proxy_apt_direct_hosts | difference(forward_proxy_no_proxy) | length == 0
       - forward_proxy_url == 'http://127.0.0.1:' ~ (forward_proxy_port | string)
       - >-
         forward_proxy_container_url
@@ -48,6 +62,9 @@
       - >-
         not forward_proxy_container_enabled
         or forward_proxy_listen_addresses | difference(['127.0.0.1']) | length > 0
+      - >-
+        forward_proxy_listen_addresses | difference(['127.0.0.1']) | length == 0
+        or forward_proxy_container_enabled
       - >-
         not forward_proxy_manage_package
         or forward_proxy_bootstrap_package_only
@@ -64,6 +81,21 @@
       Container propagation additionally requires a non-loopback listen address.
       Package installation is a separate bootstrap-only phase and cannot also
       activate the proxy service or container propagation.
+
+- name: Validate opted-in service restarts
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9_.@-]{1,128}$')
+    fail_msg: "Opted-in proxy client services must use exact systemd unit names."
+  loop: "{{ forward_proxy_restart_services }}"
+
+- name: Validate upstream hostname labels
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$')
+    fail_msg: "The upstream proxy must be an exact DNS name with valid labels."
+  loop: "{{ forward_proxy_upstream_host.split('.') }}"
+  when: forward_proxy_upstream_enabled | bool
 
 - name: Require the shared container firewall contract
   ansible.builtin.assert:
@@ -85,22 +117,34 @@
       contract; package installation cannot run in the hardened proxy phase.
   when: forward_proxy_manage_package | bool
 
-- name: Validate the temporary package-bootstrap firewall contract
+- name: Validate the temporary package-bootstrap firewall envelope
   ansible.builtin.assert:
     that:
       - host_firewall_mode == 'bootstrap'
       - host_firewall_egress_policy is mapping
       - host_firewall_egress_policy.functions is mapping
+      - host_firewall_egress_policy.functions.bootstrap_http is mapping
       - host_firewall_egress_policy.functions.bootstrap_https is mapping
-      - host_firewall_egress_policy.functions.bootstrap_https.enabled is boolean
-      - host_firewall_egress_policy.functions.bootstrap_https.enabled
-      - host_firewall_egress_policy.functions.bootstrap_https.status == 'temporary-maintenance'
-      - host_firewall_egress_policy.functions.bootstrap_https.protocol == 'tcp'
-      - host_firewall_egress_policy.functions.bootstrap_https.port is integer
-      - host_firewall_egress_policy.functions.bootstrap_https.port == 443
     fail_msg: >-
-      Package bootstrap is allowed only while the explicit temporary HTTPS
-      maintenance function is active in bootstrap firewall mode.
+      Package bootstrap requires explicit temporary HTTP and HTTPS maintenance
+      functions in bootstrap firewall mode.
+  when: forward_proxy_manage_package | bool
+
+- name: Validate every temporary package-bootstrap transport
+  ansible.builtin.assert:
+    that:
+      - host_firewall_egress_policy.functions[item.name].enabled is boolean
+      - host_firewall_egress_policy.functions[item.name].enabled
+      - host_firewall_egress_policy.functions[item.name].status == 'temporary-maintenance'
+      - host_firewall_egress_policy.functions[item.name].protocol == 'tcp'
+      - host_firewall_egress_policy.functions[item.name].port is integer
+      - host_firewall_egress_policy.functions[item.name].port == item.port
+    fail_msg: >-
+      Package bootstrap may use only its explicit temporary TCP 80 and TCP 443
+      maintenance functions.
+  loop:
+    - {name: bootstrap_http, port: 80}
+    - {name: bootstrap_https, port: 443}
   when: forward_proxy_manage_package | bool
 
 - name: Validate the shared container firewall contract
@@ -115,6 +159,8 @@
       - host_firewall_forward_proxy_access.port is integer
       - host_firewall_forward_proxy_access.port == forward_proxy_port
       - host_firewall_forward_proxy_access.destination_ipv4 in forward_proxy_listen_addresses
+      - host_firewall_forward_proxy_access.interfaces | length > 0
+      - host_firewall_forward_proxy_access.sources_ipv4 | length > 0
       - host_firewall_forward_proxy_access.interfaces | difference(host_firewall_container_interfaces) | length == 0
       - host_firewall_forward_proxy_access.sources_ipv4 | difference(forward_proxy_allowed_clients) | length == 0
     fail_msg: >-
@@ -175,6 +221,21 @@
     fail_msg: "NO_PROXY entries must be individual host, domain, address, or CIDR tokens."
   loop: "{{ forward_proxy_no_proxy }}"
 
+- name: Validate exact apt direct hosts
+  ansible.builtin.assert:
+    that:
+      - >-
+        item is match(
+          '^(?:localhost|(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|'
+          '(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+'
+          '[A-Za-z]{2,63})$'
+        )
+    fail_msg: >-
+      APT DIRECT exceptions must be exact hostnames or IPv4 addresses; suffixes,
+      CIDRs, and wildcard forms are prohibited.
+  loop: "{{ forward_proxy_apt_direct_hosts }}"
+
 - name: Validate managed forward proxy paths
   ansible.builtin.assert:
     that:
@@ -190,3 +251,4 @@
     - "{{ forward_proxy_environment_path }}"
     - "{{ forward_proxy_systemd_environment_path }}"
     - "{{ forward_proxy_containers_config_path }}"
+    - "{{ forward_proxy_ss_binary }}"

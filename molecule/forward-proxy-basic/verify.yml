@@ -14,7 +14,7 @@
 
     - name: Read rendered apt policy
       ansible.builtin.slurp:
-        src: "{{ forward_proxy_test_root }}/etc/apt/90-lit-forward-proxy"
+        src: "{{ forward_proxy_test_root }}/etc/apt/99-lit-forward-proxy"
       register: forward_proxy_apt_config
 
     - name: Read rendered Podman policy
@@ -39,6 +39,12 @@
           - "'http_access deny lit_connect !lit_ssl_ports' in (forward_proxy_squid_config.content | b64decode)"
           - >-
             'Acquire::https::Proxy "http://127.0.0.1:3128";'
+            in (forward_proxy_apt_config.content | b64decode)
+          - >-
+            'Acquire::http::Proxy::apt.internal.example "DIRECT";'
+            in (forward_proxy_apt_config.content | b64decode)
+          - >-
+            'Acquire::https::Proxy::127.0.0.1 "DIRECT";'
             in (forward_proxy_apt_config.content | b64decode)
           - "'http_proxy = true' in (forward_proxy_containers_config.content | b64decode)"
           - >-

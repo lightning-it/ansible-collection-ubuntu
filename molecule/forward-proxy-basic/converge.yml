@@ -50,8 +50,13 @@
         - localhost
         - 127.0.0.1
         - .internal.example
+        - apt.internal.example
+      forward_proxy_apt_direct_hosts:
+        - localhost
+        - 127.0.0.1
+        - apt.internal.example
       forward_proxy_config_path: "{{ forward_proxy_test_root }}/etc/squid/squid.conf"
-      forward_proxy_apt_config_path: "{{ forward_proxy_test_root }}/etc/apt/90-lit-forward-proxy"
+      forward_proxy_apt_config_path: "{{ forward_proxy_test_root }}/etc/apt/99-lit-forward-proxy"
       forward_proxy_profile_path: "{{ forward_proxy_test_root }}/etc/profile.d/90-lit-forward-proxy.sh"
       forward_proxy_environment_path: "{{ forward_proxy_test_root }}/etc/environment.d/90-lit-forward-proxy.conf"
       forward_proxy_systemd_environment_path: >-
