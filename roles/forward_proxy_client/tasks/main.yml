@@ -102,6 +102,14 @@
       {{ forward_proxy_client_state_marker_content.content | b64decode | from_json }}
   when: forward_proxy_client_state_marker.stat.exists
 
+- name: Initialize empty previous forward proxy client state
+  ansible.builtin.set_fact:
+    forward_proxy_client_previous_state_manifest:
+      managed_paths: []
+      managed_checksums: []
+      managed_modes: []
+  when: not forward_proxy_client_state_marker.stat.exists
+
 - name: Validate the exact previous forward proxy client ownership manifest
   ansible.builtin.assert:
     that:

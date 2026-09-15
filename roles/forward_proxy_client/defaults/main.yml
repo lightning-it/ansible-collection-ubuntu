@@ -25,6 +25,7 @@ forward_proxy_client_no_proxy:
   - localhost
   - 127.0.0.1
   - ::1
+forward_proxy_client_approved_no_proxy_domains: []
 forward_proxy_client_apt_direct_hosts:
   - localhost
   - 127.0.0.1

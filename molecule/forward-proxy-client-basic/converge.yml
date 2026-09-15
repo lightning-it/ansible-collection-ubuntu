@@ -55,6 +55,9 @@
         - 127.0.0.1
         - .internal.example
         - apt.internal.example
+      forward_proxy_client_approved_no_proxy_domains:
+        - .internal.example
+        - apt.internal.example
       forward_proxy_client_apt_direct_hosts:
         - localhost
         - 127.0.0.1

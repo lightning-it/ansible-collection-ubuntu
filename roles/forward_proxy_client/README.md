@@ -21,6 +21,8 @@ Important inputs include:
 - `forward_proxy_client_enabled`: render or safely remove Ubuntu client state.
 - `forward_proxy_client_proxy_url`: local host proxy URL.
 - `forward_proxy_client_no_proxy`: exact local/internal bypass tokens.
+- `forward_proxy_client_approved_no_proxy_domains`: reviewed internal DNS
+  names/suffixes that may appear in `NO_PROXY`; public destinations remain forbidden.
 - `forward_proxy_client_apt_direct_hosts`: restricted to host loopback.
 - `forward_proxy_client_container_enabled`: opt in only after live network readback.
 - `forward_proxy_client_restart_services`: exact existing systemd services for a controlled cutover.

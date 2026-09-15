@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+import yaml
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 ROLE_ROOT = REPOSITORY_ROOT / "roles" / "forward_proxy_client"
@@ -68,6 +69,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("Refuse to adopt new unowned forward proxy client target paths", tasks)
         self.assertIn("not item.stat.exists", tasks)
         self.assertIn("Refuse unsafe forward proxy client managed directories", tasks)
+        self.assertIn("Initialize empty previous forward proxy client state", tasks)
         self.assertNotIn("_forward_proxy_client_", tasks)
 
     def test_firewall_mode_and_ports_match_service_upstream_mode(self) -> None:
@@ -79,6 +81,11 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("[forward_proxy_client_upstream_ipv4 ~ '/32']", assertions)
         self.assertIn("else ['0.0.0.0/0']", assertions)
         self.assertIn("get('interface', '')", assertions)
+        self.assertIn("{1,15}", assertions)
+        firewall_assertions = (
+            REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml"
+        ).read_text()
+        self.assertIn("residual | trim | length >= 20", firewall_assertions)
 
     def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
@@ -86,8 +93,62 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_trusted_parent_paths", assertions)
         self.assertIn("item | dirname in forward_proxy_client_trusted_parent_paths", assertions)
         self.assertIn('loop: "{{ forward_proxy_client_trusted_parent_paths }}"', main)
-        self.assertIn("(?:/(?:[0-9]|[12][0-9]|3[0-2]))?", assertions)
+        self.assertIn("forward_proxy_client_approved_no_proxy_domains", assertions)
+        self.assertIn("(?:/(?:[89]|[12][0-9]|3[0-2]))?", assertions)
         self.assertNotIn("(?:/[0-9]{1,3})?", assertions)
+        argument_spec = (ROLE_ROOT / "meta" / "argument_specs.yml").read_text()
+        self.assertIn("forward_proxy_client_trusted_parent_paths", argument_spec)
+        self.assertIn("forward_proxy_client_approved_no_proxy_domains", argument_spec)
+
+    def test_systemd_change_and_restart_conditions_have_complete_truth_table(self) -> None:
+        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "enabled.yml").read_text())
+        by_name = {task["name"]: task for task in tasks}
+        reload_task = by_name["Reload systemd manager after changing proxy client defaults"]
+        restart_task = by_name["Restart opted-in proxy client services"]
+
+        def enabled(task: dict[str, object], **context: object) -> bool:
+            condition_values = {
+                "forward_proxy_client_manage_systemd | bool": bool(
+                    context["forward_proxy_client_manage_systemd"]
+                ),
+                "forward_proxy_client_systemd_environment_result.changed": bool(
+                    context.get("forward_proxy_client_systemd_environment_result", {}).get(
+                        "changed", False
+                    )
+                ),
+                "forward_proxy_client_restart_now | bool": bool(
+                    context.get("forward_proxy_client_restart_now", False)
+                ),
+                "forward_proxy_client_managed_state_changed_internal | bool": bool(
+                    context.get("forward_proxy_client_managed_state_changed_internal", False)
+                ),
+            }
+            return all(condition_values[condition] for condition in task["when"])
+
+        for manage_systemd in (False, True):
+            for changed in (False, True):
+                context = {
+                    "forward_proxy_client_manage_systemd": manage_systemd,
+                    "forward_proxy_client_systemd_environment_result": {"changed": changed},
+                }
+                self.assertEqual(enabled(reload_task, **context), manage_systemd and changed)
+
+        for manage_systemd in (False, True):
+            for restart_now in (False, True):
+                for changed in (False, True):
+                    context = {
+                        "forward_proxy_client_manage_systemd": manage_systemd,
+                        "forward_proxy_client_restart_now": restart_now,
+                        "forward_proxy_client_managed_state_changed_internal": changed,
+                    }
+                    self.assertEqual(
+                        enabled(restart_task, **context),
+                        manage_systemd and restart_now and changed,
+                    )
+        self.assertEqual(
+            restart_task["ansible.builtin.systemd"]["state"],
+            "restarted",
+        )
 
 
 if __name__ == "__main__":

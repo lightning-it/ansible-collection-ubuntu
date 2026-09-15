@@ -34,6 +34,10 @@
       - host_firewall_forward_proxy_egress.residual is string
       - >-
         not host_firewall_forward_proxy_egress.enabled
+        or host_firewall_forward_proxy_egress.mode != 'direct'
+        or host_firewall_forward_proxy_egress.residual | trim | length >= 20
+      - >-
+        not host_firewall_forward_proxy_egress.enabled
         or (
           host_firewall_mode == 'hardened'
           and host_firewall_forward_proxy_egress.status == 'approved'
