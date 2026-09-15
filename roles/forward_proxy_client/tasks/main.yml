@@ -14,6 +14,17 @@
     that:
       - forward_proxy_client_state_marker.stat.isreg | default(false)
       - not forward_proxy_client_state_marker.stat.islnk | default(false)
+      - forward_proxy_client_state_marker.stat.mode == '0600'
+      - >-
+        forward_proxy_client_state_marker.stat.pw_name | default('')
+          == forward_proxy_client_file_owner | string
+        or forward_proxy_client_state_marker.stat.uid | string
+          == forward_proxy_client_file_owner | string
+      - >-
+        forward_proxy_client_state_marker.stat.gr_name | default('')
+          == forward_proxy_client_file_group | string
+        or forward_proxy_client_state_marker.stat.gid | string
+          == forward_proxy_client_file_group | string
     fail_msg: "The proxy-client state marker must be a regular non-symlink file."
   when: forward_proxy_client_state_marker.stat.exists
 
@@ -87,21 +98,29 @@
       - forward_proxy_client_previous_state_manifest is mapping
       - >-
         forward_proxy_client_previous_state_manifest.keys() | list | sort
-        == ['managed_checksums', 'managed_paths', 'owner', 'schema']
+        == ['managed_checksums', 'managed_modes', 'managed_paths', 'owner', 'schema']
       - >-
         forward_proxy_client_previous_state_manifest.schema
-        == 'lit.ubuntu.forward_proxy_client.managed-state/v2'
+        == 'lit.ubuntu.forward_proxy_client.managed-state/v3'
       - forward_proxy_client_previous_state_manifest.owner == 'lit.ubuntu.forward_proxy_client'
       - forward_proxy_client_previous_state_manifest.managed_paths is sequence
       - forward_proxy_client_previous_state_manifest.managed_paths is not string
       - forward_proxy_client_previous_state_manifest.managed_checksums is sequence
       - forward_proxy_client_previous_state_manifest.managed_checksums is not string
+      - forward_proxy_client_previous_state_manifest.managed_modes is sequence
+      - forward_proxy_client_previous_state_manifest.managed_modes is not string
       - >-
         forward_proxy_client_previous_state_manifest.managed_checksums | length
         == forward_proxy_client_previous_state_manifest.managed_paths | length
       - >-
+        forward_proxy_client_previous_state_manifest.managed_modes | length
+        == forward_proxy_client_previous_state_manifest.managed_paths | length
+      - >-
+        forward_proxy_client_previous_state_manifest.managed_modes
+        | reject('match', '^0[0-7]{3}\Z') | list | length == 0
+      - >-
         forward_proxy_client_previous_state_manifest.managed_checksums
-        | reject('match', '^[a-f0-9]{64}$') | list | length == 0
+        | reject('match', '^[a-f0-9]{64}\Z') | list | length == 0
       - >-
         forward_proxy_client_previous_state_manifest.managed_paths | unique | list | length
         == forward_proxy_client_previous_state_manifest.managed_paths | length
@@ -120,13 +139,14 @@
 
 - name: Inspect previously managed forward proxy client files
   ansible.builtin.stat:
-    path: "{{ item.0 }}"
+    path: "{{ item.0.0 }}"
     follow: false
     checksum_algorithm: sha256
   loop: >-
     {{
       forward_proxy_client_previous_state_manifest.managed_paths
       | zip(forward_proxy_client_previous_state_manifest.managed_checksums)
+      | zip(forward_proxy_client_previous_state_manifest.managed_modes)
       | list
     }}
   register: forward_proxy_client_previous_asset_stats
@@ -140,7 +160,16 @@
         or (
           item.stat.isreg | default(false)
           and not item.stat.islnk | default(false)
-          and item.stat.checksum == item.item.1
+          and item.stat.checksum == item.item.0.1
+          and item.stat.mode == item.item.1
+          and (
+            item.stat.pw_name | default('') == forward_proxy_client_file_owner | string
+            or item.stat.uid | string == forward_proxy_client_file_owner | string
+          )
+          and (
+            item.stat.gr_name | default('') == forward_proxy_client_file_group | string
+            or item.stat.gid | string == forward_proxy_client_file_group | string
+          )
         )
     fail_msg: >-
       A previously managed proxy-client path changed type or content. Stop
@@ -171,7 +200,7 @@
 
 - name: Remove forward proxy client configuration when disabled
   ansible.builtin.file:
-    path: "{{ item.item.0 }}"
+    path: "{{ item.item.0.0 }}"
     state: absent
   loop: "{{ forward_proxy_client_previous_asset_stats.results | default([]) }}"
   when:

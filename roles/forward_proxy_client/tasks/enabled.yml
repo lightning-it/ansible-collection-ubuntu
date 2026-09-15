@@ -18,6 +18,7 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+  register: forward_proxy_client_apt_config_result
 
 - name: Render interactive proxy environment
   ansible.builtin.template:
@@ -26,6 +27,7 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+  register: forward_proxy_client_profile_result
 
 - name: Render process proxy environment
   ansible.builtin.template:
@@ -34,6 +36,7 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+  register: forward_proxy_client_environment_result
 
 - name: Render systemd proxy defaults
   ansible.builtin.template:
@@ -51,12 +54,14 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+  register: forward_proxy_client_containers_config_result
   when: forward_proxy_client_container_enabled | bool
 
 - name: Remove previously owned client-container proxy defaults
   ansible.builtin.file:
     path: "{{ forward_proxy_client_containers_config_path }}"
     state: absent
+  register: forward_proxy_client_containers_remove_result
   when:
     - not forward_proxy_client_container_enabled | bool
     - forward_proxy_client_state_marker.stat.exists
@@ -66,6 +71,18 @@
         forward_proxy_client_previous_state_manifest
         | default({'managed_paths': []})
       ).managed_paths
+
+- name: Determine whether managed Ubuntu proxy-client state changed
+  ansible.builtin.set_fact:
+    forward_proxy_client_managed_state_changed_internal: >-
+      {{
+        forward_proxy_client_apt_config_result.changed
+        or forward_proxy_client_profile_result.changed
+        or forward_proxy_client_environment_result.changed
+        or forward_proxy_client_systemd_environment_result.changed
+        or forward_proxy_client_containers_config_result.changed | default(false)
+        or forward_proxy_client_containers_remove_result.changed | default(false)
+      }}
 
 - name: Inspect rendered forward proxy client files
   ansible.builtin.stat:
@@ -79,11 +96,26 @@
 - name: Verify rendered forward proxy client files before recording ownership
   ansible.builtin.assert:
     that:
-      - item.stat.isreg | default(false)
-      - not item.stat.islnk | default(false)
-      - item.stat.checksum is match('^[a-f0-9]{64}$')
-    fail_msg: "Every recorded proxy-client asset must be a regular non-symlink file."
-  loop: "{{ forward_proxy_client_managed_asset_stats.results | default([]) }}"
+      - item.0.stat.isreg | default(false)
+      - not item.0.stat.islnk | default(false)
+      - item.0.stat.checksum is match('^[a-f0-9]{64}\Z')
+      - item.0.stat.mode == item.1
+      - >-
+        item.0.stat.pw_name | default('') == forward_proxy_client_file_owner | string
+        or item.0.stat.uid | string == forward_proxy_client_file_owner | string
+      - >-
+        item.0.stat.gr_name | default('') == forward_proxy_client_file_group | string
+        or item.0.stat.gid | string == forward_proxy_client_file_group | string
+    fail_msg: >-
+      Every recorded proxy-client asset must retain the exact regular-file,
+      owner, group, mode, and checksum boundary.
+  loop: >-
+    {{
+      forward_proxy_client_managed_asset_stats.results
+      | zip(forward_proxy_client_managed_modes_effective_internal) | list
+    }}
+  loop_control:
+    label: "{{ item.0.item }}"
   when: not ansible_check_mode
 
 - name: Record exact forward proxy client file ownership
@@ -91,13 +123,14 @@
     content: >-
       {{
         {
-          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v2',
+          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v3',
           'owner': 'lit.ubuntu.forward_proxy_client',
           'managed_paths': forward_proxy_client_managed_paths_effective_internal,
           'managed_checksums': (
             forward_proxy_client_managed_asset_stats.results
             | map(attribute='stat.checksum') | list
-          )
+          ),
+          'managed_modes': forward_proxy_client_managed_modes_effective_internal
         } | to_nice_json
       }}
     dest: "{{ forward_proxy_client_state_marker_path }}"
@@ -123,3 +156,4 @@
   when:
     - forward_proxy_client_manage_systemd | bool
     - forward_proxy_client_restart_now | bool
+    - forward_proxy_client_managed_state_changed_internal | bool

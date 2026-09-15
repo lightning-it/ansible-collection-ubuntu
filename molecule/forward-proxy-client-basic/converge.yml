@@ -10,7 +10,12 @@
       - podman0
     host_firewall_forward_proxy_egress:
       enabled: true
+      status: approved
       owner_username: proxy
+      mode: direct
+      ports:
+        - 80
+        - 443
     host_firewall_forward_proxy_access:
       enabled: true
       port: 3128

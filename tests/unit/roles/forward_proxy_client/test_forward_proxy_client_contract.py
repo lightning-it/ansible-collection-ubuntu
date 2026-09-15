@@ -35,6 +35,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_systemd_environment_result.changed", tasks)
         self.assertIn('loop: "{{ forward_proxy_client_restart_services }}"', tasks)
         self.assertIn("forward_proxy_client_restart_now | bool", tasks)
+        self.assertIn("forward_proxy_client_managed_state_changed_internal | bool", tasks)
 
     def test_container_boundary_matches_the_host_firewall(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
@@ -47,7 +48,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("192\\.168\\.", assertions)
         self.assertIn("192\\.168\\.", firewall_assertions)
         self.assertIn("172\\.(?:1[6-9]|2[0-9]|3[01])\\.", firewall_assertions)
-        self.assertIn("/(?:[89]|[12][0-9]|3[0-2])$", assertions)
+        self.assertIn("/(?:[89]|[12][0-9]|3[0-2])\\Z", assertions)
         self.assertIn("/(?:1[6-9]|2[0-9]|3[0-2])$", firewall_assertions)
 
     def test_disabled_state_cleans_only_adapter_owned_state(self) -> None:
@@ -55,11 +56,14 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         variables = (ROLE_ROOT / "vars" / "main.yml").read_text()
         self.assertIn("Inspect the forward proxy client managed-state marker", tasks)
         self.assertIn("forward_proxy_client_previous_state_manifest.managed_paths", tasks)
-        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v2", tasks)
+        self.assertIn("lit.ubuntu.forward_proxy_client.managed-state/v3", tasks)
         self.assertNotIn("managed-state/v1", variables)
         self.assertIn("checksum_algorithm: sha256", tasks)
         self.assertIn("item.stat.isreg", tasks)
         self.assertIn("item.stat.islnk", tasks)
+        self.assertIn("item.stat.mode", tasks)
+        self.assertIn("item.stat.pw_name", tasks)
+        self.assertIn("item.stat.gr_name", tasks)
         self.assertIn("Refuse to adopt unowned forward proxy client target paths", tasks)
         self.assertIn("Refuse to adopt new unowned forward proxy client target paths", tasks)
         self.assertIn("not item.stat.exists", tasks)
@@ -71,6 +75,8 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_firewall_egress.get('mode', '')", assertions)
         self.assertIn("forward_proxy_client_firewall_egress.get('ports', [])", assertions)
         self.assertIn("if forward_proxy_client_upstream_enabled", assertions)
+        self.assertIn("get('status', '') == 'approved'", assertions)
+        self.assertIn("[forward_proxy_client_upstream_ipv4 ~ '/32']", assertions)
 
 
 if __name__ == "__main__":

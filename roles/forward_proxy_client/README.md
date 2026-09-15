@@ -24,7 +24,10 @@ Important inputs include:
 - `forward_proxy_client_apt_direct_hosts`: restricted to host loopback.
 - `forward_proxy_client_container_enabled`: opt in only after live network readback.
 - `forward_proxy_client_restart_services`: exact existing systemd services for a controlled cutover.
-- `forward_proxy_client_restart_now`: explicit one-shot restart switch, false by default.
+- `forward_proxy_client_restart_now`: permits one restart only when this run actually changes managed client state;
+  unchanged runs remain idempotent even if the switch remains true.
+- `forward_proxy_client_upstream_ipv4`: exact resolved parent-proxy IPv4 identity used to bind upstream mode to the
+  firewall's single `/32` destination.
 
 The role writes APT, interactive shell, process, systemd-manager, and optional
 Podman client defaults. Existing containers are not recreated automatically.
@@ -48,6 +51,15 @@ a collection cycle and allowing Automation to pin each collection explicitly.
   roles:
     - role: lit.ubuntu.forward_proxy_client
       forward_proxy_client_enabled: true
+      forward_proxy_client_firewall_egress:
+        enabled: true
+        status: approved
+        owner_username: proxy
+        mode: direct
+        interface: eth0
+        destinations_ipv4: [0.0.0.0/0]
+        ports: [80, 443]
+        residual: No non-proxy public egress is permitted.
 ```
 
 ## License
