@@ -47,6 +47,8 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("192\\.168\\.", assertions)
         self.assertIn("192\\.168\\.", firewall_assertions)
         self.assertIn("172\\.(?:1[6-9]|2[0-9]|3[01])\\.", firewall_assertions)
+        self.assertIn("/(?:[89]|[12][0-9]|3[0-2])$", assertions)
+        self.assertIn("/(?:1[6-9]|2[0-9]|3[0-2])$", firewall_assertions)
 
     def test_disabled_state_cleans_only_adapter_owned_state(self) -> None:
         tasks = "".join(path.read_text() for path in sorted((ROLE_ROOT / "tasks").glob("*.yml")))
@@ -59,7 +61,10 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("item.stat.isreg", tasks)
         self.assertIn("item.stat.islnk", tasks)
         self.assertIn("Refuse to adopt unowned forward proxy client target paths", tasks)
+        self.assertIn("Refuse to adopt new unowned forward proxy client target paths", tasks)
         self.assertIn("not item.stat.exists", tasks)
+        self.assertIn("Refuse unsafe forward proxy client managed directories", tasks)
+        self.assertNotIn("_forward_proxy_client_", tasks)
 
     def test_firewall_mode_and_ports_match_service_upstream_mode(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()

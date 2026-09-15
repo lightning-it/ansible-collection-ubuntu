@@ -1,15 +1,14 @@
 ---
 - name: Create forward proxy client managed directories
   ansible.builtin.file:
-    path: "{{ item | dirname }}"
+    path: "{{ item }}"
     state: directory
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0755"
   loop: >-
     {{
-      (_forward_proxy_client_managed_paths_effective + [forward_proxy_client_state_marker_path])
-      | unique | list
+      forward_proxy_client_managed_directories_internal
     }}
 
 - name: Render apt proxy policy
@@ -73,7 +72,7 @@
     path: "{{ item }}"
     follow: false
     checksum_algorithm: sha256
-  loop: "{{ _forward_proxy_client_managed_paths_effective }}"
+  loop: "{{ forward_proxy_client_managed_paths_effective_internal }}"
   register: forward_proxy_client_managed_asset_stats
   when: not ansible_check_mode
 
@@ -94,7 +93,7 @@
         {
           'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v2',
           'owner': 'lit.ubuntu.forward_proxy_client',
-          'managed_paths': _forward_proxy_client_managed_paths_effective,
+          'managed_paths': forward_proxy_client_managed_paths_effective_internal,
           'managed_checksums': (
             forward_proxy_client_managed_asset_stats.results
             | map(attribute='stat.checksum') | list

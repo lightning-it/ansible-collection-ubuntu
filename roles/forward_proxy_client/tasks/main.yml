@@ -17,11 +17,45 @@
     fail_msg: "The proxy-client state marker must be a regular non-symlink file."
   when: forward_proxy_client_state_marker.stat.exists
 
+- name: Inspect forward proxy client managed directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop: "{{ forward_proxy_client_managed_directories_internal }}"
+  register: forward_proxy_client_managed_directory_stats
+
+- name: Refuse unsafe forward proxy client managed directories
+  ansible.builtin.assert:
+    that:
+      - >-
+        not item.stat.exists
+        or (
+          item.stat.isdir | default(false)
+          and not item.stat.islnk | default(false)
+          and item.stat.mode == '0755'
+          and (
+            item.stat.pw_name | default('')
+              == forward_proxy_client_file_owner | string
+            or item.stat.uid | string
+              == forward_proxy_client_file_owner | string
+          )
+          and (
+            item.stat.gr_name | default('')
+              == forward_proxy_client_file_group | string
+            or item.stat.gid | string
+              == forward_proxy_client_file_group | string
+          )
+        )
+    fail_msg: >-
+      A proxy-client directory already exists with a foreign type, owner,
+      group, or mode. Stop before changing shared filesystem state.
+  loop: "{{ forward_proxy_client_managed_directory_stats.results }}"
+
 - name: Inspect unowned forward proxy client target paths
   ansible.builtin.stat:
     path: "{{ item }}"
     follow: false
-  loop: "{{ _forward_proxy_client_managed_paths_effective }}"
+  loop: "{{ forward_proxy_client_managed_paths_effective_internal }}"
   register: forward_proxy_client_unowned_target_stats
   when: not forward_proxy_client_state_marker.stat.exists
 
@@ -72,12 +106,12 @@
         forward_proxy_client_previous_state_manifest.managed_paths | unique | list | length
         == forward_proxy_client_previous_state_manifest.managed_paths | length
       - >-
-        _forward_proxy_client_base_managed_paths
+        forward_proxy_client_base_managed_paths_internal
         | difference(forward_proxy_client_previous_state_manifest.managed_paths)
         | length == 0
       - >-
         forward_proxy_client_previous_state_manifest.managed_paths
-        | difference(_forward_proxy_client_all_managed_paths)
+        | difference(forward_proxy_client_all_managed_paths_internal)
         | length == 0
     fail_msg: >-
       Existing forward proxy client state is not the exact role-owned path
@@ -112,6 +146,28 @@
       A previously managed proxy-client path changed type or content. Stop
       before overwriting or deleting it.
   loop: "{{ forward_proxy_client_previous_asset_stats.results | default([]) }}"
+
+- name: Inspect newly managed forward proxy client target paths
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop: >-
+    {{
+      forward_proxy_client_managed_paths_effective_internal
+      | difference(forward_proxy_client_previous_state_manifest.managed_paths)
+    }}
+  register: forward_proxy_client_new_target_stats
+  when: forward_proxy_client_state_marker.stat.exists
+
+- name: Refuse to adopt new unowned forward proxy client target paths
+  ansible.builtin.assert:
+    that:
+      - not item.stat.exists
+    fail_msg: >-
+      A newly enabled proxy-client target already exists outside the ownership
+      manifest. Stop before overwriting a potentially foreign file.
+  loop: "{{ forward_proxy_client_new_target_stats.results | default([]) }}"
+  when: forward_proxy_client_state_marker.stat.exists
 
 - name: Remove forward proxy client configuration when disabled
   ansible.builtin.file:

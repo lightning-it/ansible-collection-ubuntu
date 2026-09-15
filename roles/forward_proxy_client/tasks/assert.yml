@@ -17,7 +17,10 @@
         or (
           not forward_proxy_client_manage_systemd
           and (
-            (_forward_proxy_client_all_managed_paths + [forward_proxy_client_state_marker_path])
+            (
+              forward_proxy_client_all_managed_paths_internal
+              + [forward_proxy_client_state_marker_path]
+            )
             | reject('match', '^/tmp/') | list | length == 0
           )
         )
@@ -26,7 +29,10 @@
         or (
           not forward_proxy_client_manage_systemd
           and (
-            (_forward_proxy_client_all_managed_paths + [forward_proxy_client_state_marker_path])
+            (
+              forward_proxy_client_all_managed_paths_internal
+              + [forward_proxy_client_state_marker_path]
+            )
             | reject('match', '^/tmp/') | list | length == 0
           )
         )
@@ -89,7 +95,16 @@
       - >-
         item == '127.0.0.1/32'
         or item is match(
-          '^(?:10\.|192\.168\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)'
+          '^10\.(?:[0-9]{1,3}\.){2}[0-9]{1,3}'
+          '/(?:[89]|[12][0-9]|3[0-2])$'
+        )
+        or item is match(
+          '^172\.(?:1[6-9]|2[0-9]|3[01])\.(?:[0-9]{1,3}\.)'
+          '[0-9]{1,3}/(?:1[2-9]|2[0-9]|3[0-2])$'
+        )
+        or item is match(
+          '^192\.168\.(?:[0-9]{1,3}\.)[0-9]{1,3}'
+          '/(?:1[6-9]|2[0-9]|3[0-2])$'
         )
     fail_msg: >-
       Proxy clients must be exact loopback or RFC1918 CIDRs; globally routable
@@ -201,8 +216,8 @@
     that:
       - >-
         (
-          _forward_proxy_client_all_managed_paths
+          forward_proxy_client_all_managed_paths_internal
           + [forward_proxy_client_state_marker_path]
         ) | unique | list | length
-        == (_forward_proxy_client_all_managed_paths | length) + 1
+        == (forward_proxy_client_all_managed_paths_internal | length) + 1
     fail_msg: "Every Ubuntu proxy-client managed path must be distinct."
