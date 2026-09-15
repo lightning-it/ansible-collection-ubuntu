@@ -102,8 +102,8 @@
         == ['destination_ipv4', 'enabled', 'interfaces', 'port', 'sources_ipv4']
       - host_firewall_forward_proxy_access.enabled is boolean
       - host_firewall_forward_proxy_access.port is integer
-      - host_firewall_forward_proxy_access.port | int >= 1024
-      - host_firewall_forward_proxy_access.port | int <= 65535
+      - host_firewall_forward_proxy_access.port >= 1024
+      - host_firewall_forward_proxy_access.port <= 65535
       - host_firewall_forward_proxy_access.interfaces is sequence
       - host_firewall_forward_proxy_access.interfaces is not string
       - host_firewall_forward_proxy_access.sources_ipv4 is sequence

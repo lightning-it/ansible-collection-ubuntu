@@ -6,11 +6,11 @@ http_port {{ address }}:{{ forward_proxy_port }}
 acl lit_clients src {{ forward_proxy_allowed_clients | join(' ') }}
 acl lit_safe_ports port {{ forward_proxy_allowed_destination_ports | join(' ') }}
 acl lit_ssl_ports port 443
-acl CONNECT method CONNECT
+acl lit_connect method CONNECT
 acl lit_allowed_domains dstdomain {{ forward_proxy_allowed_destination_domains | join(' ') }}
 
 http_access deny !lit_safe_ports
-http_access deny CONNECT !lit_ssl_ports
+http_access deny lit_connect !lit_ssl_ports
 http_access allow lit_clients lit_allowed_domains
 http_access deny all
 

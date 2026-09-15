@@ -75,6 +75,34 @@
       firewall access contract and container interface list.
   when: forward_proxy_container_enabled | bool
 
+- name: Require the temporary package-bootstrap firewall contract
+  ansible.builtin.assert:
+    that:
+      - host_firewall_mode is defined
+      - host_firewall_egress_policy is defined
+    fail_msg: >-
+      Package bootstrap requires the explicit temporary host-firewall egress
+      contract; package installation cannot run in the hardened proxy phase.
+  when: forward_proxy_manage_package | bool
+
+- name: Validate the temporary package-bootstrap firewall contract
+  ansible.builtin.assert:
+    that:
+      - host_firewall_mode == 'bootstrap'
+      - host_firewall_egress_policy is mapping
+      - host_firewall_egress_policy.functions is mapping
+      - host_firewall_egress_policy.functions.bootstrap_https is mapping
+      - host_firewall_egress_policy.functions.bootstrap_https.enabled is boolean
+      - host_firewall_egress_policy.functions.bootstrap_https.enabled
+      - host_firewall_egress_policy.functions.bootstrap_https.status == 'temporary-maintenance'
+      - host_firewall_egress_policy.functions.bootstrap_https.protocol == 'tcp'
+      - host_firewall_egress_policy.functions.bootstrap_https.port is integer
+      - host_firewall_egress_policy.functions.bootstrap_https.port == 443
+    fail_msg: >-
+      Package bootstrap is allowed only while the explicit temporary HTTPS
+      maintenance function is active in bootstrap firewall mode.
+  when: forward_proxy_manage_package | bool
+
 - name: Validate the shared container firewall contract
   ansible.builtin.assert:
     that:
