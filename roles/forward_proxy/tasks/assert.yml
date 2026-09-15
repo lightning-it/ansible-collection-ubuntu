@@ -7,8 +7,27 @@
       - forward_proxy_restart_services is sequence
       - forward_proxy_restart_services is not string
       - forward_proxy_restart_services | unique | list | length == forward_proxy_restart_services | length
+      - forward_proxy_restart_clients is boolean
       - forward_proxy_file_owner is match('^(?:[a-z_][a-z0-9_-]{0,31}|[0-9]{1,10})$')
       - forward_proxy_file_group is match('^(?:[a-z_][a-z0-9_-]{0,31}|[0-9]{1,10})$')
+      - >-
+        forward_proxy_file_owner in ['root', '0']
+        or (
+          not forward_proxy_manage_runtime
+          and (
+            (_forward_proxy_all_managed_paths + [forward_proxy_state_marker_path])
+            | reject('match', '^/tmp/') | list | length == 0
+          )
+        )
+      - >-
+        forward_proxy_file_group in ['root', '0']
+        or (
+          not forward_proxy_manage_runtime
+          and (
+            (_forward_proxy_all_managed_paths + [forward_proxy_state_marker_path])
+            | reject('match', '^/tmp/') | list | length == 0
+          )
+        )
       - >-
         forward_proxy_image
         is match('^docker\.io/ubuntu/squid@sha256:[a-f0-9]{64}\Z')
@@ -125,7 +144,7 @@
       - forward_proxy_container_firewall_access.port is integer
       - forward_proxy_container_firewall_access.port == forward_proxy_port
       - forward_proxy_container_firewall_access.destination_ipv4 in forward_proxy_listen_addresses
-      - forward_proxy_container_firewall_access.destination_ipv4 != '127.0.0.1'
+      - not forward_proxy_container_firewall_access.destination_ipv4.startswith('127.')
       - forward_proxy_container_firewall_access.interfaces | length > 0
       - forward_proxy_container_firewall_access.sources_ipv4 | length > 0
       - >-

@@ -2,6 +2,7 @@
 forward_proxy_enabled: false
 forward_proxy_manage_runtime: true
 forward_proxy_restart_services: []
+forward_proxy_restart_clients: false
 forward_proxy_file_owner: root
 forward_proxy_file_group: root
 

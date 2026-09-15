@@ -116,7 +116,7 @@
   loop: "{{ forward_proxy_restart_services }}"
   when:
     - forward_proxy_manage_runtime | bool
-    - forward_proxy_systemd_environment_result.changed
+    - forward_proxy_restart_clients | bool
 
 - name: Manage the persistent Squid container service
   ansible.builtin.include_role:

@@ -169,11 +169,6 @@ host_firewall_egress_function_contract:
     port: 3100
     modes: [bootstrap, hardened]
     interface_role: management
-  bootstrap_http:
-    protocol: tcp
-    port: 80
-    modes: [bootstrap]
-    interface_role: public
   bootstrap_https:
     protocol: tcp
     port: 443

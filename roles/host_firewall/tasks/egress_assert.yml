@@ -26,7 +26,7 @@
       - host_firewall_forward_proxy_egress.enabled is boolean
       - host_firewall_forward_proxy_egress.status in ['approved', 'disabled']
       - host_firewall_forward_proxy_egress.mode in ['direct', 'upstream']
-      - host_firewall_forward_proxy_egress.owner_username is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - host_firewall_forward_proxy_egress.owner_username == 'proxy'
       - host_firewall_forward_proxy_egress.destinations_ipv4 is sequence
       - host_firewall_forward_proxy_egress.destinations_ipv4 is not string
       - host_firewall_forward_proxy_egress.ports is sequence
@@ -41,7 +41,6 @@
               in [host_firewall_public_interface, host_firewall_management_interface]
           and host_firewall_forward_proxy_egress.destinations_ipv4 | length >= 1
           and host_firewall_forward_proxy_egress.ports | length >= 1
-          and not host_firewall_egress_policy.functions.bootstrap_http.enabled
           and not host_firewall_egress_policy.functions.bootstrap_https.enabled
           and not host_firewall_egress_policy.functions.https_proxy.enabled
         )
@@ -119,7 +118,7 @@
           and host_firewall_forward_proxy_access.sources_ipv4 | length >= 1
           and host_firewall_forward_proxy_access.destination_ipv4
               is match(host_firewall_ipv4_pattern)
-          and host_firewall_forward_proxy_access.destination_ipv4 != '127.0.0.1'
+          and not host_firewall_forward_proxy_access.destination_ipv4.startswith('127.')
         )
       - >-
         host_firewall_forward_proxy_access.enabled
@@ -296,7 +295,7 @@
     _ntp: "{{ host_firewall_egress_policy.functions.ntp }}"
     _atlas: "{{ host_firewall_egress_policy.functions.atlas_loki }}"
 
-- name: Enforce mode-specific package bootstrap and proxy egress boundary
+- name: Enforce mode-specific image bootstrap and proxy egress boundary
   ansible.builtin.assert:
     that:
       - >-
@@ -304,9 +303,6 @@
           host_firewall_mode == 'bootstrap'
           and host_firewall_egress_policy.status == 'draft'
           and host_firewall_egress_policy.stance == 'bootstrap-restricted'
-          and _bootstrap_http.enabled | bool
-          and _bootstrap_http.status == 'temporary-maintenance'
-          and _bootstrap_http.destinations_ipv4 == ['0.0.0.0/0']
           and _bootstrap_https.enabled | bool
           and _bootstrap_https.status == 'temporary-maintenance'
           and _bootstrap_https.destinations_ipv4 == ['0.0.0.0/0']
@@ -318,9 +314,6 @@
           host_firewall_mode == 'hardened'
           and host_firewall_egress_policy.status == 'approved'
           and host_firewall_egress_policy.stance == 'deny-by-default'
-          and not _bootstrap_http.enabled | bool
-          and _bootstrap_http.status == 'disabled-staged-transfer'
-          and _bootstrap_http.destinations_ipv4 | length == 0
           and not _bootstrap_https.enabled | bool
           and _bootstrap_https.status == 'disabled-staged-transfer'
           and _bootstrap_https.destinations_ipv4 | length == 0
@@ -339,16 +332,14 @@
             )
           )
         )
-      - _bootstrap_http.destinations_ipv6 | length == 0
       - _bootstrap_https.destinations_ipv6 | length == 0
       - _proxy.destinations_ipv6 | length == 0
-      - not _bootstrap_http.mtls_required | bool
       - not _bootstrap_https.mtls_required | bool
     fail_msg: >-
-      Bootstrap HTTP(S) is a temporary, never-confirmable public exception. Hardened mode must disable both
-      transports and either use one approved management proxy /32 on TCP 3128 or controller-pull/staged transfer.
+      Bootstrap HTTPS is a temporary, never-confirmable public exception.
+      Hardened mode must disable it and either use one approved management
+      proxy /32 on TCP 3128 or use controller-pull/staged transfer.
   vars:
-    _bootstrap_http: "{{ host_firewall_egress_policy.functions.bootstrap_http }}"
     _bootstrap_https: "{{ host_firewall_egress_policy.functions.bootstrap_https }}"
     _proxy: "{{ host_firewall_egress_policy.functions.https_proxy }}"
 

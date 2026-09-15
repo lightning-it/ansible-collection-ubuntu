@@ -143,7 +143,6 @@
           - "'ip daddr { 1.1.1.1/32, 8.8.8.8/32 } tcp dport 53' in host_firewall_candidate_content"
           - "'ip daddr { 0.0.0.0/0 } udp dport 123' in host_firewall_candidate_content"
           - "'ip daddr { 10.10.30.24/32 } tcp dport 3100' in host_firewall_candidate_content"
-          - "'ip daddr { 0.0.0.0/0 } tcp dport 80' in host_firewall_candidate_content"
           - "'ip daddr { 0.0.0.0/0 } tcp dport 443' in host_firewall_candidate_content"
 
     - name: Build the hardened proxy egress test policy
@@ -158,14 +157,6 @@
                   'functions': host_firewall_egress_policy.functions
                     | combine(
                         {
-                          'bootstrap_http': host_firewall_egress_policy.functions.bootstrap_http
-                            | combine(
-                                {
-                                  'enabled': false,
-                                  'status': 'disabled-staged-transfer',
-                                  'destinations_ipv4': []
-                                }
-                              ),
                           'bootstrap_https': host_firewall_egress_policy.functions.bootstrap_https
                             | combine(
                                 {

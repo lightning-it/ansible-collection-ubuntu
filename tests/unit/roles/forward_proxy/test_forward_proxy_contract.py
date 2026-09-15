@@ -50,6 +50,16 @@ class ForwardProxyContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_image_pull_policy == 'Never'", assertions)
         self.assertIn("imagePullPolicy: {{ forward_proxy_image_pull_policy }}", pod)
 
+    def test_system_managed_files_and_egress_use_fixed_identities(self) -> None:
+        assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
+        firewall_assertions = (
+            REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml"
+        ).read_text()
+        self.assertIn("forward_proxy_file_owner in ['root', '0']", assertions)
+        self.assertIn("reject('match', '^/tmp/')", assertions)
+        self.assertIn("forward_proxy_firewall_egress.owner_username == 'proxy'", assertions)
+        self.assertIn("host_firewall_forward_proxy_egress.owner_username == 'proxy'", firewall_assertions)
+
     def test_apt_override_wins_and_encodes_exact_direct_hosts(self) -> None:
         defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
         template = (ROLE_ROOT / "templates" / "apt-proxy.conf.j2").read_text()
@@ -64,9 +74,11 @@ class ForwardProxyContractTests(unittest.TestCase):
         defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
         tasks = (ROLE_ROOT / "tasks" / "enabled.yml").read_text()
         self.assertIn("forward_proxy_restart_services: []", defaults)
+        self.assertIn("forward_proxy_restart_clients: false", defaults)
         self.assertIn("Reload systemd manager after changing proxy defaults", tasks)
         self.assertIn("forward_proxy_systemd_environment_result.changed", tasks)
         self.assertIn('loop: "{{ forward_proxy_restart_services }}"', tasks)
+        self.assertIn("forward_proxy_restart_clients | bool", tasks)
 
     def test_disabled_state_cleans_only_role_owned_managed_state(self) -> None:
         defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
@@ -102,7 +114,7 @@ class ForwardProxyContractTests(unittest.TestCase):
 
     def test_container_proxy_destination_cannot_be_host_loopback(self) -> None:
         assertions = (REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml").read_text()
-        self.assertIn("host_firewall_forward_proxy_access.destination_ipv4 != '127.0.0.1'", assertions)
+        self.assertIn("not host_firewall_forward_proxy_access.destination_ipv4.startswith('127.')", assertions)
 
     def test_proxy_client_networks_reject_global_ipv4_scope(self) -> None:
         role_assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()

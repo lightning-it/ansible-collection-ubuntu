@@ -53,18 +53,6 @@ host_firewall_egress_policy:
       declared_fqdns: []
       mtls_required: true
       residual: "mTLS identity and trust evidence are validated outside nftables."
-    bootstrap_http:
-      enabled: true
-      status: temporary-maintenance
-      protocol: tcp
-      port: 80
-      modes: [bootstrap]
-      interface: "{{ host_firewall_public_interface }}"
-      destinations_ipv4: [0.0.0.0/0]
-      destinations_ipv6: []
-      declared_fqdns: []
-      mtls_required: false
-      residual: "Temporary package bootstrap exception; productive confirmation is prohibited."
     bootstrap_https:
       enabled: true
       status: temporary-maintenance

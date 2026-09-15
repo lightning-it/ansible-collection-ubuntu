@@ -47,7 +47,11 @@ The collection requires `lit.foundational` 1.32.0 for the shared
 - `forward_proxy_image`: immutable `docker.io/ubuntu/squid@sha256:...` image.
 - `forward_proxy_image_pull_policy`: fixed to `Never`.
 - `forward_proxy_restart_services`: exact existing systemd client services to
-  restart after system-manager proxy defaults change. This is opt-in.
+  restart during a cutover.
+- `forward_proxy_restart_clients`: explicit one-shot cutover action for the
+  listed services. It is false by default, so ordinary idempotent runs do not
+  restart clients. Set it true only for the controlled cutover, verify the
+  effective environment, then return it to false.
 - `forward_proxy_allowed_destination_domains`: mandatory closed destination
   allowlist when enabled.
 - `forward_proxy_listen_addresses` and `forward_proxy_allowed_clients`: exact

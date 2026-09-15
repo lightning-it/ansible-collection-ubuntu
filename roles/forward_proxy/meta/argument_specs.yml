@@ -6,6 +6,7 @@ argument_specs:
       forward_proxy_enabled: {type: bool, default: false}
       forward_proxy_manage_runtime: {type: bool, default: true}
       forward_proxy_restart_services: {type: list, elements: str, default: []}
+      forward_proxy_restart_clients: {type: bool, default: false}
       forward_proxy_file_owner: {type: str, default: root}
       forward_proxy_file_group: {type: str, default: root}
       forward_proxy_image: {type: str}

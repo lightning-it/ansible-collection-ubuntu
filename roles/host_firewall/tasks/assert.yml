@@ -455,11 +455,10 @@
       - host_firewall_mode == 'hardened'
       - host_firewall_egress_status == 'approved'
       - host_firewall_egress_stance == 'deny-by-default'
-      - not host_firewall_egress_policy.functions.bootstrap_http.enabled | bool
       - not host_firewall_egress_policy.functions.bootstrap_https.enabled | bool
     fail_msg: >-
       Productive confirmation requires hardened mode and the approved deny-by-default egress baseline. A bootstrap
-      HTTP(S) maintenance exception can be applied only under watchdog protection and can never be confirmed.
+      HTTPS maintenance exception can be applied only under watchdog protection and can never be confirmed.
   when:
     - host_firewall_enabled | bool
     - host_firewall_action == 'confirm'
