@@ -17,6 +17,8 @@ http_access allow lit_clients lit_allowed_domains
 http_access deny all
 
 cache deny all
+cache_dir null /tmp
+pid_filename /tmp/squid.pid
 forwarded_for delete
 via off
 {% if forward_proxy_upstream_enabled %}
@@ -26,6 +28,6 @@ never_direct allow all
 always_direct allow all
 {% endif %}
 
-access_log stdio:/var/log/squid/access.log
-cache_log /var/log/squid/cache.log
-coredump_dir /var/spool/squid
+access_log stdio:/dev/stdout
+cache_log /dev/stderr
+coredump_dir /tmp

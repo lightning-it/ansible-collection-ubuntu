@@ -1,5 +1,6 @@
 ---
 minor_changes:
   - >-
-    Add a closed host-local forward proxy role with explicit destination ACLs,
-    host and Podman environment integration, and optional upstream chaining.
+    Add a closed, digest-pinned Squid Podman role with explicit destination
+    ACLs, host and client-container environment integration, shared Quadlet
+    lifecycle, and optional upstream chaining.

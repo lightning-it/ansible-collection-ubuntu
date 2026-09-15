@@ -1,14 +1,20 @@
 ---
 forward_proxy_enabled: false
-forward_proxy_manage_package: false
-forward_proxy_bootstrap_package_only: false
-forward_proxy_manage_service: true
+forward_proxy_manage_runtime: true
 forward_proxy_restart_services: []
-forward_proxy_package_name: squid
-forward_proxy_service_name: squid
 forward_proxy_file_owner: root
 forward_proxy_file_group: root
-forward_proxy_ss_binary: /usr/bin/ss
+
+forward_proxy_image: >-
+  docker.io/ubuntu/squid@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
+forward_proxy_image_pull_policy: Never
+forward_proxy_runtime_uid: 13
+forward_proxy_runtime_gid: 13
+forward_proxy_unit_name: lit-forward-proxy
+forward_proxy_systemd_scope: system
+forward_proxy_quadlet_dir: /etc/containers/systemd
+forward_proxy_podman_binary: /usr/bin/podman
+forward_proxy_readiness_timeout: 30
 
 forward_proxy_listen_addresses:
   - 127.0.0.1
@@ -39,18 +45,18 @@ forward_proxy_container_url: "http://host.containers.internal:{{ forward_proxy_p
 forward_proxy_container_enabled: false
 
 # Foreign host-firewall inputs are mapped once into this role-owned interface.
+forward_proxy_firewall_egress: >-
+  {{ host_firewall_forward_proxy_egress | default({}) }}
 forward_proxy_container_firewall_access: >-
   {{ host_firewall_forward_proxy_access | default({}) }}
 forward_proxy_container_firewall_interfaces: >-
   {{ host_firewall_container_interfaces | default([]) }}
-forward_proxy_bootstrap_firewall_mode: "{{ host_firewall_mode | default('') }}"
-forward_proxy_bootstrap_firewall_egress_policy: >-
-  {{ host_firewall_egress_policy | default({}) }}
 
-forward_proxy_config_path: /etc/squid/squid.conf
+forward_proxy_config_path: /etc/lit-forward-proxy/squid.conf
+forward_proxy_pod_manifest_path: /etc/lit-forward-proxy/squid-pod.yml
 forward_proxy_apt_config_path: /etc/apt/apt.conf.d/99-lit-forward-proxy
 forward_proxy_profile_path: /etc/profile.d/90-lit-forward-proxy.sh
 forward_proxy_environment_path: /etc/environment.d/90-lit-forward-proxy.conf
 forward_proxy_systemd_environment_path: /etc/systemd/system.conf.d/90-lit-forward-proxy.conf
 forward_proxy_containers_config_path: /etc/containers/containers.conf.d/90-lit-forward-proxy.conf
-forward_proxy_state_marker_path: /var/lib/lit-forward-proxy/managed
+forward_proxy_state_marker_path: /var/lib/lit-forward-proxy/managed.json
