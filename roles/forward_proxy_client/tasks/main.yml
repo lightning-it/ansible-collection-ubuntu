@@ -1,0 +1,157 @@
+---
+- name: Validate Ubuntu forward proxy client configuration
+  ansible.builtin.import_tasks: assert.yml
+  tags: always
+
+- name: Inspect the forward proxy client managed-state marker
+  ansible.builtin.stat:
+    path: "{{ forward_proxy_client_state_marker_path }}"
+    follow: false
+  register: forward_proxy_client_state_marker
+
+- name: Validate the forward proxy client managed-state marker file type
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_state_marker.stat.isreg | default(false)
+      - not forward_proxy_client_state_marker.stat.islnk | default(false)
+    fail_msg: "The proxy-client state marker must be a regular non-symlink file."
+  when: forward_proxy_client_state_marker.stat.exists
+
+- name: Inspect unowned forward proxy client target paths
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop: "{{ _forward_proxy_client_managed_paths_effective }}"
+  register: forward_proxy_client_unowned_target_stats
+  when: not forward_proxy_client_state_marker.stat.exists
+
+- name: Refuse to adopt unowned forward proxy client target paths
+  ansible.builtin.assert:
+    that:
+      - not item.stat.exists
+    fail_msg: >-
+      A proxy-client target already exists without the exact adapter ownership
+      marker. Stop before overwriting a potentially foreign file.
+  loop: "{{ forward_proxy_client_unowned_target_stats.results | default([]) }}"
+  when: not forward_proxy_client_state_marker.stat.exists
+
+- name: Read the forward proxy client managed-state marker
+  ansible.builtin.slurp:
+    src: "{{ forward_proxy_client_state_marker_path }}"
+  register: forward_proxy_client_state_marker_content
+  when: forward_proxy_client_state_marker.stat.exists
+
+- name: Decode the previous forward proxy client managed state
+  ansible.builtin.set_fact:
+    forward_proxy_client_previous_state_manifest: >-
+      {{ forward_proxy_client_state_marker_content.content | b64decode | from_json }}
+  when: forward_proxy_client_state_marker.stat.exists
+
+- name: Validate the exact previous forward proxy client ownership manifest
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_previous_state_manifest is mapping
+      - >-
+        forward_proxy_client_previous_state_manifest.keys() | list | sort
+        == ['managed_checksums', 'managed_paths', 'owner', 'schema']
+      - >-
+        forward_proxy_client_previous_state_manifest.schema
+        == 'lit.ubuntu.forward_proxy_client.managed-state/v2'
+      - forward_proxy_client_previous_state_manifest.owner == 'lit.ubuntu.forward_proxy_client'
+      - forward_proxy_client_previous_state_manifest.managed_paths is sequence
+      - forward_proxy_client_previous_state_manifest.managed_paths is not string
+      - forward_proxy_client_previous_state_manifest.managed_checksums is sequence
+      - forward_proxy_client_previous_state_manifest.managed_checksums is not string
+      - >-
+        forward_proxy_client_previous_state_manifest.managed_checksums | length
+        == forward_proxy_client_previous_state_manifest.managed_paths | length
+      - >-
+        forward_proxy_client_previous_state_manifest.managed_checksums
+        | reject('match', '^[a-f0-9]{64}$') | list | length == 0
+      - >-
+        forward_proxy_client_previous_state_manifest.managed_paths | unique | list | length
+        == forward_proxy_client_previous_state_manifest.managed_paths | length
+      - >-
+        _forward_proxy_client_base_managed_paths
+        | difference(forward_proxy_client_previous_state_manifest.managed_paths)
+        | length == 0
+      - >-
+        forward_proxy_client_previous_state_manifest.managed_paths
+        | difference(_forward_proxy_client_all_managed_paths)
+        | length == 0
+    fail_msg: >-
+      Existing forward proxy client state is not the exact role-owned path
+      set. Stop before removing or replacing any file.
+  when: forward_proxy_client_state_marker.stat.exists
+
+- name: Inspect previously managed forward proxy client files
+  ansible.builtin.stat:
+    path: "{{ item.0 }}"
+    follow: false
+    checksum_algorithm: sha256
+  loop: >-
+    {{
+      forward_proxy_client_previous_state_manifest.managed_paths
+      | zip(forward_proxy_client_previous_state_manifest.managed_checksums)
+      | list
+    }}
+  register: forward_proxy_client_previous_asset_stats
+  when: forward_proxy_client_state_marker.stat.exists
+
+- name: Verify previously managed forward proxy client file ownership
+  ansible.builtin.assert:
+    that:
+      - >-
+        not item.stat.exists
+        or (
+          item.stat.isreg | default(false)
+          and not item.stat.islnk | default(false)
+          and item.stat.checksum == item.item.1
+        )
+    fail_msg: >-
+      A previously managed proxy-client path changed type or content. Stop
+      before overwriting or deleting it.
+  loop: "{{ forward_proxy_client_previous_asset_stats.results | default([]) }}"
+
+- name: Remove forward proxy client configuration when disabled
+  ansible.builtin.file:
+    path: "{{ item.item.0 }}"
+    state: absent
+  loop: "{{ forward_proxy_client_previous_asset_stats.results | default([]) }}"
+  when:
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+    - item.stat.exists
+
+- name: Reload systemd manager after removing proxy client defaults
+  ansible.builtin.systemd:
+    daemon_reexec: true
+    scope: "{{ forward_proxy_client_systemd_scope }}"
+  when:
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+    - forward_proxy_client_manage_systemd | bool
+
+- name: Restart opted-in services after disabling the proxy client
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    scope: "{{ forward_proxy_client_systemd_scope }}"
+  loop: "{{ forward_proxy_client_restart_services }}"
+  when:
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+    - forward_proxy_client_manage_systemd | bool
+    - forward_proxy_client_restart_now | bool
+
+- name: Remove the forward proxy client managed-state marker when disabled
+  ansible.builtin.file:
+    path: "{{ forward_proxy_client_state_marker_path }}"
+    state: absent
+  when:
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+
+- name: Apply enabled Ubuntu forward proxy client state
+  ansible.builtin.include_tasks: enabled.yml
+  when: forward_proxy_client_enabled | bool

@@ -1,0 +1,126 @@
+---
+- name: Create forward proxy client managed directories
+  ansible.builtin.file:
+    path: "{{ item | dirname }}"
+    state: directory
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0755"
+  loop: >-
+    {{
+      (_forward_proxy_client_managed_paths_effective + [forward_proxy_client_state_marker_path])
+      | unique | list
+    }}
+
+- name: Render apt proxy policy
+  ansible.builtin.template:
+    src: apt-proxy.conf.j2
+    dest: "{{ forward_proxy_client_apt_config_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+
+- name: Render interactive proxy environment
+  ansible.builtin.template:
+    src: proxy-environment.sh.j2
+    dest: "{{ forward_proxy_client_profile_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+
+- name: Render process proxy environment
+  ansible.builtin.template:
+    src: proxy-environment.conf.j2
+    dest: "{{ forward_proxy_client_environment_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+
+- name: Render systemd proxy defaults
+  ansible.builtin.template:
+    src: systemd-environment.conf.j2
+    dest: "{{ forward_proxy_client_systemd_environment_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+  register: forward_proxy_client_systemd_environment_result
+
+- name: Render client-container proxy defaults
+  ansible.builtin.template:
+    src: containers-proxy.conf.j2
+    dest: "{{ forward_proxy_client_containers_config_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+  when: forward_proxy_client_container_enabled | bool
+
+- name: Remove previously owned client-container proxy defaults
+  ansible.builtin.file:
+    path: "{{ forward_proxy_client_containers_config_path }}"
+    state: absent
+  when:
+    - not forward_proxy_client_container_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+    - >-
+      forward_proxy_client_containers_config_path
+      in (
+        forward_proxy_client_previous_state_manifest
+        | default({'managed_paths': []})
+      ).managed_paths
+
+- name: Inspect rendered forward proxy client files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+    checksum_algorithm: sha256
+  loop: "{{ _forward_proxy_client_managed_paths_effective }}"
+  register: forward_proxy_client_managed_asset_stats
+  when: not ansible_check_mode
+
+- name: Verify rendered forward proxy client files before recording ownership
+  ansible.builtin.assert:
+    that:
+      - item.stat.isreg | default(false)
+      - not item.stat.islnk | default(false)
+      - item.stat.checksum is match('^[a-f0-9]{64}$')
+    fail_msg: "Every recorded proxy-client asset must be a regular non-symlink file."
+  loop: "{{ forward_proxy_client_managed_asset_stats.results | default([]) }}"
+  when: not ansible_check_mode
+
+- name: Record exact forward proxy client file ownership
+  ansible.builtin.copy:
+    content: >-
+      {{
+        {
+          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v2',
+          'owner': 'lit.ubuntu.forward_proxy_client',
+          'managed_paths': _forward_proxy_client_managed_paths_effective,
+          'managed_checksums': (
+            forward_proxy_client_managed_asset_stats.results
+            | map(attribute='stat.checksum') | list
+          )
+        } | to_nice_json
+      }}
+    dest: "{{ forward_proxy_client_state_marker_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0600"
+  when: not ansible_check_mode
+
+- name: Reload systemd manager after changing proxy client defaults
+  ansible.builtin.systemd:
+    daemon_reexec: true
+    scope: "{{ forward_proxy_client_systemd_scope }}"
+  when:
+    - forward_proxy_client_manage_systemd | bool
+    - forward_proxy_client_systemd_environment_result.changed
+
+- name: Restart opted-in proxy client services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    scope: "{{ forward_proxy_client_systemd_scope }}"
+  loop: "{{ forward_proxy_client_restart_services }}"
+  when:
+    - forward_proxy_client_manage_systemd | bool
+    - forward_proxy_client_restart_now | bool

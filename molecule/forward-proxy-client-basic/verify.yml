@@ -1,0 +1,78 @@
+---
+- name: Verify Ubuntu forward proxy client configuration
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    forward_proxy_client_test_root: /tmp/wunder/lit-forward-proxy-client-molecule
+  tasks:
+    - name: Read rendered apt policy
+      ansible.builtin.slurp:
+        src: "{{ forward_proxy_client_test_root }}/etc/apt/99-lit-forward-proxy"
+      register: forward_proxy_client_apt_config
+
+    - name: Read rendered Podman client policy
+      ansible.builtin.slurp:
+        src: >-
+          {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
+      register: forward_proxy_client_containers_config
+
+    - name: Assert Ubuntu host and container clients use the common service
+      ansible.builtin.assert:
+        that:
+          - >-
+            'Acquire::https::Proxy "http://127.0.0.1:3128";'
+            in (forward_proxy_client_apt_config.content | b64decode)
+          - >-
+            'Acquire::http::Proxy::localhost "DIRECT";'
+            in (forward_proxy_client_apt_config.content | b64decode)
+          - >-
+            'Acquire::https::Proxy::127.0.0.1 "DIRECT";'
+            in (forward_proxy_client_apt_config.content | b64decode)
+          - "'http_proxy = true' in (forward_proxy_client_containers_config.content | b64decode)"
+          - >-
+            'HTTPS_PROXY=http://host.containers.internal:3128'
+            in (forward_proxy_client_containers_config.content | b64decode)
+        quiet: true
+
+    - name: Disable the previously managed Ubuntu forward proxy client
+      ansible.builtin.include_role:
+        name: lit.ubuntu.forward_proxy_client
+      vars:
+        forward_proxy_client_enabled: false
+        forward_proxy_client_manage_systemd: false
+        forward_proxy_client_apt_config_path: >-
+          {{ forward_proxy_client_test_root }}/etc/apt/99-lit-forward-proxy
+        forward_proxy_client_profile_path: >-
+          {{ forward_proxy_client_test_root }}/etc/profile.d/90-lit-forward-proxy.sh
+        forward_proxy_client_environment_path: >-
+          {{ forward_proxy_client_test_root }}/etc/environment.d/90-lit-forward-proxy.conf
+        forward_proxy_client_systemd_environment_path: >-
+          {{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d/90-lit-forward-proxy.conf
+        forward_proxy_client_containers_config_path: >-
+          {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
+        forward_proxy_client_state_marker_path: >-
+          {{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client/managed.json
+
+    - name: Inspect disabled forward proxy client paths
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ forward_proxy_client_test_root }}/etc/apt/99-lit-forward-proxy"
+        - "{{ forward_proxy_client_test_root }}/etc/profile.d/90-lit-forward-proxy.sh"
+        - "{{ forward_proxy_client_test_root }}/etc/environment.d/90-lit-forward-proxy.conf"
+        - "{{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d/90-lit-forward-proxy.conf"
+        - >-
+          {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
+        - >-
+          {{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client/managed.json
+      register: forward_proxy_client_disabled_paths
+
+    - name: Assert disabled state removes only role-owned client state
+      ansible.builtin.assert:
+        that:
+          - >-
+            forward_proxy_client_disabled_paths.results
+            | selectattr('stat.exists') | list | length == 0
+        quiet: true

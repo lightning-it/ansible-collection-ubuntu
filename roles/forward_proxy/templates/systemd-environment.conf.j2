@@ -1,8 +1,0 @@
-# Managed by lit.ubuntu.forward_proxy. Takes effect for newly started services.
-[Manager]
-DefaultEnvironment="http_proxy={{ forward_proxy_url }}"
-DefaultEnvironment="https_proxy={{ forward_proxy_url }}"
-DefaultEnvironment="HTTP_PROXY={{ forward_proxy_url }}"
-DefaultEnvironment="HTTPS_PROXY={{ forward_proxy_url }}"
-DefaultEnvironment="no_proxy={{ forward_proxy_no_proxy | join(',') }}"
-DefaultEnvironment="NO_PROXY={{ forward_proxy_no_proxy | join(',') }}"

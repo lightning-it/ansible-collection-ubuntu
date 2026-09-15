@@ -1,0 +1,32 @@
+---
+argument_specs:
+  main:
+    short_description: Configure Ubuntu clients to use the standard LIT forward proxy.
+    options:
+      forward_proxy_client_enabled: {type: bool, default: false}
+      forward_proxy_client_manage_systemd: {type: bool, default: true}
+      forward_proxy_client_restart_services: {type: list, elements: str, default: []}
+      forward_proxy_client_restart_now: {type: bool, default: false}
+      forward_proxy_client_file_owner: {type: str, default: root}
+      forward_proxy_client_file_group: {type: str, default: root}
+      forward_proxy_client_systemd_scope: {type: str, default: system}
+      forward_proxy_client_proxy_port: {type: int, default: 3128}
+      forward_proxy_client_listen_addresses: {type: list, elements: str}
+      forward_proxy_client_allowed_clients: {type: list, elements: str}
+      forward_proxy_client_proxy_url: {type: str}
+      forward_proxy_client_container_url: {type: str}
+      forward_proxy_client_container_enabled: {type: bool, default: false}
+      forward_proxy_client_upstream_enabled: {type: bool, default: false}
+      forward_proxy_client_upstream_host: {type: str, default: ""}
+      forward_proxy_client_upstream_port: {type: int, default: 3128}
+      forward_proxy_client_no_proxy: {type: list, elements: str}
+      forward_proxy_client_apt_direct_hosts: {type: list, elements: str}
+      forward_proxy_client_firewall_egress: {type: dict, default: {}}
+      forward_proxy_client_container_firewall_access: {type: dict, default: {}}
+      forward_proxy_client_container_firewall_interfaces: {type: list, elements: str, default: []}
+      forward_proxy_client_apt_config_path: {type: path}
+      forward_proxy_client_profile_path: {type: path}
+      forward_proxy_client_environment_path: {type: path}
+      forward_proxy_client_systemd_environment_path: {type: path}
+      forward_proxy_client_containers_config_path: {type: path}
+      forward_proxy_client_state_marker_path: {type: path}

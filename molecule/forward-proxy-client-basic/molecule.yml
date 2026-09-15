@@ -21,7 +21,7 @@ provisioner:
     verify: verify.yml
 
 scenario:
-  name: forward-proxy-basic
+  name: forward-proxy-client-basic
   test_sequence:
     - dependency
     - syntax
