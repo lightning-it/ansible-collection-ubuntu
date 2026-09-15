@@ -54,6 +54,7 @@
       - forward_proxy_apt_direct_hosts is not string
       - forward_proxy_apt_direct_hosts | unique | list | length == forward_proxy_apt_direct_hosts | length
       - forward_proxy_apt_direct_hosts | difference(forward_proxy_no_proxy) | length == 0
+      - forward_proxy_apt_direct_hosts | difference(['localhost', '127.0.0.1']) | length == 0
       - forward_proxy_url == 'http://127.0.0.1:' ~ (forward_proxy_port | string)
       - >-
         forward_proxy_container_url
@@ -100,8 +101,9 @@
 - name: Require the shared container firewall contract
   ansible.builtin.assert:
     that:
-      - host_firewall_forward_proxy_access is defined
-      - host_firewall_container_interfaces is defined
+      - forward_proxy_container_firewall_access is mapping
+      - forward_proxy_container_firewall_interfaces is sequence
+      - forward_proxy_container_firewall_interfaces is not string
     fail_msg: >-
       Container proxy propagation requires the live, inventory-pinned host
       firewall access contract and container interface list.
@@ -110,8 +112,8 @@
 - name: Require the temporary package-bootstrap firewall contract
   ansible.builtin.assert:
     that:
-      - host_firewall_mode is defined
-      - host_firewall_egress_policy is defined
+      - forward_proxy_bootstrap_firewall_mode is string
+      - forward_proxy_bootstrap_firewall_egress_policy is mapping
     fail_msg: >-
       Package bootstrap requires the explicit temporary host-firewall egress
       contract; package installation cannot run in the hardened proxy phase.
@@ -120,11 +122,10 @@
 - name: Validate the temporary package-bootstrap firewall envelope
   ansible.builtin.assert:
     that:
-      - host_firewall_mode == 'bootstrap'
-      - host_firewall_egress_policy is mapping
-      - host_firewall_egress_policy.functions is mapping
-      - host_firewall_egress_policy.functions.bootstrap_http is mapping
-      - host_firewall_egress_policy.functions.bootstrap_https is mapping
+      - forward_proxy_bootstrap_firewall_mode == 'bootstrap'
+      - forward_proxy_bootstrap_firewall_egress_policy.functions is mapping
+      - forward_proxy_bootstrap_firewall_egress_policy.functions.bootstrap_http is mapping
+      - forward_proxy_bootstrap_firewall_egress_policy.functions.bootstrap_https is mapping
     fail_msg: >-
       Package bootstrap requires explicit temporary HTTP and HTTPS maintenance
       functions in bootstrap firewall mode.
@@ -133,12 +134,12 @@
 - name: Validate every temporary package-bootstrap transport
   ansible.builtin.assert:
     that:
-      - host_firewall_egress_policy.functions[item.name].enabled is boolean
-      - host_firewall_egress_policy.functions[item.name].enabled
-      - host_firewall_egress_policy.functions[item.name].status == 'temporary-maintenance'
-      - host_firewall_egress_policy.functions[item.name].protocol == 'tcp'
-      - host_firewall_egress_policy.functions[item.name].port is integer
-      - host_firewall_egress_policy.functions[item.name].port == item.port
+      - forward_proxy_bootstrap_firewall_egress_policy.functions[item.name].enabled is boolean
+      - forward_proxy_bootstrap_firewall_egress_policy.functions[item.name].enabled
+      - forward_proxy_bootstrap_firewall_egress_policy.functions[item.name].status == 'temporary-maintenance'
+      - forward_proxy_bootstrap_firewall_egress_policy.functions[item.name].protocol == 'tcp'
+      - forward_proxy_bootstrap_firewall_egress_policy.functions[item.name].port is integer
+      - forward_proxy_bootstrap_firewall_egress_policy.functions[item.name].port == item.port
     fail_msg: >-
       Package bootstrap may use only its explicit temporary TCP 80 and TCP 443
       maintenance functions.
@@ -150,19 +151,23 @@
 - name: Validate the shared container firewall contract
   ansible.builtin.assert:
     that:
-      - host_firewall_forward_proxy_access is mapping
+      - forward_proxy_container_firewall_access is mapping
       - >-
-        host_firewall_forward_proxy_access.keys() | list | sort
+        forward_proxy_container_firewall_access.keys() | list | sort
         == ['destination_ipv4', 'enabled', 'interfaces', 'port', 'sources_ipv4']
-      - host_firewall_forward_proxy_access.enabled is boolean
-      - host_firewall_forward_proxy_access.enabled
-      - host_firewall_forward_proxy_access.port is integer
-      - host_firewall_forward_proxy_access.port == forward_proxy_port
-      - host_firewall_forward_proxy_access.destination_ipv4 in forward_proxy_listen_addresses
-      - host_firewall_forward_proxy_access.interfaces | length > 0
-      - host_firewall_forward_proxy_access.sources_ipv4 | length > 0
-      - host_firewall_forward_proxy_access.interfaces | difference(host_firewall_container_interfaces) | length == 0
-      - host_firewall_forward_proxy_access.sources_ipv4 | difference(forward_proxy_allowed_clients) | length == 0
+      - forward_proxy_container_firewall_access.enabled is boolean
+      - forward_proxy_container_firewall_access.enabled
+      - forward_proxy_container_firewall_access.port is integer
+      - forward_proxy_container_firewall_access.port == forward_proxy_port
+      - forward_proxy_container_firewall_access.destination_ipv4 in forward_proxy_listen_addresses
+      - forward_proxy_container_firewall_access.interfaces | length > 0
+      - forward_proxy_container_firewall_access.sources_ipv4 | length > 0
+      - >-
+        forward_proxy_container_firewall_access.interfaces
+        | difference(forward_proxy_container_firewall_interfaces) | length == 0
+      - >-
+        forward_proxy_container_firewall_access.sources_ipv4
+        | difference(forward_proxy_allowed_clients) | length == 0
     fail_msg: >-
       Container propagation must use the same exact listener, port, interfaces,
       and source CIDRs as the enabled host-firewall proxy access rule.
@@ -232,8 +237,8 @@
           '[A-Za-z]{2,63})$'
         )
     fail_msg: >-
-      APT DIRECT exceptions must be exact hostnames or IPv4 addresses; suffixes,
-      CIDRs, and wildcard forms are prohibited.
+      APT DIRECT exceptions are restricted to host-local loopback names and
+      addresses; site-local exceptions need their own reviewed firewall grant.
   loop: "{{ forward_proxy_apt_direct_hosts }}"
 
 - name: Validate managed forward proxy paths
@@ -251,4 +256,5 @@
     - "{{ forward_proxy_environment_path }}"
     - "{{ forward_proxy_systemd_environment_path }}"
     - "{{ forward_proxy_containers_config_path }}"
+    - "{{ forward_proxy_state_marker_path }}"
     - "{{ forward_proxy_ss_binary }}"

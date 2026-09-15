@@ -17,8 +17,10 @@ class ForwardProxyContractTests(unittest.TestCase):
     def test_non_loopback_listener_requires_complete_container_boundary(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
         self.assertIn("or forward_proxy_container_enabled", assertions)
-        self.assertIn("host_firewall_forward_proxy_access.interfaces | length > 0", assertions)
-        self.assertIn("host_firewall_forward_proxy_access.sources_ipv4 | length > 0", assertions)
+        self.assertIn("forward_proxy_container_firewall_access.interfaces | length > 0", assertions)
+        self.assertIn("forward_proxy_container_firewall_access.sources_ipv4 | length > 0", assertions)
+        self.assertNotIn("host_firewall_forward_proxy_access.interfaces", assertions)
+        self.assertNotIn("host_firewall_container_interfaces", assertions)
 
     def test_upstream_hostname_is_validated_label_by_label(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
@@ -43,7 +45,8 @@ class ForwardProxyContractTests(unittest.TestCase):
         self.assertIn("/etc/apt/apt.conf.d/99-lit-forward-proxy", defaults)
         self.assertIn("Acquire::http::Proxy::{{ host }} \"DIRECT\";", template)
         self.assertIn("Acquire::https::Proxy::{{ host }} \"DIRECT\";", template)
-        self.assertIn("APT DIRECT exceptions must be exact hostnames", assertions)
+        self.assertIn("APT DIRECT exceptions are restricted to host-local loopback", assertions)
+        self.assertIn("difference(['localhost', '127.0.0.1'])", assertions)
 
     def test_existing_systemd_clients_have_explicit_idempotent_cutover(self) -> None:
         defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
@@ -54,6 +57,24 @@ class ForwardProxyContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_systemd_environment_result.changed", tasks)
         self.assertIn('loop: "{{ forward_proxy_restart_services }}"', tasks)
         self.assertIn("masked: false", handlers)
+
+    def test_disabled_state_cleans_only_role_owned_managed_state(self) -> None:
+        defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
+        tasks = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        self.assertIn("forward_proxy_state_marker_path", defaults)
+        self.assertIn("Inspect the forward proxy managed-state marker", tasks)
+        self.assertIn("Remove forward proxy managed configuration when disabled", tasks)
+        self.assertIn("forward_proxy_state_marker.stat.exists", tasks)
+        self.assertIn("Record that the role owns the managed forward proxy state", tasks)
+
+    def test_squid_rejects_non_connect_traffic_to_https_port(self) -> None:
+        template = (ROLE_ROOT / "templates" / "squid.conf.j2").read_text()
+        self.assertIn("acl lit_http_ports port 80", template)
+        self.assertIn("http_access deny !lit_connect !lit_http_ports", template)
+
+    def test_container_proxy_destination_cannot_be_host_loopback(self) -> None:
+        assertions = (REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml").read_text()
+        self.assertIn("host_firewall_forward_proxy_access.destination_ipv4 != '127.0.0.1'", assertions)
 
 
 if __name__ == "__main__":

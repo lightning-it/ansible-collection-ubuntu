@@ -3,6 +3,77 @@
   ansible.builtin.import_tasks: assert.yml
   tags: always
 
+- name: Inspect the forward proxy managed-state marker
+  ansible.builtin.stat:
+    path: "{{ forward_proxy_state_marker_path }}"
+    follow: false
+  register: forward_proxy_state_marker
+  when: not forward_proxy_enabled | bool
+
+- name: Remove forward proxy managed configuration when disabled
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ forward_proxy_config_path }}"
+    - "{{ forward_proxy_apt_config_path }}"
+    - "{{ forward_proxy_profile_path }}"
+    - "{{ forward_proxy_environment_path }}"
+    - "{{ forward_proxy_systemd_environment_path }}"
+    - "{{ forward_proxy_containers_config_path }}"
+  when:
+    - not forward_proxy_enabled | bool
+    - forward_proxy_state_marker.stat.exists
+
+- name: Inspect systemd services before disabled-state cleanup
+  ansible.builtin.service_facts:
+  when:
+    - not forward_proxy_enabled | bool
+    - forward_proxy_state_marker.stat.exists
+    - forward_proxy_manage_service | bool
+
+- name: Stop and mask the previously managed proxy when disabled
+  ansible.builtin.systemd_service:
+    name: "{{ forward_proxy_service_name }}"
+    enabled: false
+    state: stopped
+    masked: true
+  vars:
+    forward_proxy_service_unit: >-
+      {{ forward_proxy_service_name if forward_proxy_service_name.endswith('.service')
+         else forward_proxy_service_name ~ '.service' }}
+  when:
+    - not forward_proxy_enabled | bool
+    - forward_proxy_state_marker.stat.exists
+    - forward_proxy_manage_service | bool
+    - forward_proxy_service_unit in ansible_facts.services
+
+- name: Reload systemd after removing managed proxy defaults
+  ansible.builtin.systemd_service:
+    daemon_reexec: true
+  when:
+    - not forward_proxy_enabled | bool
+    - forward_proxy_state_marker.stat.exists
+    - forward_proxy_manage_service | bool
+
+- name: Restart opted-in clients after disabling proxy defaults
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ forward_proxy_restart_services }}"
+  when:
+    - not forward_proxy_enabled | bool
+    - forward_proxy_state_marker.stat.exists
+    - forward_proxy_manage_service | bool
+
+- name: Remove the forward proxy managed-state marker when disabled
+  ansible.builtin.file:
+    path: "{{ forward_proxy_state_marker_path }}"
+    state: absent
+  when:
+    - not forward_proxy_enabled | bool
+    - forward_proxy_state_marker.stat.exists
+
 - name: Stop when the forward proxy is disabled
   ansible.builtin.meta: end_role
   when: not forward_proxy_enabled | bool
@@ -56,6 +127,7 @@
     - "{{ forward_proxy_environment_path }}"
     - "{{ forward_proxy_systemd_environment_path }}"
     - "{{ forward_proxy_containers_config_path }}"
+    - "{{ forward_proxy_state_marker_path }}"
 
 - name: Render the closed forward proxy policy
   ansible.builtin.template:
@@ -126,6 +198,14 @@
     path: "{{ forward_proxy_containers_config_path }}"
     state: absent
   when: not forward_proxy_container_enabled | bool
+
+- name: Record that the role owns the managed forward proxy state
+  ansible.builtin.copy:
+    content: "lit.ubuntu.forward_proxy managed state\n"
+    dest: "{{ forward_proxy_state_marker_path }}"
+    owner: "{{ forward_proxy_file_owner }}"
+    group: "{{ forward_proxy_file_group }}"
+    mode: "0640"
 
 - name: Enable and start the forward proxy
   ansible.builtin.systemd_service:

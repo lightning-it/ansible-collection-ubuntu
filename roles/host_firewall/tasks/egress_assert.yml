@@ -119,6 +119,7 @@
           and host_firewall_forward_proxy_access.sources_ipv4 | length >= 1
           and host_firewall_forward_proxy_access.destination_ipv4
               is match(host_firewall_ipv4_pattern)
+          and host_firewall_forward_proxy_access.destination_ipv4 != '127.0.0.1'
         )
       - >-
         host_firewall_forward_proxy_access.enabled

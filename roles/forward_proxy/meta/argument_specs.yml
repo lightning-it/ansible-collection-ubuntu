@@ -26,9 +26,14 @@ argument_specs:
       forward_proxy_url: {type: str}
       forward_proxy_container_url: {type: str}
       forward_proxy_container_enabled: {type: bool, default: false}
+      forward_proxy_container_firewall_access: {type: dict, default: {}}
+      forward_proxy_container_firewall_interfaces: {type: list, elements: str, default: []}
+      forward_proxy_bootstrap_firewall_mode: {type: str, default: ""}
+      forward_proxy_bootstrap_firewall_egress_policy: {type: dict, default: {}}
       forward_proxy_config_path: {type: path}
       forward_proxy_apt_config_path: {type: path}
       forward_proxy_profile_path: {type: path}
       forward_proxy_environment_path: {type: path}
       forward_proxy_systemd_environment_path: {type: path}
       forward_proxy_containers_config_path: {type: path}
+      forward_proxy_state_marker_path: {type: path}
