@@ -4,6 +4,7 @@
     that:
       - forward_proxy_enabled is boolean
       - forward_proxy_manage_package is boolean
+      - forward_proxy_bootstrap_package_only is boolean
       - forward_proxy_manage_service is boolean
       - forward_proxy_package_name is match('^[a-z0-9][a-z0-9+.-]{1,63}$')
       - forward_proxy_service_name is match('^[A-Za-z0-9_.@-]{1,128}$')
@@ -47,10 +48,51 @@
       - >-
         not forward_proxy_container_enabled
         or forward_proxy_listen_addresses | difference(['127.0.0.1']) | length > 0
+      - >-
+        not forward_proxy_manage_package
+        or forward_proxy_bootstrap_package_only
+      - >-
+        not forward_proxy_bootstrap_package_only
+        or (
+          forward_proxy_manage_package
+          and not forward_proxy_manage_service
+          and not forward_proxy_container_enabled
+        )
     fail_msg: >-
       Forward proxy inputs must define a local LIT proxy, explicit clients,
       explicit destination domains, safe ports, and an optional exact upstream.
       Container propagation additionally requires a non-loopback listen address.
+      Package installation is a separate bootstrap-only phase and cannot also
+      activate the proxy service or container propagation.
+
+- name: Require the shared container firewall contract
+  ansible.builtin.assert:
+    that:
+      - host_firewall_forward_proxy_access is defined
+      - host_firewall_container_interfaces is defined
+    fail_msg: >-
+      Container proxy propagation requires the live, inventory-pinned host
+      firewall access contract and container interface list.
+  when: forward_proxy_container_enabled | bool
+
+- name: Validate the shared container firewall contract
+  ansible.builtin.assert:
+    that:
+      - host_firewall_forward_proxy_access is mapping
+      - >-
+        host_firewall_forward_proxy_access.keys() | list | sort
+        == ['destination_ipv4', 'enabled', 'interfaces', 'port', 'sources_ipv4']
+      - host_firewall_forward_proxy_access.enabled is boolean
+      - host_firewall_forward_proxy_access.enabled
+      - host_firewall_forward_proxy_access.port is integer
+      - host_firewall_forward_proxy_access.port == forward_proxy_port
+      - host_firewall_forward_proxy_access.destination_ipv4 in forward_proxy_listen_addresses
+      - host_firewall_forward_proxy_access.interfaces | difference(host_firewall_container_interfaces) | length == 0
+      - host_firewall_forward_proxy_access.sources_ipv4 | difference(forward_proxy_allowed_clients) | length == 0
+    fail_msg: >-
+      Container propagation must use the same exact listener, port, interfaces,
+      and source CIDRs as the enabled host-firewall proxy access rule.
+  when: forward_proxy_container_enabled | bool
 
 - name: Validate forward proxy listen addresses
   ansible.builtin.assert:

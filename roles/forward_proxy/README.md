@@ -19,6 +19,10 @@ a security boundary.
 
 See `defaults/main.yml`. Important inputs are:
 
+- `forward_proxy_manage_package` and
+  `forward_proxy_bootstrap_package_only`: an explicitly selected first phase
+  that installs Squid and ends the role without configuring or starting it.
+  Normal activation leaves both values false.
 - `forward_proxy_allowed_destination_domains`: mandatory closed destination
   allowlist when enabled.
 - `forward_proxy_listen_addresses` and `forward_proxy_allowed_clients`: exact
@@ -43,6 +47,17 @@ None.
 ## Example Playbook
 
 ```yaml
+- hosts: edge
+  become: true
+  roles:
+    - role: lit.ubuntu.forward_proxy
+      forward_proxy_enabled: true
+      forward_proxy_manage_package: true
+      forward_proxy_bootstrap_package_only: true
+      forward_proxy_manage_service: false
+      forward_proxy_allowed_destination_domains:
+        - .ubuntu.com
+
 - hosts: edge
   become: true
   roles:

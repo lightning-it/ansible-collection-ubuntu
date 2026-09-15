@@ -1,6 +1,7 @@
 ---
 forward_proxy_enabled: false
-forward_proxy_manage_package: true
+forward_proxy_manage_package: false
+forward_proxy_bootstrap_package_only: false
 forward_proxy_manage_service: true
 forward_proxy_package_name: squid
 forward_proxy_service_name: squid

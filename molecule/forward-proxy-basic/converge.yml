@@ -6,6 +6,16 @@
   gather_facts: false
   vars:
     forward_proxy_test_root: /tmp/wunder/lit-forward-proxy-molecule
+    host_firewall_container_interfaces:
+      - podman0
+    host_firewall_forward_proxy_access:
+      enabled: true
+      port: 3128
+      interfaces:
+        - podman0
+      sources_ipv4:
+        - 192.0.2.0/24
+      destination_ipv4: 192.0.2.1
   pre_tasks:
     - name: Read rootless test UID
       ansible.builtin.command: id -u

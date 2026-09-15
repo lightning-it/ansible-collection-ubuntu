@@ -5,6 +5,7 @@ driver:
   name: default
 platforms:
   - name: host-firewall.example.test
+    managed: false
 provisioner:
   name: ansible
   playbooks:

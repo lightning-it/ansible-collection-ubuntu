@@ -1,6 +1,9 @@
 ---
 galaxy_info:
+  role_name: forward_proxy
+  namespace: lit
   author: Lightning IT
+  company: Lightning IT
   description: Configure a closed LIT forward proxy with optional upstream chaining.
   license: MIT
   min_ansible_version: "2.18"
@@ -8,4 +11,9 @@ galaxy_info:
     - name: Ubuntu
       versions:
         - noble
+  galaxy_tags:
+    - proxy
+    - security
+    - squid
+    - ubuntu
 dependencies: []

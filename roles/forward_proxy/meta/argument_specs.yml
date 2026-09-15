@@ -4,7 +4,8 @@ argument_specs:
     short_description: Configure the standard LIT Squid forward proxy.
     options:
       forward_proxy_enabled: {type: bool, default: false}
-      forward_proxy_manage_package: {type: bool, default: true}
+      forward_proxy_manage_package: {type: bool, default: false}
+      forward_proxy_bootstrap_package_only: {type: bool, default: false}
       forward_proxy_manage_service: {type: bool, default: true}
       forward_proxy_package_name: {type: str, default: squid}
       forward_proxy_service_name: {type: str, default: squid}
