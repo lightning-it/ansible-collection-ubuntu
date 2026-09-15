@@ -46,7 +46,7 @@
           and (
             item.stat.mode is match('^0[0-7][0145][0145]\Z')
             or (
-              item.item == '/tmp'
+              item.item in ['/tmp', forward_proxy_client_render_root]
               and item.stat.mode == '1777'
               and item.stat.uid == 0
               and item.stat.gid == 0
@@ -124,20 +124,23 @@
     forward_proxy_client_desired_checksums_internal: >-
       {{
         (
-          [
-            lookup('ansible.builtin.template', role_path ~ '/templates/apt-proxy.conf.j2'),
-            lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.sh.j2'),
-            lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.conf.j2'),
-            lookup('ansible.builtin.template', role_path ~ '/templates/systemd-environment.conf.j2')
-          ]
-          + (
-              [lookup('ansible.builtin.template', role_path ~ '/templates/containers-proxy.conf.j2')]
-              if forward_proxy_client_container_enabled | bool
-              else []
-            )
-        ) | map('hash', 'sha256') | list
+          (
+            [
+              lookup('ansible.builtin.template', role_path ~ '/templates/apt-proxy.conf.j2'),
+              lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.sh.j2'),
+              lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.conf.j2'),
+              lookup('ansible.builtin.template', role_path ~ '/templates/systemd-environment.conf.j2')
+            ]
+            + (
+                [lookup('ansible.builtin.template', role_path ~ '/templates/containers-proxy.conf.j2')]
+                if forward_proxy_client_container_enabled | bool
+                else []
+              )
+          ) | map('hash', 'sha256') | list
+        )
+        if forward_proxy_client_enabled | bool
+        else []
       }}
-  when: forward_proxy_client_enabled | bool
 
 - name: Bind desired proxy-client checksums to their exact paths
   ansible.builtin.set_fact:
@@ -148,7 +151,23 @@
           | zip(forward_proxy_client_desired_checksums_internal)
         )
       }}
-  when: forward_proxy_client_enabled | bool
+
+- name: Bind any pending proxy-client transition to exact checksum and mode maps
+  ansible.builtin.set_fact:
+    forward_proxy_client_pending_checksum_map_internal: >-
+      {{
+        dict(
+          forward_proxy_client_previous_state_manifest.pending_managed_paths
+          | zip(forward_proxy_client_previous_state_manifest.pending_managed_checksums)
+        )
+      }}
+    forward_proxy_client_pending_mode_map_internal: >-
+      {{
+        dict(
+          forward_proxy_client_previous_state_manifest.pending_managed_paths
+          | zip(forward_proxy_client_previous_state_manifest.pending_managed_modes)
+        )
+      }}
 
 - name: Validate the exact previous forward proxy client ownership manifest
   ansible.builtin.assert:
@@ -194,9 +213,6 @@
       - forward_proxy_client_previous_state_manifest.restart_activated_services is not string
       - >-
         forward_proxy_client_previous_state_manifest.restart_pending_services
-        | difference(forward_proxy_client_restart_services) | length == 0
-      - >-
-        forward_proxy_client_previous_state_manifest.restart_pending_services
         | reject('match', '^[A-Za-z0-9_.@-]{1,128}\Z') | list | length == 0
       - >-
         forward_proxy_client_previous_state_manifest.restart_activated_services
@@ -239,13 +255,19 @@
       - >-
         forward_proxy_client_previous_state_manifest.write_state == 'stable'
         or (
-          forward_proxy_client_enabled | bool
-          and forward_proxy_client_previous_state_manifest.pending_managed_paths
-            == forward_proxy_client_managed_paths_effective_internal
-          and forward_proxy_client_previous_state_manifest.pending_managed_checksums
-            == forward_proxy_client_desired_checksums_internal
-          and forward_proxy_client_previous_state_manifest.pending_managed_modes
-            == forward_proxy_client_managed_modes_effective_internal
+          forward_proxy_client_previous_state_manifest.pending_managed_paths
+            | difference(forward_proxy_client_all_managed_paths_internal) | length == 0
+          and (
+            not forward_proxy_client_enabled | bool
+            or (
+              forward_proxy_client_previous_state_manifest.pending_managed_paths
+                == forward_proxy_client_managed_paths_effective_internal
+              and forward_proxy_client_previous_state_manifest.pending_managed_checksums
+                == forward_proxy_client_desired_checksums_internal
+              and forward_proxy_client_previous_state_manifest.pending_managed_modes
+                == forward_proxy_client_managed_modes_effective_internal
+            )
+          )
         )
       - >-
         forward_proxy_client_previous_state_manifest.managed_paths | unique | list | length
@@ -270,6 +292,21 @@
       set. Stop before removing or replacing any file.
   when: forward_proxy_client_state_marker.stat.exists
 
+- name: Validate exact modes for any pending proxy-client transition
+  ansible.builtin.assert:
+    that:
+      - item.0 in forward_proxy_client_all_managed_mode_map_internal
+      - item.1 == forward_proxy_client_all_managed_mode_map_internal[item.0]
+    fail_msg: >-
+      Pending proxy-client paths must retain the role's exact managed modes.
+  loop: >-
+    {{
+      forward_proxy_client_previous_state_manifest.pending_managed_paths
+      | zip(forward_proxy_client_previous_state_manifest.pending_managed_modes)
+      | list
+    }}
+  when: forward_proxy_client_state_marker.stat.exists
+
 - name: Bind previously managed proxy-client paths to the trusted parent chain
   ansible.builtin.assert:
     that:
@@ -277,7 +314,13 @@
     fail_msg: >-
       Every previously managed proxy-client path must retain an immediate
       directory in the complete trusted parent chain before cleanup.
-  loop: "{{ forward_proxy_client_previous_state_manifest.managed_paths }}"
+  loop: >-
+    {{
+      (
+        forward_proxy_client_previous_state_manifest.managed_paths
+        + forward_proxy_client_previous_state_manifest.pending_managed_paths
+      ) | unique | list
+    }}
   when: forward_proxy_client_state_marker.stat.exists
 
 - name: Determine the exact proxy-client directories required by this transition
@@ -292,6 +335,7 @@
           if forward_proxy_client_enabled | bool
           else (
             forward_proxy_client_previous_state_manifest.managed_paths
+            + forward_proxy_client_previous_state_manifest.pending_managed_paths
             + (
                 [forward_proxy_client_state_marker_path]
                 if forward_proxy_client_state_marker.stat.exists
@@ -350,9 +394,9 @@
             item.stat.checksum == item.item.0.1
             or (
               forward_proxy_client_previous_state_manifest.write_state == 'pending'
-              and item.item.0.0 in forward_proxy_client_desired_checksum_map_internal
+              and item.item.0.0 in forward_proxy_client_pending_checksum_map_internal
               and item.stat.checksum
-                == forward_proxy_client_desired_checksum_map_internal[item.item.0.0]
+                == forward_proxy_client_pending_checksum_map_internal[item.item.0.0]
             )
           )
           and item.stat.mode == item.item.1
@@ -379,7 +423,15 @@
     checksum_algorithm: sha256
   loop: >-
     {{
-      forward_proxy_client_managed_paths_effective_internal
+      (
+        forward_proxy_client_previous_state_manifest.pending_managed_paths
+        if forward_proxy_client_previous_state_manifest.write_state == 'pending'
+        else (
+          forward_proxy_client_managed_paths_effective_internal
+          if forward_proxy_client_enabled | bool
+          else forward_proxy_client_previous_state_manifest.managed_paths
+        )
+      )
       | difference(forward_proxy_client_previous_state_manifest.managed_paths)
     }}
   register: forward_proxy_client_new_target_stats
@@ -392,15 +444,12 @@
         not item.stat.exists
         or (
           forward_proxy_client_previous_state_manifest.write_state == 'pending'
-          and item.item in forward_proxy_client_desired_checksum_map_internal
+          and item.item in forward_proxy_client_pending_checksum_map_internal
           and item.stat.isreg | default(false)
           and not item.stat.islnk | default(false)
           and item.stat.checksum
-            == forward_proxy_client_desired_checksum_map_internal[item.item]
-          and item.stat.mode
-            == forward_proxy_client_managed_modes_effective_internal[
-              forward_proxy_client_managed_paths_effective_internal.index(item.item)
-            ]
+            == forward_proxy_client_pending_checksum_map_internal[item.item]
+          and item.stat.mode == forward_proxy_client_pending_mode_map_internal[item.item]
           and (
             item.stat.pw_name | default('') == forward_proxy_client_file_owner | string
             or item.stat.uid | string == forward_proxy_client_file_owner | string
@@ -435,7 +484,10 @@
     that:
       - >-
         forward_proxy_client_systemd_environment_path
-        not in forward_proxy_client_previous_state_manifest.managed_paths
+        not in (
+          forward_proxy_client_previous_state_manifest.managed_paths
+          + forward_proxy_client_previous_state_manifest.pending_managed_paths
+        )
         or forward_proxy_client_manage_systemd | bool
       - >-
         forward_proxy_client_disable_restart_services_internal | length == 0
@@ -459,6 +511,17 @@
   when:
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists
+    - item.stat.exists
+
+- name: Remove exact pending-only proxy-client files when disabled
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    state: absent
+  loop: "{{ forward_proxy_client_new_target_stats.results | default([]) }}"
+  when:
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+    - forward_proxy_client_previous_state_manifest.write_state == 'pending'
     - item.stat.exists
 
 - name: Reload systemd manager after removing proxy client defaults

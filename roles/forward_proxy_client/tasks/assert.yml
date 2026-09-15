@@ -10,8 +10,9 @@
         forward_proxy_client_restart_services | unique | list | length
         == forward_proxy_client_restart_services | length
       - forward_proxy_client_restart_now is boolean
-      - forward_proxy_client_file_owner is match('^(?:[a-z_][a-z0-9_-]{0,31}|[0-9]{1,10})\Z')
-      - forward_proxy_client_file_group is match('^(?:[a-z_][a-z0-9_-]{0,31}|[0-9]{1,10})\Z')
+      - forward_proxy_client_file_owner is match('^(?:[a-z_][a-z0-9_-]{0,31}|0|[1-9][0-9]{0,9})\Z')
+      - forward_proxy_client_file_group is match('^(?:[a-z_][a-z0-9_-]{0,31}|0|[1-9][0-9]{0,9})\Z')
+      - forward_proxy_client_render_root is match('^/tmp/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\Z')
       - >-
         forward_proxy_client_file_owner not in ['root', '0']
         or (
@@ -30,7 +31,10 @@
               forward_proxy_client_all_managed_paths_internal
               + [forward_proxy_client_state_marker_path]
             )
-            | reject('match', '^/tmp/') | list | length == 0
+            | reject(
+                'match',
+                '^' ~ (forward_proxy_client_render_root | regex_escape) ~ '(?:/|$)'
+              ) | list | length == 0
           )
         )
       - >-
@@ -42,7 +46,10 @@
               forward_proxy_client_all_managed_paths_internal
               + [forward_proxy_client_state_marker_path]
             )
-            | reject('match', '^/tmp/') | list | length == 0
+            | reject(
+                'match',
+                '^' ~ (forward_proxy_client_render_root | regex_escape) ~ '(?:/|$)'
+              ) | list | length == 0
           )
         )
       - forward_proxy_client_systemd_scope == 'system'
@@ -66,6 +73,14 @@
       - forward_proxy_client_no_proxy is not string
       - forward_proxy_client_approved_no_proxy_domains is sequence
       - forward_proxy_client_approved_no_proxy_domains is not string
+      - forward_proxy_client_internal_domain_suffixes is sequence
+      - forward_proxy_client_internal_domain_suffixes is not string
+      - >-
+        forward_proxy_client_internal_domain_suffixes | unique | list | length
+        == forward_proxy_client_internal_domain_suffixes | length
+      - >-
+        forward_proxy_client_approved_no_proxy_domains | length == 0
+        or forward_proxy_client_internal_domain_suffixes | length > 0
       - >-
         forward_proxy_client_approved_no_proxy_domains | unique | list | length
         == forward_proxy_client_approved_no_proxy_domains | length
@@ -316,10 +331,27 @@
           '[A-Za-z]{2,63}\Z'
         )
       - item not in ['localhost']
+      - >-
+        (item | regex_replace('^\\.', '')) is match(
+          '^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*'
+          '(?:' ~ forward_proxy_client_internal_domain_suffix_pattern_internal ~ ')\\Z'
+        )
     fail_msg: >-
       Approved NO_PROXY domains must be explicit reviewed internal DNS names
       or suffixes; public bypasses require a separate policy decision.
   loop: "{{ forward_proxy_client_approved_no_proxy_domains }}"
+
+- name: Validate internal proxy-client bypass suffixes
+  ansible.builtin.assert:
+    that:
+      - >-
+        item is match(
+          '^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+'
+          '[A-Za-z]{2,63}\\Z'
+        )
+    fail_msg: >-
+      Internal NO_PROXY suffixes must be explicit canonical DNS suffixes.
+  loop: "{{ forward_proxy_client_internal_domain_suffixes }}"
 
 - name: Validate every trusted proxy-client parent path
   ansible.builtin.assert:

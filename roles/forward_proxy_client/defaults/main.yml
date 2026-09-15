@@ -23,6 +23,7 @@ forward_proxy_client_no_proxy:
   - 127.0.0.1
   - ::1
 forward_proxy_client_approved_no_proxy_domains: []
+forward_proxy_client_internal_domain_suffixes: []
 forward_proxy_client_apt_direct_hosts:
   - localhost
   - 127.0.0.1
@@ -41,6 +42,7 @@ forward_proxy_client_environment_path: /etc/environment.d/90-lit-forward-proxy.c
 forward_proxy_client_systemd_environment_path: /etc/systemd/system.conf.d/90-lit-forward-proxy.conf
 forward_proxy_client_containers_config_path: /etc/containers/containers.conf.d/90-lit-forward-proxy.conf
 forward_proxy_client_state_marker_path: /var/lib/lit-forward-proxy-client/managed.json
+forward_proxy_client_render_root: /tmp/wunder
 
 # Every parent between / and a managed target must be enumerated. The closed
 # chain is lstat-validated before the adapter writes as root.

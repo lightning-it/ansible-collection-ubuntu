@@ -1,0 +1,12 @@
+---
+- name: Prepare a deterministic fresh proxy-client test tree
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Remove only the scenario-owned proxy-client test root
+      ansible.builtin.file:
+        path: /tmp/wunder/lit-forward-proxy-client-molecule
+        state: absent
+      check_mode: false

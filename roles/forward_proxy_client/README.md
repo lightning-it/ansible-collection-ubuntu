@@ -24,6 +24,9 @@ Important inputs include:
 - `forward_proxy_client_no_proxy`: exact local/internal bypass tokens.
 - `forward_proxy_client_approved_no_proxy_domains`: reviewed internal DNS
   names/suffixes that may appear in `NO_PROXY`; public destinations remain forbidden.
+- `forward_proxy_client_internal_domain_suffixes`: explicit internal DNS suffix
+  boundary for every approved DNS bypass. Each approved name must equal or be a
+  descendant of one of these suffixes.
 - `forward_proxy_client_apt_direct_hosts`: restricted to host loopback.
 - `forward_proxy_client_container_enabled`: opt in only after live network readback.
 - `forward_proxy_client_restart_services`: exact existing systemd services for a controlled cutover.
@@ -37,6 +40,8 @@ Important inputs include:
 - `forward_proxy_client_trusted_parent_paths`: complete, explicit parent chain for every current or previously managed
   file, ordered from parent to child. Every component is created individually
   only below a revalidated parent and is checked again before a privileged write.
+- `forward_proxy_client_render_root`: the single non-root, non-systemd test/render
+  tree allowed below `/tmp`; root-owned runs can never use it.
 
 Disabling a previously managed adapter always requires the controlled systemd
 cutover. Any service restart recorded by an earlier staged or failed activation
@@ -51,7 +56,7 @@ rendered files are otherwise unchanged, so its first explicit cutover cannot be
 silently skipped. Before changing the managed file set, the role records the
 exact desired checksums as a pending transition. If a later file operation is
 interrupted, the next run accepts only the old checksum or that exact pending
-checksum and can safely finish the same transition. Root-owned runs reject every
+checksum and can safely finish or disable and remove the same transition. Root-owned runs reject every
 managed path below the world-writable `/tmp` tree; `/tmp` is limited to the
 non-root, non-systemd test/render boundary.
 

@@ -17,7 +17,8 @@
             forward_proxy_client_directory_parent.stat.mode
             is match('^0[0-7][0145][0145]\Z')
             or (
-              forward_proxy_client_directory_path | dirname == '/tmp'
+              forward_proxy_client_directory_path | dirname
+                in ['/tmp', forward_proxy_client_render_root]
               and forward_proxy_client_directory_parent.stat.mode == '1777'
               and forward_proxy_client_directory_parent.stat.uid == 0
               and forward_proxy_client_directory_parent.stat.gid == 0
@@ -66,7 +67,8 @@
             forward_proxy_client_directory_before.stat.mode
               is match('^0[0-7][0145][0145]\Z')
             or (
-              forward_proxy_client_directory_path == '/tmp'
+              forward_proxy_client_directory_path
+                in ['/tmp', forward_proxy_client_render_root]
               and forward_proxy_client_directory_before.stat.mode == '1777'
               and forward_proxy_client_directory_before.stat.uid == 0
               and forward_proxy_client_directory_before.stat.gid == 0
@@ -129,7 +131,8 @@
         forward_proxy_client_directory_after.stat.mode
         is match('^0[0-7][0145][0145]\Z')
         or (
-          forward_proxy_client_directory_path == '/tmp'
+          forward_proxy_client_directory_path
+            in ['/tmp', forward_proxy_client_render_root]
           and forward_proxy_client_directory_after.stat.mode == '1777'
           and forward_proxy_client_directory_after.stat.uid == 0
           and forward_proxy_client_directory_after.stat.gid == 0

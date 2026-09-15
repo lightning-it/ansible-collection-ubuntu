@@ -248,10 +248,13 @@ class ForwardProxyClientContractTests(unittest.TestCase):
     def test_root_owned_state_cannot_be_redirected_below_tmp(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
         readme = (ROLE_ROOT / "README.md").read_text()
+        self.assertIn("|0|[1-9][0-9]{0,9}", assertions)
+        self.assertNotIn("|[0-9]{1,10}", assertions)
         self.assertIn(
             "forward_proxy_client_file_owner not in ['root', '0']", assertions
         )
         self.assertIn("select('match', '^/tmp(?:/|$)')", assertions)
+        self.assertIn("forward_proxy_client_render_root | regex_escape", assertions)
         self.assertIn("Root-owned runs reject every", readme)
 
     def test_interrupted_file_transition_is_exactly_recoverable(self) -> None:
@@ -270,14 +273,37 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("'write_state': 'pending'", enabled)
         self.assertEqual(enabled.count("'write_state': 'stable'"), 2)
         self.assertIn("the old checksum or that exact pending", readme)
+        self.assertIn(
+            "Remove exact pending-only proxy-client files when disabled", main
+        )
+        self.assertIn("forward_proxy_client_pending_checksum_map_internal", main)
 
     def test_molecule_runs_fresh_tree_check_mode_before_converge(self) -> None:
         scenario = REPOSITORY_ROOT / "molecule" / "forward-proxy-client-basic"
         molecule = yaml.safe_load((scenario / "molecule.yml").read_text())
         check = (scenario / "check.yml").read_text()
+        prepare = (scenario / "prepare.yml").read_text()
         sequence = molecule["scenario"]["test_sequence"]
+        self.assertLess(sequence.index("prepare"), sequence.index("check"))
         self.assertLess(sequence.index("check"), sequence.index("converge"))
+        self.assertIn("Remove only the scenario-owned proxy-client test root", prepare)
+        self.assertIn("check_mode: false", prepare)
         self.assertIn("not forward_proxy_client_check_root_state.stat.exists", check)
+
+    def test_approved_dns_bypasses_stay_inside_explicit_internal_suffixes(self) -> None:
+        defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
+        variables = (ROLE_ROOT / "vars" / "main.yml").read_text()
+        assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
+        argument_spec = (ROLE_ROOT / "meta" / "argument_specs.yml").read_text()
+        self.assertIn("forward_proxy_client_internal_domain_suffixes: []", defaults)
+        self.assertIn(
+            "forward_proxy_client_internal_domain_suffix_pattern_internal", variables
+        )
+        self.assertIn("Validate internal proxy-client bypass suffixes", assertions)
+        self.assertIn(
+            "forward_proxy_client_internal_domain_suffix_pattern_internal", assertions
+        )
+        self.assertIn("forward_proxy_client_internal_domain_suffixes", argument_spec)
 
     def test_parent_chain_and_no_proxy_tokens_fail_closed(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()

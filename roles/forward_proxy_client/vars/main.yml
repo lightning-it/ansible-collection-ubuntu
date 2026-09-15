@@ -16,6 +16,15 @@ forward_proxy_client_all_managed_paths_internal: >-
   {{ forward_proxy_client_base_managed_paths_internal + [forward_proxy_client_containers_config_path] }}
 forward_proxy_client_all_managed_modes_internal: >-
   {{ forward_proxy_client_base_managed_modes_internal + ['0644'] }}
+forward_proxy_client_all_managed_mode_map_internal: >-
+  {{ dict(forward_proxy_client_all_managed_paths_internal | zip(forward_proxy_client_all_managed_modes_internal)) }}
+forward_proxy_client_internal_domain_suffix_pattern_internal: >-
+  {{
+    forward_proxy_client_internal_domain_suffixes
+    | map('regex_replace', '^\\.', '')
+    | map('regex_escape')
+    | join('|')
+  }}
 forward_proxy_client_managed_paths_effective_internal: >-
   {{
     forward_proxy_client_all_managed_paths_internal
