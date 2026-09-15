@@ -110,28 +110,42 @@
             in (forward_proxy_client_upstream_apt_config.content | b64decode)
         quiet: true
 
-    - name: Disable the previously managed Ubuntu forward proxy client
-      ansible.builtin.include_role:
-        name: lit.ubuntu.forward_proxy_client
-      vars:
-        forward_proxy_client_enabled: false
-        forward_proxy_client_manage_systemd: false
-        forward_proxy_client_file_owner: "{{ forward_proxy_client_verify_uid.stdout }}"
-        forward_proxy_client_file_group: "{{ forward_proxy_client_verify_gid.stdout }}"
-        forward_proxy_client_apt_config_path: >-
-          {{ forward_proxy_client_test_root }}/etc/apt/99-lit-forward-proxy
-        forward_proxy_client_profile_path: >-
-          {{ forward_proxy_client_test_root }}/etc/profile.d/90-lit-forward-proxy.sh
-        forward_proxy_client_environment_path: >-
-          {{ forward_proxy_client_test_root }}/etc/environment.d/90-lit-forward-proxy.conf
-        forward_proxy_client_systemd_environment_path: >-
-          {{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d/90-lit-forward-proxy.conf
-        forward_proxy_client_containers_config_path: >-
-          {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
-        forward_proxy_client_state_marker_path: >-
-          {{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client/managed.json
+    - name: Verify staged state refuses disable without the systemd cutover
+      block:
+        - name: Attempt to disable staged Ubuntu forward proxy client state
+          ansible.builtin.include_role:
+            name: lit.ubuntu.forward_proxy_client
+          vars:
+            forward_proxy_client_enabled: false
+            forward_proxy_client_manage_systemd: false
+            forward_proxy_client_file_owner: "{{ forward_proxy_client_verify_uid.stdout }}"
+            forward_proxy_client_file_group: "{{ forward_proxy_client_verify_gid.stdout }}"
+            forward_proxy_client_apt_config_path: >-
+              {{ forward_proxy_client_test_root }}/etc/apt/99-lit-forward-proxy
+            forward_proxy_client_profile_path: >-
+              {{ forward_proxy_client_test_root }}/etc/profile.d/90-lit-forward-proxy.sh
+            forward_proxy_client_environment_path: >-
+              {{ forward_proxy_client_test_root }}/etc/environment.d/90-lit-forward-proxy.conf
+            forward_proxy_client_systemd_environment_path: >-
+              {{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d/90-lit-forward-proxy.conf
+            forward_proxy_client_containers_config_path: >-
+              {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
+            forward_proxy_client_state_marker_path: >-
+              {{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client/managed.json
 
-    - name: Inspect disabled forward proxy client paths
+        - name: Reject an unsafe successful disable without manager cutover
+          ansible.builtin.fail:
+            msg: The staged proxy-client state was removed without its systemd cutover.
+      rescue:
+        - name: Require the exact fail-closed disable boundary
+          ansible.builtin.assert:
+            that:
+              - >-
+                'pending manager activation requires a systemd reexec'
+                in ansible_failed_result.msg
+            quiet: true
+
+    - name: Inspect staged forward proxy client paths after refused disable
       ansible.builtin.stat:
         path: "{{ item }}"
       loop:
@@ -143,12 +157,13 @@
           {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
         - >-
           {{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client/managed.json
-      register: forward_proxy_client_disabled_paths
+      register: forward_proxy_client_staged_paths
 
-    - name: Assert disabled state removes only role-owned client state
+    - name: Assert refused disable preserves all role-owned client state
       ansible.builtin.assert:
         that:
           - >-
-            forward_proxy_client_disabled_paths.results
-            | selectattr('stat.exists') | list | length == 0
+            forward_proxy_client_staged_paths.results
+            | selectattr('stat.exists') | list | length
+            == forward_proxy_client_staged_paths.results | length
         quiet: true

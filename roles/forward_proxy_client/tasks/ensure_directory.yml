@@ -94,6 +94,9 @@
     path: "{{ forward_proxy_client_directory_path }}"
     follow: false
   register: forward_proxy_client_directory_after
+  when: >-
+    not ansible_check_mode
+    or forward_proxy_client_directory_before.stat.exists
 
 - name: Require the exact proxy-client directory boundary before rendering
   ansible.builtin.assert:
@@ -123,3 +126,6 @@
           == forward_proxy_client_file_group | string
     fail_msg: >-
       The required proxy-client directory boundary changed before rendering.
+  when: >-
+    not ansible_check_mode
+    or forward_proxy_client_directory_before.stat.exists

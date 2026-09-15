@@ -300,7 +300,9 @@
 - name: Require explicit service cutover before disabling proxy client state
   ansible.builtin.assert:
     that:
-      - forward_proxy_client_manage_systemd | bool
+      - >-
+        not forward_proxy_client_previous_state_manifest.systemd_activation_pending
+        or forward_proxy_client_manage_systemd | bool
       - >-
         forward_proxy_client_disable_restart_services_internal | length == 0
         or (
@@ -308,9 +310,10 @@
           and forward_proxy_client_restart_now | bool
         )
     fail_msg: >-
-      Disabling activated proxy client state requires a systemd manager
-      reexec, and opted-in services require the explicit restart cutover, so
-      no current or newly started service keeps stale proxy variables.
+      Disabling proxy client state with pending manager activation requires a
+      systemd reexec, and pending opted-in services require the explicit
+      restart cutover, so no current or newly started service keeps stale
+      proxy variables.
   when:
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists

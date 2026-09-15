@@ -47,6 +47,10 @@
         == 'http://host.containers.internal:' ~ (forward_proxy_client_proxy_port | string)
       - forward_proxy_client_listen_addresses is sequence
       - forward_proxy_client_listen_addresses is not string
+      - forward_proxy_client_listen_addresses | length > 0
+      - >-
+        forward_proxy_client_listen_addresses | unique | list | length
+        == forward_proxy_client_listen_addresses | length
       - "'127.0.0.1' in forward_proxy_client_listen_addresses"
       - forward_proxy_client_allowed_clients is sequence
       - forward_proxy_client_allowed_clients is not string
@@ -81,6 +85,8 @@
             '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}\Z'
           )
           and not forward_proxy_client_upstream_ipv4.startswith('127.')
+          and forward_proxy_client_upstream_ipv4.split('.')[0] | int >= 1
+          and forward_proxy_client_upstream_ipv4.split('.')[0] | int <= 223
         )
       - >-
         forward_proxy_client_apt_direct_hosts | unique | list | length
@@ -92,6 +98,35 @@
     fail_msg: >-
       Ubuntu proxy-client inputs must point to the loopback service and define
       exact host and optional container integration boundaries.
+
+- name: Validate Ubuntu forward proxy client listen addresses
+  ansible.builtin.assert:
+    that:
+      - >-
+        item is match(
+          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}\Z'
+        )
+      - >-
+        item == '127.0.0.1'
+        or item is match(
+          '^10\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\Z'
+        )
+        or item is match(
+          '^172\\.(?:1[6-9]|2[0-9]|3[01])\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\Z'
+        )
+        or item is match(
+          '^192\\.168\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\Z'
+        )
+    fail_msg: >-
+      Proxy listeners must be unique exact loopback or RFC1918 IPv4
+      addresses; arbitrary or public listener identities are forbidden.
+  loop: "{{ forward_proxy_client_listen_addresses }}"
 
 - name: Validate opted-in service restarts
   ansible.builtin.assert:

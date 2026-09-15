@@ -182,6 +182,17 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("2 ** (32 - (item.split('/')[1] | int))", firewall_assertions)
         self.assertNotIn("[1-9]?[0-9]", firewall_assertions)
         self.assertNotIn("[1-9]?[0-9]", firewall_defaults)
+        self.assertIn(
+            "forward_proxy_client_listen_addresses | unique | list | length",
+            assertions,
+        )
+        self.assertIn(
+            "Validate Ubuntu forward proxy client listen addresses", assertions
+        )
+        self.assertIn(
+            "forward_proxy_client_upstream_ipv4.split('.')[0] | int <= 223",
+            assertions,
+        )
 
     def test_restart_documentation_discloses_deferred_pending_work(self) -> None:
         readme = (ROLE_ROOT / "README.md").read_text()
@@ -353,9 +364,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             "forward_proxy_client_disable_restart_services_internal | length == 0",
             cutover_task["ansible.builtin.assert"]["that"][1],
         )
-        self.assertEqual(
+        self.assertIn(
+            "forward_proxy_client_previous_state_manifest.systemd_activation_pending",
             cutover_task["ansible.builtin.assert"]["that"][0],
-            "forward_proxy_client_manage_systemd | bool",
         )
         self.assertEqual(
             restart_task["loop"],
@@ -363,6 +374,11 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         self.assertIn(
             "Preserve every pending service across proxy-client disable", by_name
+        )
+        ensure = (ROLE_ROOT / "tasks" / "ensure_directory.yml").read_text()
+        self.assertEqual(ensure.count("not ansible_check_mode"), 2)
+        self.assertEqual(
+            ensure.count("forward_proxy_client_directory_before.stat.exists"), 4
         )
 
     def test_root_documentation_and_molecule_cover_public_adapter_modes(self) -> None:
