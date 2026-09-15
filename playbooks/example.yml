@@ -26,6 +26,13 @@
       vars:
         automatic_updates_enabled: false
 
+    # The portable Squid service is deployed by lit.supplementary. This
+    # collection-level example exposes the Ubuntu adapter without activating
+    # proxy or firewall changes.
+    - role: lit.ubuntu.forward_proxy_client
+      vars:
+        forward_proxy_client_enabled: false
+
     - role: lit.ubuntu.users
       vars:
         users_accounts:

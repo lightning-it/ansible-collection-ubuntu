@@ -28,6 +28,10 @@
       - >-
         not host_firewall_forward_proxy_egress.enabled
         or host_firewall_forward_proxy_egress.status == 'approved'
+      - >-
+        not host_firewall_forward_proxy_egress.enabled
+        or host_firewall_forward_proxy_egress.interface
+            is match('^[A-Za-z0-9_.:-]{1,15}\Z')
       - host_firewall_forward_proxy_egress.mode in ['direct', 'upstream']
       - host_firewall_forward_proxy_egress.owner_username == 'proxy'
       - host_firewall_forward_proxy_egress.destinations_ipv4 is sequence

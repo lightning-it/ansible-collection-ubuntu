@@ -124,6 +124,10 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             REPOSITORY_ROOT / "roles" / "host_firewall" / "tasks" / "egress_assert.yml"
         ).read_text()
         self.assertIn("residual | trim | length >= 20", firewall_assertions)
+        self.assertIn(
+            "interface\n            is match('^[A-Za-z0-9_.:-]{1,15}\\Z')",
+            firewall_assertions,
+        )
         self.assertNotIn("(?:[0-9]{1,3}\\.){2}[0-9]{1,3}", firewall_assertions)
 
     def test_disabled_adapter_does_not_require_live_container_firewall_state(
@@ -312,15 +316,26 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("not ansible_check_mode", restart_task["when"])
         self.assertIn(
             "forward_proxy_client_restart_services | length == 0",
+            cutover_task["ansible.builtin.assert"]["that"][1],
+        )
+        self.assertIn(
+            "forward_proxy_client_previous_state_manifest.systemd_activation_pending",
+            cutover_task["ansible.builtin.assert"]["that"][0],
+        )
+        self.assertIn(
+            "forward_proxy_client_manage_systemd | bool",
             cutover_task["ansible.builtin.assert"]["that"][0],
         )
 
     def test_root_documentation_and_molecule_cover_public_adapter_modes(self) -> None:
         root_readme = (REPOSITORY_ROOT / "README.md").read_text()
+        example = (REPOSITORY_ROOT / "playbooks" / "example.yml").read_text()
         verify = (
             REPOSITORY_ROOT / "molecule" / "forward-proxy-client-basic" / "verify.yml"
         ).read_text()
         self.assertIn("lit.ubuntu.forward_proxy_client", root_readme)
+        self.assertIn("role: lit.ubuntu.forward_proxy_client", example)
+        self.assertIn("forward_proxy_client_enabled: false", example)
         self.assertIn("forward_proxy_client_upstream_enabled: true", verify)
         self.assertIn("192.0.2.10/32", verify)
         self.assertIn("forward_proxy_client_upstream_port: 8080", verify)

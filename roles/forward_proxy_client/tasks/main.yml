@@ -239,14 +239,18 @@
   ansible.builtin.assert:
     that:
       - >-
+        forward_proxy_client_previous_state_manifest.systemd_activation_pending
+        or forward_proxy_client_manage_systemd | bool
+      - >-
         forward_proxy_client_restart_services | length == 0
         or (
           forward_proxy_client_manage_systemd | bool
           and forward_proxy_client_restart_now | bool
         )
     fail_msg: >-
-      Disabling proxy client state with opted-in services requires the
-      explicit restart cutover so no service keeps stale proxy variables.
+      Disabling activated proxy client state requires a systemd manager
+      reexec, and opted-in services require the explicit restart cutover, so
+      no current or newly started service keeps stale proxy variables.
   when:
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists
