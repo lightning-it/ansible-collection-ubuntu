@@ -239,9 +239,23 @@ host_firewall_policy_material:
   output_policy: drop
   ipv4_only: true
   egress_policy: "{{ host_firewall_egress_policy }}"
-  forward_proxy_egress: "{{ host_firewall_forward_proxy_egress }}"
-  forward_proxy_access: "{{ host_firewall_forward_proxy_access }}"
-host_firewall_policy_fingerprint: "{{ host_firewall_policy_material | to_json | hash('sha256') }}"
+host_firewall_policy_material_effective: >-
+  {{
+    host_firewall_policy_material
+    | combine(
+        {
+          'forward_proxy_egress': host_firewall_forward_proxy_egress,
+          'forward_proxy_access': host_firewall_forward_proxy_access
+        }
+        if (
+          host_firewall_forward_proxy_egress.enabled | bool
+          or host_firewall_forward_proxy_access.enabled | bool
+        )
+        else {}
+      )
+  }}
+host_firewall_policy_fingerprint: >-
+  {{ host_firewall_policy_material_effective | to_json | hash('sha256') }}
 host_firewall_egress_policy_sha256: "{{ host_firewall_egress_policy | to_json | hash('sha256') }}"
 host_firewall_egress_status: "{{ host_firewall_egress_policy.get('status', 'draft') }}"
 host_firewall_egress_stance: "{{ host_firewall_egress_policy.get('stance', 'unconfigured') }}"

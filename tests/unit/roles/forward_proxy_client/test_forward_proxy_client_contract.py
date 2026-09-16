@@ -24,6 +24,17 @@ class ForwardProxyClientContractTests(unittest.TestCase):
     ) -> None:
         wrapper = yaml.safe_load((ROLE_ROOT / "tasks" / "main.yml").read_text())
         by_name = {task["name"]: task for task in wrapper}
+        lock_parent = by_name[
+            "Require a pre-existing non-symlink proxy-client lock parent"
+        ]["ansible.builtin.assert"]["that"]
+        self.assertIn(
+            "forward_proxy_client_lock_parent.stat.isdir | default(false)",
+            lock_parent,
+        )
+        self.assertIn(
+            "not forward_proxy_client_lock_parent.stat.islnk | default(false)",
+            lock_parent,
+        )
         acquire = by_name["Acquire the bounded per-host proxy-client transition lock"]
         command = acquire["ansible.builtin.command"]
         self.assertEqual(
@@ -366,6 +377,14 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "Record recoverable pending proxy-client file transition", enabled
         )
+        self.assertIn(
+            "Reinspect the pending marker parent before recording a transition",
+            enabled,
+        )
+        self.assertIn(
+            "Require the pending marker parent before recording a transition",
+            enabled,
+        )
         self.assertIn("'write_state': 'pending'", enabled)
         self.assertEqual(enabled.count("'write_state': 'stable'"), 2)
         self.assertIn("the old checksum or that exact pending", readme)
@@ -385,6 +404,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertLess(sequence.index("check"), sequence.index("converge"))
         self.assertIn("Remove only the scenario-owned proxy-client test root", prepare)
         self.assertIn("Remove only the scenario-owned stale proxy-client lock", prepare)
+        self.assertIn("Prepare the scenario-owned proxy-client lock parent", prepare)
         self.assertIn(
             "residual: Only the owner-bound proxy may reach reviewed Internet destinations.",
             converge,
@@ -618,6 +638,28 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_enabled: false", role_readme)
         self.assertIn("compose `lit.ubuntu.host_firewall`", role_readme)
         self.assertIn("does not enforce egress", role_readme)
+
+    def test_disabled_proxy_upgrade_preserves_the_legacy_firewall_fingerprint(
+        self,
+    ) -> None:
+        defaults = (
+            REPOSITORY_ROOT / "roles" / "host_firewall" / "defaults" / "main.yml"
+        ).read_text()
+        legacy_material = defaults.split(
+            "host_firewall_policy_material:", maxsplit=1
+        )[1].split("host_firewall_policy_material_effective:", maxsplit=1)[0]
+        effective_material = defaults.split(
+            "host_firewall_policy_material_effective:", maxsplit=1
+        )[1].split("host_firewall_policy_fingerprint:", maxsplit=1)[0]
+        self.assertNotIn("forward_proxy_egress", legacy_material)
+        self.assertNotIn("forward_proxy_access", legacy_material)
+        self.assertIn("forward_proxy_egress", effective_material)
+        self.assertIn("forward_proxy_access", effective_material)
+        self.assertIn("else {}", effective_material)
+        self.assertIn(
+            "host_firewall_policy_material_effective | to_json | hash('sha256')",
+            defaults,
+        )
 
 
 if __name__ == "__main__":

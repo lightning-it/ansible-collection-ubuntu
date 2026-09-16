@@ -46,7 +46,8 @@ Important inputs include:
   bounded per-host mutual exclusion for the complete inspect, transition,
   render, activation, disable, and finalize sequence. A competing run fails
   closed after the timeout; an interrupted stale lock requires explicit
-  operator inspection before removal.
+  operator inspection before removal. The lock parent is a caller-prepared,
+  trusted directory and must exist before the role starts.
 
 Disabling a previously managed adapter always requires the controlled systemd
 cutover. Any service restart recorded by an earlier staged or failed activation

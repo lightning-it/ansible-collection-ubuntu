@@ -5,6 +5,13 @@
   become: false
   gather_facts: false
   tasks:
+    - name: Prepare the scenario-owned proxy-client lock parent
+      ansible.builtin.file:
+        path: /tmp/wunder
+        state: directory
+        mode: "1777"
+      check_mode: false
+
     - name: Remove only the scenario-owned proxy-client test root
       ansible.builtin.file:
         path: /tmp/wunder/lit-forward-proxy-client-molecule

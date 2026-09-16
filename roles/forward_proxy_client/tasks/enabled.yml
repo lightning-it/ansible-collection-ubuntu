@@ -12,6 +12,27 @@
           != forward_proxy_client_managed_modes_effective_internal
       }}
 
+- name: Reinspect the pending marker parent before recording a transition
+  ansible.builtin.stat:
+    path: "{{ forward_proxy_client_state_marker_path | dirname }}"
+    follow: false
+  register: forward_proxy_client_pending_marker_parent
+  when:
+    - not ansible_check_mode
+    - forward_proxy_client_file_transition_required_internal | bool
+
+- name: Require the pending marker parent before recording a transition
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_pending_marker_parent.stat.isdir | default(false)
+      - not forward_proxy_client_pending_marker_parent.stat.islnk | default(false)
+    fail_msg: >-
+      The exact managed-state parent must exist as a validated non-symlink
+      directory before recording a recoverable proxy-client transition.
+  when:
+    - not ansible_check_mode
+    - forward_proxy_client_file_transition_required_internal | bool
+
 - name: Record recoverable pending proxy-client file transition
   ansible.builtin.copy:
     content: >-
