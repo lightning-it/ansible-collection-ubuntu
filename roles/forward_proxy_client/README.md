@@ -81,22 +81,17 @@ a collection cycle and allowing Automation to pin each collection explicitly.
 ## Example Playbook
 
 ```yaml
-- name: Configure Ubuntu forward proxy clients
+- name: Validate the Ubuntu adapter without activating client routing
   hosts: edge
   become: true
   roles:
     - role: lit.ubuntu.forward_proxy_client
-      forward_proxy_client_enabled: true
-      forward_proxy_client_firewall_egress:
-        enabled: true
-        status: approved
-        owner_username: proxy
-        mode: direct
-        interface: eth0
-        destinations_ipv4: [0.0.0.0/0]
-        ports: [80, 443]
-        residual: No non-proxy public egress is permitted.
+      forward_proxy_client_enabled: false
 ```
+
+Production activation must compose `lit.ubuntu.host_firewall`,
+`lit.supplementary.forward_proxy`, and this adapter in one controlled plan.
+Passing a copied firewall contract to this adapter alone does not enforce egress.
 
 ## License
 

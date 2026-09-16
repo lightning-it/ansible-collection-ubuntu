@@ -56,7 +56,9 @@
       - forward_proxy_client_lock_timeout is integer
       - forward_proxy_client_lock_timeout >= 1
       - forward_proxy_client_lock_timeout <= 300
-      - forward_proxy_client_lock_path is match('^/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\.lock\Z')
+      - >-
+        forward_proxy_client_lock_path
+        is match('^/[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*\.lock\Z')
       - >-
         forward_proxy_client_lock_path.startswith('/run/lock/')
         or forward_proxy_client_lock_path.startswith(forward_proxy_client_render_root.rstrip('/') ~ '/')
@@ -65,9 +67,14 @@
         or forward_proxy_client_lock_path.startswith('/run/lock/')
       - forward_proxy_client_lock_path not in forward_proxy_client_all_managed_paths_internal
       - forward_proxy_client_lock_path != forward_proxy_client_state_marker_path
-      - forward_proxy_client_proxy_port is integer
-      - forward_proxy_client_proxy_port >= 1024
-      - forward_proxy_client_proxy_port <= 65535
+      - >-
+        forward_proxy_client_proxy_port is integer
+        or (
+          forward_proxy_client_proxy_port is string
+          and forward_proxy_client_proxy_port is match('^[1-9][0-9]{0,4}\Z')
+        )
+      - forward_proxy_client_proxy_port | int >= 1024
+      - forward_proxy_client_proxy_port | int <= 65535
       - forward_proxy_client_listen_addresses is sequence
       - forward_proxy_client_listen_addresses is not string
       - forward_proxy_client_listen_addresses | length > 0
@@ -106,6 +113,12 @@
         forward_proxy_client_trusted_parent_paths | unique | list | length
         == forward_proxy_client_trusted_parent_paths | length
       - forward_proxy_client_upstream_enabled is boolean
+      - >-
+        forward_proxy_client_upstream_port is integer
+        or (
+          forward_proxy_client_upstream_port is string
+          and forward_proxy_client_upstream_port is match('^[1-9][0-9]{0,4}\Z')
+        )
       - forward_proxy_client_upstream_port | int >= 1
       - forward_proxy_client_upstream_port | int <= 65535
       - >-
@@ -220,7 +233,7 @@
       - >-
         forward_proxy_client_firewall_egress.get('ports', [])
         == (
-          [forward_proxy_client_upstream_port]
+          [forward_proxy_client_upstream_port_internal | int]
           if forward_proxy_client_upstream_enabled
           else [80, 443]
         )
@@ -261,7 +274,9 @@
       - forward_proxy_client_container_firewall_access.enabled is boolean
       - forward_proxy_client_container_firewall_access.enabled
       - forward_proxy_client_container_firewall_access.port is integer
-      - forward_proxy_client_container_firewall_access.port == forward_proxy_client_proxy_port
+      - >-
+        forward_proxy_client_container_firewall_access.port | int
+        == forward_proxy_client_proxy_port_internal | int
       - >-
         forward_proxy_client_container_firewall_access.destination_ipv4
         in forward_proxy_client_listen_addresses

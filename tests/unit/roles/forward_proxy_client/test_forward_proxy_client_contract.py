@@ -39,6 +39,11 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         self.assertEqual(acquire["delay"], 1)
         self.assertEqual(acquire["retries"], "{{ forward_proxy_client_lock_timeout }}")
+        lock_assertion = by_name["Require the exclusive proxy-client transition lock"]
+        self.assertIn(
+            "forward_proxy_client_lock_acquisition.rc == 0",
+            lock_assertion["ansible.builtin.assert"]["that"],
+        )
         locked = by_name[
             "Apply the complete proxy-client transition under one host lock"
         ]
@@ -64,21 +69,44 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "forward_proxy_client_file_owner not in ['root', '0']", assertions
         )
+        self.assertIn("[A-Za-z0-9][A-Za-z0-9_.-]*", assertions)
         self.assertIn("interrupted stale lock requires explicit", readme)
 
     def test_proxy_port_is_a_canonical_integer_and_headers_match_fail_closed_state(
         self,
     ) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()
+        variables = (ROLE_ROOT / "vars" / "main.yml").read_text()
         self.assertIn("forward_proxy_client_proxy_port is integer", assertions)
-        self.assertIn("forward_proxy_client_proxy_port >= 1024", assertions)
-        self.assertIn("forward_proxy_client_proxy_port <= 65535", assertions)
-        self.assertNotIn("forward_proxy_client_proxy_port | int", assertions)
+        self.assertIn("forward_proxy_client_proxy_port is string", assertions)
+        self.assertIn("^[1-9][0-9]{0,4}\\Z", assertions)
+        self.assertIn("forward_proxy_client_proxy_port | int >= 1024", assertions)
+        self.assertIn("forward_proxy_client_proxy_port | int <= 65535", assertions)
+        self.assertIn(
+            "forward_proxy_client_proxy_port_internal: "
+            '"{{ forward_proxy_client_proxy_port | int }}"',
+            variables,
+        )
+        self.assertIn(
+            "http://127.0.0.1:{{ forward_proxy_client_proxy_port_internal }}",
+            variables,
+        )
+        self.assertNotIn(
+            "http://127.0.0.1:{{ forward_proxy_client_proxy_port }}", variables
+        )
+        self.assertIn("forward_proxy_client_upstream_port is integer", assertions)
+        self.assertIn("forward_proxy_client_upstream_port is string", assertions)
+        self.assertIn(
+            'forward_proxy_client_upstream_port_internal: '
+            '"{{ forward_proxy_client_upstream_port | int }}"',
+            variables,
+        )
         for template in (
             "apt-proxy.conf.j2",
             "containers-proxy.conf.j2",
             "proxy-environment.conf.j2",
             "proxy-environment.sh.j2",
+            "systemd-environment.conf.j2",
         ):
             header = (ROLE_ROOT / "templates" / template).read_text().splitlines()[0]
             self.assertIn("Out-of-band changes are rejected", header)
@@ -155,6 +183,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "not forward_proxy_client_container_firewall_access.destination_ipv4.startswith('127.')",
             assertions,
+        )
+        self.assertIn(
+            "in host_firewall_observed_ipv4_addresses", firewall_assertions
         )
         self.assertIn("192\\.168\\.", assertions)
         self.assertIn("192\\.168\\.", firewall_assertions)
@@ -347,11 +378,17 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         scenario = REPOSITORY_ROOT / "molecule" / "forward-proxy-client-basic"
         molecule = yaml.safe_load((scenario / "molecule.yml").read_text())
         check = (scenario / "check.yml").read_text()
+        converge = (scenario / "converge.yml").read_text()
         prepare = (scenario / "prepare.yml").read_text()
         sequence = molecule["scenario"]["test_sequence"]
         self.assertLess(sequence.index("prepare"), sequence.index("check"))
         self.assertLess(sequence.index("check"), sequence.index("converge"))
         self.assertIn("Remove only the scenario-owned proxy-client test root", prepare)
+        self.assertIn("Remove only the scenario-owned stale proxy-client lock", prepare)
+        self.assertIn(
+            "residual: Only the owner-bound proxy may reach reviewed Internet destinations.",
+            converge,
+        )
         self.assertIn("check_mode: false", prepare)
         self.assertIn("not forward_proxy_client_check_root_state.stat.exists", check)
 
@@ -572,6 +609,15 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_upstream_enabled: true", verify)
         self.assertIn("192.0.2.10/32", verify)
         self.assertIn("forward_proxy_client_upstream_port: 8080", verify)
+        self.assertIn(
+            "forward_proxy_client_lock_path: "
+            "/tmp/wunder/lit-forward-proxy-client-molecule.lock",
+            verify,
+        )
+        role_readme = (ROLE_ROOT / "README.md").read_text()
+        self.assertIn("forward_proxy_client_enabled: false", role_readme)
+        self.assertIn("compose `lit.ubuntu.host_firewall`", role_readme)
+        self.assertIn("does not enforce egress", role_readme)
 
 
 if __name__ == "__main__":

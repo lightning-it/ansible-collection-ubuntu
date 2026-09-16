@@ -17,6 +17,15 @@
   until: forward_proxy_client_lock_acquisition.rc == 0
   when: not ansible_check_mode
 
+- name: Require the exclusive proxy-client transition lock
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_lock_acquisition.rc == 0
+    fail_msg: >-
+      The per-host proxy-client transition lock was not acquired within the
+      bounded timeout. Stop without inspecting or changing managed state.
+  when: not ansible_check_mode
+
 - name: Apply the complete proxy-client transition under one host lock
   block:
     - name: Inspect, transition, render, activate, and finalize proxy-client state

@@ -6,6 +6,7 @@
   gather_facts: false
   vars:
     forward_proxy_client_test_root: /tmp/wunder/lit-forward-proxy-client-molecule
+    forward_proxy_client_lock_path: /tmp/wunder/lit-forward-proxy-client-molecule.lock
     forward_proxy_client_proxy_port: 3128
     forward_proxy_client_trusted_parent_paths:
       - /tmp

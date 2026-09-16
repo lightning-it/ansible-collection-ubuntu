@@ -136,6 +136,8 @@
           and host_firewall_forward_proxy_access.destination_ipv4
               is match(host_firewall_ipv4_pattern)
           and not host_firewall_forward_proxy_access.destination_ipv4.startswith('127.')
+          and host_firewall_forward_proxy_access.destination_ipv4
+              in host_firewall_observed_ipv4_addresses
         )
       - >-
         host_firewall_forward_proxy_access.enabled

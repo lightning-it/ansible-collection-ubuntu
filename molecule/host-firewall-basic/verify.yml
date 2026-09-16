@@ -39,6 +39,7 @@
     host_firewall_observed_ipv4_addresses:
       - 192.0.2.10
       - 10.0.30.10
+      - 10.88.0.1
     host_firewall_observed_ipv6_addresses: []
     host_firewall_platform_name: Ubuntu
     host_firewall_platform_version: "24.04"
