@@ -131,13 +131,13 @@
         (
           (
             [
-              lookup('ansible.builtin.template', role_path ~ '/templates/apt-proxy.conf.j2'),
-              lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.sh.j2'),
-              lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.conf.j2'),
-              lookup('ansible.builtin.template', role_path ~ '/templates/systemd-environment.conf.j2')
+              lookup('ansible.builtin.template', role_path ~ '/templates/apt-proxy.conf.j2', rstrip=false),
+              lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.sh.j2', rstrip=false),
+              lookup('ansible.builtin.template', role_path ~ '/templates/proxy-environment.conf.j2', rstrip=false),
+              lookup('ansible.builtin.template', role_path ~ '/templates/systemd-environment.conf.j2', rstrip=false)
             ]
             + (
-                [lookup('ansible.builtin.template', role_path ~ '/templates/containers-proxy.conf.j2')]
+                [lookup('ansible.builtin.template', role_path ~ '/templates/containers-proxy.conf.j2', rstrip=false)]
                 if forward_proxy_client_container_enabled | bool
                 else []
               )
@@ -557,6 +557,8 @@
   ansible.builtin.include_tasks: remove_managed_path.yml
   vars:
     forward_proxy_client_remove_path: "{{ item.item.0.0 }}"
+    forward_proxy_client_remove_checksum: "{{ item.stat.checksum }}"
+    forward_proxy_client_remove_mode: "{{ item.stat.mode }}"
   loop: "{{ forward_proxy_client_previous_asset_stats.results | default([]) }}"
   when:
     - not forward_proxy_client_enabled | bool
@@ -567,6 +569,8 @@
   ansible.builtin.include_tasks: remove_managed_path.yml
   vars:
     forward_proxy_client_remove_path: "{{ item.item }}"
+    forward_proxy_client_remove_checksum: "{{ item.stat.checksum }}"
+    forward_proxy_client_remove_mode: "{{ item.stat.mode }}"
   loop: "{{ forward_proxy_client_new_target_stats.results | default([]) }}"
   when:
     - not forward_proxy_client_enabled | bool
@@ -601,6 +605,8 @@
   ansible.builtin.include_tasks: remove_managed_path.yml
   vars:
     forward_proxy_client_remove_path: "{{ forward_proxy_client_state_marker_path }}"
+    forward_proxy_client_remove_checksum: ""
+    forward_proxy_client_remove_mode: "0600"
   when:
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists

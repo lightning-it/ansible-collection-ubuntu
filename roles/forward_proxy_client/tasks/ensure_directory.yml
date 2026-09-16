@@ -100,6 +100,7 @@
   ansible.builtin.file:
     path: "{{ forward_proxy_client_directory_path }}"
     state: directory
+    follow: false
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0755"

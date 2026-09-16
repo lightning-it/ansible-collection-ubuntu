@@ -33,6 +33,13 @@
       ansible.builtin.command: id -g
       register: forward_proxy_client_verify_gid
       changed_when: false
+
+    - name: Select the portable non-root verification identity
+      ansible.builtin.set_fact:
+        forward_proxy_client_verify_uid_effective: >-
+          {{ '1' if forward_proxy_client_verify_uid.stdout == '0' else forward_proxy_client_verify_uid.stdout }}
+        forward_proxy_client_verify_gid_effective: >-
+          {{ '1' if forward_proxy_client_verify_gid.stdout == '0' else forward_proxy_client_verify_gid.stdout }}
   tasks:
     - name: Read rendered apt policy
       ansible.builtin.slurp:
@@ -59,7 +66,7 @@
             in (forward_proxy_client_apt_config.content | b64decode)
           - "'http_proxy = true' in (forward_proxy_client_containers_config.content | b64decode)"
           - >-
-            'HTTPS_PROXY=http://host.containers.internal:3128'
+            'HTTPS_PROXY=http://10.89.0.1:3128'
             in (forward_proxy_client_containers_config.content | b64decode)
         quiet: true
 
@@ -69,8 +76,8 @@
       vars:
         forward_proxy_client_enabled: true
         forward_proxy_client_manage_systemd: false
-        forward_proxy_client_file_owner: "{{ forward_proxy_client_verify_uid.stdout }}"
-        forward_proxy_client_file_group: "{{ forward_proxy_client_verify_gid.stdout }}"
+        forward_proxy_client_file_owner: "{{ forward_proxy_client_verify_uid_effective }}"
+        forward_proxy_client_file_group: "{{ forward_proxy_client_verify_gid_effective }}"
         forward_proxy_client_upstream_enabled: true
         forward_proxy_client_upstream_ipv4: 192.0.2.10
         forward_proxy_client_upstream_port: 8080
@@ -128,8 +135,8 @@
           vars:
             forward_proxy_client_enabled: false
             forward_proxy_client_manage_systemd: false
-            forward_proxy_client_file_owner: "{{ forward_proxy_client_verify_uid.stdout }}"
-            forward_proxy_client_file_group: "{{ forward_proxy_client_verify_gid.stdout }}"
+            forward_proxy_client_file_owner: "{{ forward_proxy_client_verify_uid_effective }}"
+            forward_proxy_client_file_group: "{{ forward_proxy_client_verify_gid_effective }}"
             forward_proxy_client_apt_config_path: >-
               {{ forward_proxy_client_test_root }}/etc/apt/99-lit-forward-proxy
             forward_proxy_client_profile_path: >-

@@ -68,11 +68,13 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         release = locked["always"][0]
         self.assertEqual(
-            release["ansible.builtin.file"]["path"],
-            "{{ forward_proxy_client_lock_path }}",
+            release["ansible.builtin.command"]["argv"],
+            ["/usr/bin/rmdir", "--", "{{ forward_proxy_client_lock_path }}"],
         )
-        self.assertEqual(release["ansible.builtin.file"]["state"], "absent")
         self.assertIs(release["changed_when"], False)
+        self.assertEqual(
+            release["failed_when"], "forward_proxy_client_lock_release.rc != 0"
+        )
         self.assertIn(
             "forward_proxy_client_lock_acquisition.rc | default(1) == 0",
             release["when"],
@@ -436,7 +438,6 @@ class ForwardProxyClientContractTests(unittest.TestCase):
     def test_molecule_runs_fresh_tree_check_mode_before_converge(self) -> None:
         scenario = REPOSITORY_ROOT / "molecule" / "forward-proxy-client-basic"
         molecule = yaml.safe_load((scenario / "molecule.yml").read_text())
-        check = (scenario / "check.yml").read_text()
         converge = (scenario / "converge.yml").read_text()
         prepare = (scenario / "prepare.yml").read_text()
         sequence = molecule["scenario"]["test_sequence"]
@@ -444,13 +445,17 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertLess(sequence.index("check"), sequence.index("converge"))
         self.assertIn("Remove only the scenario-owned proxy-client test root", prepare)
         self.assertIn("Remove only the scenario-owned stale proxy-client lock", prepare)
-        self.assertIn("Prepare the scenario-owned proxy-client lock parent", prepare)
+        self.assertIn("Inspect the pre-provisioned proxy-client lock parent", prepare)
+        self.assertIn("forward_proxy_client_prepared_parent.stat.mode == '1777'", prepare)
+        self.assertIn("forward_proxy_client_prepared_parent.stat.uid == 0", prepare)
         self.assertIn(
             "residual: Only the owner-bound proxy may reach reviewed Internet destinations.",
             converge,
         )
         self.assertIn("check_mode: false", prepare)
-        self.assertIn("not forward_proxy_client_check_root_state.stat.exists", check)
+        self.assertNotIn("check", molecule["provisioner"]["playbooks"])
+        self.assertIn("not forward_proxy_client_check_root_state.stat.exists", converge)
+        self.assertIn("when: ansible_check_mode", converge)
 
     def test_approved_dns_bypasses_stay_inside_explicit_internal_suffixes(self) -> None:
         defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
@@ -612,6 +617,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             8,
         )
         self.assertIn("revalidate_mutation_parents.yml", removal)
+        self.assertIn("Reinspect the exact proxy-client path", removal)
+        self.assertIn("/usr/bin/unlink", removal)
+        self.assertNotIn("state: absent", removal)
         self.assertGreaterEqual(
             sum(
                 task.get("ansible.builtin.include_tasks") == "remove_managed_path.yml"

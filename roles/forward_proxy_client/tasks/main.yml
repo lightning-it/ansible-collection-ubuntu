@@ -49,10 +49,14 @@
       ansible.builtin.include_tasks: transition.yml
   always:
     - name: Release the per-host proxy-client transition lock
-      ansible.builtin.file:
-        path: "{{ forward_proxy_client_lock_path }}"
-        state: absent
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/rmdir
+          - --
+          - "{{ forward_proxy_client_lock_path }}"
+      register: forward_proxy_client_lock_release
       changed_when: false
+      failed_when: forward_proxy_client_lock_release.rc != 0
       when:
         - not ansible_check_mode
         - forward_proxy_client_lock_acquisition.rc | default(1) == 0

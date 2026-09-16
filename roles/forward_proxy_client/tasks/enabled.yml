@@ -132,6 +132,21 @@
   ansible.builtin.include_tasks: remove_managed_path.yml
   vars:
     forward_proxy_client_remove_path: "{{ forward_proxy_client_containers_config_path }}"
+    forward_proxy_client_remove_checksum: >-
+      {{
+        dict(
+          forward_proxy_client_previous_state_manifest.managed_paths
+          | zip(forward_proxy_client_previous_state_manifest.managed_checksums)
+        )[forward_proxy_client_containers_config_path]
+      }}
+    forward_proxy_client_remove_mode: >-
+      {{
+        dict(
+          forward_proxy_client_previous_state_manifest.managed_paths
+          | zip(forward_proxy_client_previous_state_manifest.managed_modes)
+        )[forward_proxy_client_containers_config_path]
+      }}
+    forward_proxy_client_remove_allow_absent: true
   register: forward_proxy_client_containers_remove_result
   when:
     - not forward_proxy_client_container_enabled | bool

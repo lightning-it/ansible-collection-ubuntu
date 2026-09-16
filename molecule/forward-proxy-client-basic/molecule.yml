@@ -18,7 +18,6 @@ provisioner:
         ansible_connection: local
   playbooks:
     prepare: prepare.yml
-    check: check.yml
     converge: converge.yml
     verify: verify.yml
 

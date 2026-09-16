@@ -41,12 +41,19 @@
       register: forward_proxy_client_test_gid
       check_mode: false
       changed_when: false
+
+    - name: Select a portable non-root managed-file identity
+      ansible.builtin.set_fact:
+        forward_proxy_client_test_uid_effective: >-
+          {{ '1' if forward_proxy_client_test_uid.stdout == '0' else forward_proxy_client_test_uid.stdout }}
+        forward_proxy_client_test_gid_effective: >-
+          {{ '1' if forward_proxy_client_test_gid.stdout == '0' else forward_proxy_client_test_gid.stdout }}
   roles:
     - role: lit.ubuntu.forward_proxy_client
       forward_proxy_client_enabled: true
       forward_proxy_client_manage_systemd: false
-      forward_proxy_client_file_owner: "{{ forward_proxy_client_test_uid.stdout }}"
-      forward_proxy_client_file_group: "{{ forward_proxy_client_test_gid.stdout }}"
+      forward_proxy_client_file_owner: "{{ forward_proxy_client_test_uid_effective }}"
+      forward_proxy_client_file_group: "{{ forward_proxy_client_test_gid_effective }}"
       forward_proxy_client_lock_path: /tmp/wunder/lit-forward-proxy-client-molecule.lock
       forward_proxy_client_container_enabled: true
       forward_proxy_client_listen_addresses:
@@ -95,3 +102,17 @@
         - "{{ forward_proxy_client_test_root }}/var"
         - "{{ forward_proxy_client_test_root }}/var/lib"
         - "{{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client"
+  post_tasks:
+    - name: Inspect the fresh-tree proxy-client root after check mode
+      ansible.builtin.stat:
+        path: "{{ forward_proxy_client_test_root }}"
+        follow: false
+      register: forward_proxy_client_check_root_state
+      when: ansible_check_mode
+
+    - name: Require check mode to leave the fresh tree absent
+      ansible.builtin.assert:
+        that:
+          - not forward_proxy_client_check_root_state.stat.exists
+        fail_msg: "Fresh-tree check mode must not create directories or managed files."
+      when: ansible_check_mode
