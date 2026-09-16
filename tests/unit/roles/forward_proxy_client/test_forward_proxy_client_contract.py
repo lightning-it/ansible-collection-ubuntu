@@ -393,6 +393,8 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         self.assertIn("forward_proxy_client_container_url_internal", templates)
         self.assertIn("cannot be overridden", readme)
+        self.assertIn("if forward_proxy_client_container_enabled | bool", variables)
+        self.assertIn("else forward_proxy_client_proxy_url_internal", variables)
 
     def test_root_owned_state_cannot_be_redirected_below_tmp(self) -> None:
         assertions = (ROLE_ROOT / "tasks" / "assert.yml").read_text()

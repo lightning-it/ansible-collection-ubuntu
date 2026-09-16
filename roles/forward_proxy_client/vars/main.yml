@@ -4,8 +4,12 @@ forward_proxy_client_upstream_port_internal: "{{ forward_proxy_client_upstream_p
 forward_proxy_client_proxy_url_internal: "http://127.0.0.1:{{ forward_proxy_client_proxy_port_internal }}"
 forward_proxy_client_container_url_internal: >-
   {{
-    'http://' ~ forward_proxy_client_container_firewall_access.destination_ipv4
-    ~ ':' ~ (forward_proxy_client_proxy_port_internal | string)
+    (
+      'http://' ~ forward_proxy_client_container_firewall_access.destination_ipv4
+      ~ ':' ~ (forward_proxy_client_proxy_port_internal | string)
+    )
+    if forward_proxy_client_container_enabled | bool
+    else forward_proxy_client_proxy_url_internal
   }}
 forward_proxy_client_base_managed_paths_internal:
   - "{{ forward_proxy_client_apt_config_path }}"
