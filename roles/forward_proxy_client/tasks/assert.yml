@@ -143,6 +143,73 @@
       Ubuntu proxy-client inputs must point to the loopback service and define
       exact host and optional container integration boundaries.
 
+- name: Bind every internal proxy-client value to its canonical derivation
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_proxy_port_internal == (forward_proxy_client_proxy_port | int)
+      - forward_proxy_client_upstream_port_internal == (forward_proxy_client_upstream_port | int)
+      - >-
+        forward_proxy_client_proxy_url_internal
+        == 'http://127.0.0.1:' ~ (forward_proxy_client_proxy_port | int | string)
+      - >-
+        forward_proxy_client_container_url_internal
+        == 'http://host.containers.internal:' ~ (forward_proxy_client_proxy_port | int | string)
+      - >-
+        forward_proxy_client_base_managed_paths_internal
+        == [
+          forward_proxy_client_apt_config_path,
+          forward_proxy_client_profile_path,
+          forward_proxy_client_environment_path,
+          forward_proxy_client_systemd_environment_path
+        ]
+      - >-
+        forward_proxy_client_base_managed_modes_internal
+        == ['0644', '0644', '0644', '0644']
+      - >-
+        forward_proxy_client_all_managed_paths_internal
+        == forward_proxy_client_base_managed_paths_internal
+          + [forward_proxy_client_containers_config_path]
+      - >-
+        forward_proxy_client_all_managed_modes_internal
+        == forward_proxy_client_base_managed_modes_internal + ['0644']
+      - >-
+        forward_proxy_client_all_managed_mode_map_internal
+        == dict(
+          forward_proxy_client_all_managed_paths_internal
+          | zip(forward_proxy_client_all_managed_modes_internal)
+        )
+      - >-
+        forward_proxy_client_internal_domain_suffix_pattern_internal
+        == (
+          forward_proxy_client_internal_domain_suffixes
+          | map('regex_replace', '^\\.', '')
+          | map('regex_escape')
+          | join('|')
+        )
+      - >-
+        forward_proxy_client_managed_paths_effective_internal
+        == (
+          forward_proxy_client_all_managed_paths_internal
+          if forward_proxy_client_container_enabled | bool
+          else forward_proxy_client_base_managed_paths_internal
+        )
+      - >-
+        forward_proxy_client_managed_modes_effective_internal
+        == (
+          forward_proxy_client_all_managed_modes_internal
+          if forward_proxy_client_container_enabled | bool
+          else forward_proxy_client_base_managed_modes_internal
+        )
+      - >-
+        forward_proxy_client_managed_directories_internal
+        == (
+          forward_proxy_client_managed_paths_effective_internal
+          + [forward_proxy_client_state_marker_path]
+        ) | map('dirname') | unique | list
+    fail_msg: >-
+      Internal proxy-client values are derived security boundaries and cannot
+      be overridden independently of their validated public inputs.
+
 - name: Validate Ubuntu forward proxy client listen addresses
   ansible.builtin.assert:
     that:
@@ -442,3 +509,15 @@
         ) | unique | list | length
         == (forward_proxy_client_all_managed_paths_internal | length) + 1
     fail_msg: "Every Ubuntu proxy-client managed path must be distinct."
+
+- name: Keep the proxy-client lock outside every managed path boundary
+  ansible.builtin.assert:
+    that:
+      - item != forward_proxy_client_lock_path
+      - not item.startswith(forward_proxy_client_lock_path.rstrip('/') ~ '/')
+      - not forward_proxy_client_lock_path.startswith(item.rstrip('/') ~ '/')
+    fail_msg: >-
+      The proxy-client lock must be neither an ancestor nor a descendant of a
+      managed file or state marker.
+  loop: >-
+    {{ forward_proxy_client_all_managed_paths_internal + [forward_proxy_client_state_marker_path] }}

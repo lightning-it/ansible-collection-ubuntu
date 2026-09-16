@@ -24,9 +24,13 @@ class ForwardProxyClientContractTests(unittest.TestCase):
     ) -> None:
         wrapper = yaml.safe_load((ROLE_ROOT / "tasks" / "main.yml").read_text())
         by_name = {task["name"]: task for task in wrapper}
-        lock_parent = by_name[
+        inspect_lock_parent = by_name["Inspect the required proxy-client lock parent"]
+        self.assertEqual(inspect_lock_parent["when"], "not ansible_check_mode")
+        lock_parent_task = by_name[
             "Require a pre-existing non-symlink proxy-client lock parent"
-        ]["ansible.builtin.assert"]["that"]
+        ]
+        self.assertEqual(lock_parent_task["when"], "not ansible_check_mode")
+        lock_parent = lock_parent_task["ansible.builtin.assert"]["that"]
         self.assertIn(
             "forward_proxy_client_lock_parent.stat.isdir | default(false)",
             lock_parent,
@@ -82,6 +86,19 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         self.assertIn("[A-Za-z0-9][A-Za-z0-9_.-]*", assertions)
         self.assertIn("interrupted stale lock requires explicit", readme)
+
+        lock_boundary = {
+            task["name"]: task
+            for task in yaml.safe_load((ROLE_ROOT / "tasks" / "assert.yml").read_text())
+        }
+        lock_task = lock_boundary[
+            "Keep the proxy-client lock outside every managed path boundary"
+        ]
+        lock_checks = lock_task["ansible.builtin.assert"]["that"]
+        self.assertIn(
+            "not item.startswith(forward_proxy_client_lock_path.rstrip('/') ~ '/')",
+            lock_checks,
+        )
 
     def test_proxy_port_is_a_canonical_integer_and_headers_match_fail_closed_state(
         self,
@@ -349,6 +366,30 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_proxy_url_internal:", variables)
         self.assertIn("forward_proxy_client_container_url_internal:", variables)
         self.assertIn("forward_proxy_client_proxy_url_internal", templates)
+
+        tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "assert.yml").read_text())
+        canonical = {
+            task["name"]: task for task in tasks
+        }["Bind every internal proxy-client value to its canonical derivation"]
+        canonical_checks = canonical["ansible.builtin.assert"]["that"]
+        self.assertTrue(
+            any(
+                "forward_proxy_client_proxy_url_internal" in check
+                for check in canonical_checks
+            )
+        )
+        self.assertTrue(
+            any(
+                "forward_proxy_client_all_managed_paths_internal" in check
+                for check in canonical_checks
+            )
+        )
+        self.assertTrue(
+            any(
+                "forward_proxy_client_internal_domain_suffix_pattern_internal" in check
+                for check in canonical_checks
+            )
+        )
         self.assertIn("forward_proxy_client_container_url_internal", templates)
         self.assertIn("cannot be overridden", readme)
 
@@ -609,6 +650,15 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             "restart_activated_services",
             preserve["forward_proxy_client_disable_restart_services_internal"],
         )
+        pending = by_name["Persist pending proxy-client disable activation work"]
+        pending_content = pending["ansible.builtin.copy"]["content"]
+        self.assertIn("restart_pending_services", pending_content)
+        self.assertIn(
+            "forward_proxy_client_disable_restart_services_internal",
+            pending_content,
+        )
+        self.assertIn("restart_activated_services", pending_content)
+        self.assertIn("not ansible_check_mode", pending["when"])
         ensure = (ROLE_ROOT / "tasks" / "ensure_directory.yml").read_text()
         self.assertEqual(ensure.count("not ansible_check_mode"), 2)
         self.assertEqual(
@@ -616,6 +666,13 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         self.assertIn("forward_proxy_client_planned_directories_internal", ensure)
         self.assertIn("Initialize the check-mode proxy-client directory plan", by_name)
+
+    def test_dangling_symlinks_never_satisfy_absent_target_branches(self) -> None:
+        transition = (ROLE_ROOT / "tasks" / "transition.yml").read_text()
+        self.assertGreaterEqual(
+            transition.count("not item.stat.islnk | default(false)"),
+            5,
+        )
 
     def test_root_documentation_and_molecule_cover_public_adapter_modes(self) -> None:
         root_readme = (REPOSITORY_ROOT / "README.md").read_text()

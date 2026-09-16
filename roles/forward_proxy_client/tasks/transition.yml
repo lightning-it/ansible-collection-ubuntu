@@ -80,6 +80,7 @@
   ansible.builtin.assert:
     that:
       - not item.stat.exists
+      - not item.stat.islnk | default(false)
     fail_msg: >-
       A proxy-client target already exists without the exact adapter ownership
       marker. Stop before overwriting a potentially foreign file.
@@ -382,7 +383,10 @@
   ansible.builtin.assert:
     that:
       - >-
-        not item.stat.exists
+        (
+          not item.stat.exists
+          and not item.stat.islnk | default(false)
+        )
         or (
           item.stat.isreg | default(false)
           and not item.stat.islnk | default(false)
@@ -437,7 +441,10 @@
   ansible.builtin.assert:
     that:
       - >-
-        not item.stat.exists
+        (
+          not item.stat.exists
+          and not item.stat.islnk | default(false)
+        )
         or (
           forward_proxy_client_previous_state_manifest.write_state == 'pending'
           and item.item in forward_proxy_client_pending_checksum_map_internal
@@ -496,6 +503,38 @@
       opted-in services require the explicit restart cutover, so no current or
       newly started service keeps stale proxy variables.
   when:
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+
+- name: Persist pending proxy-client disable activation work
+  ansible.builtin.copy:
+    content: >-
+      {{
+        forward_proxy_client_previous_state_manifest
+        | combine(
+            {
+              'systemd_activation_pending': (
+                forward_proxy_client_previous_state_manifest.systemd_activation_pending
+                or forward_proxy_client_systemd_environment_path
+                  in (
+                    forward_proxy_client_previous_state_manifest.managed_paths
+                    + forward_proxy_client_previous_state_manifest.pending_managed_paths
+                  )
+              ),
+              'restart_pending_services': forward_proxy_client_disable_restart_services_internal,
+              'restart_activated_services': []
+            }
+          )
+        | to_nice_json
+      }}
+    dest: "{{ forward_proxy_client_state_marker_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0600"
+    follow: false
+    unsafe_writes: false
+  when:
+    - not ansible_check_mode
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists
 

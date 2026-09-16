@@ -8,6 +8,7 @@
     path: "{{ forward_proxy_client_lock_path | dirname }}"
     follow: false
   register: forward_proxy_client_lock_parent
+  when: not ansible_check_mode
 
 - name: Require a pre-existing non-symlink proxy-client lock parent
   ansible.builtin.assert:
@@ -17,6 +18,7 @@
     fail_msg: >-
       The configured proxy-client lock parent must already exist as a trusted
       non-symlink directory. Prepare it before invoking this role.
+  when: not ansible_check_mode
 
 - name: Acquire the bounded per-host proxy-client transition lock
   ansible.builtin.command:
