@@ -1,0 +1,48 @@
+---
+forward_proxy_client_proxy_port_internal: "{{ forward_proxy_client_proxy_port | int }}"
+forward_proxy_client_upstream_port_internal: "{{ forward_proxy_client_upstream_port | int }}"
+forward_proxy_client_proxy_url_internal: "http://127.0.0.1:{{ forward_proxy_client_proxy_port_internal }}"
+forward_proxy_client_container_url_internal: >-
+  http://host.containers.internal:{{ forward_proxy_client_proxy_port_internal }}
+forward_proxy_client_base_managed_paths_internal:
+  - "{{ forward_proxy_client_apt_config_path }}"
+  - "{{ forward_proxy_client_profile_path }}"
+  - "{{ forward_proxy_client_environment_path }}"
+  - "{{ forward_proxy_client_systemd_environment_path }}"
+forward_proxy_client_base_managed_modes_internal:
+  - "0644"
+  - "0644"
+  - "0644"
+  - "0644"
+forward_proxy_client_all_managed_paths_internal: >-
+  {{ forward_proxy_client_base_managed_paths_internal + [forward_proxy_client_containers_config_path] }}
+forward_proxy_client_all_managed_modes_internal: >-
+  {{ forward_proxy_client_base_managed_modes_internal + ['0644'] }}
+forward_proxy_client_all_managed_mode_map_internal: >-
+  {{ dict(forward_proxy_client_all_managed_paths_internal | zip(forward_proxy_client_all_managed_modes_internal)) }}
+forward_proxy_client_internal_domain_suffix_pattern_internal: >-
+  {{
+    forward_proxy_client_internal_domain_suffixes
+    | map('regex_replace', '^\\.', '')
+    | map('regex_escape')
+    | join('|')
+  }}
+forward_proxy_client_managed_paths_effective_internal: >-
+  {{
+    forward_proxy_client_all_managed_paths_internal
+    if forward_proxy_client_container_enabled | bool
+    else forward_proxy_client_base_managed_paths_internal
+  }}
+forward_proxy_client_managed_modes_effective_internal: >-
+  {{
+    forward_proxy_client_all_managed_modes_internal
+    if forward_proxy_client_container_enabled | bool
+    else forward_proxy_client_base_managed_modes_internal
+  }}
+forward_proxy_client_managed_directories_internal: >-
+  {{
+    (
+      forward_proxy_client_managed_paths_effective_internal
+      + [forward_proxy_client_state_marker_path]
+    ) | map('dirname') | unique | list
+  }}

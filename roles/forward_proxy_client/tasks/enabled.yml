@@ -1,0 +1,315 @@
+---
+- name: Determine whether the proxy-client file set needs a recoverable transition
+  ansible.builtin.set_fact:
+    forward_proxy_client_file_transition_required_internal: >-
+      {{
+        forward_proxy_client_previous_state_manifest.write_state == 'pending'
+        or forward_proxy_client_previous_state_manifest.managed_paths
+          != forward_proxy_client_managed_paths_effective_internal
+        or forward_proxy_client_previous_state_manifest.managed_checksums
+          != forward_proxy_client_desired_checksums_internal
+        or forward_proxy_client_previous_state_manifest.managed_modes
+          != forward_proxy_client_managed_modes_effective_internal
+      }}
+
+- name: Reinspect the pending marker parent before recording a transition
+  ansible.builtin.stat:
+    path: "{{ forward_proxy_client_state_marker_path | dirname }}"
+    follow: false
+  register: forward_proxy_client_pending_marker_parent
+  when:
+    - not ansible_check_mode
+    - forward_proxy_client_file_transition_required_internal | bool
+
+- name: Require the pending marker parent before recording a transition
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_pending_marker_parent.stat.isdir | default(false)
+      - not forward_proxy_client_pending_marker_parent.stat.islnk | default(false)
+    fail_msg: >-
+      The exact managed-state parent must exist as a validated non-symlink
+      directory before recording a recoverable proxy-client transition.
+  when:
+    - not ansible_check_mode
+    - forward_proxy_client_file_transition_required_internal | bool
+
+- name: Record recoverable pending proxy-client file transition
+  ansible.builtin.copy:
+    content: >-
+      {{
+        {
+          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v6',
+          'owner': 'lit.ubuntu.forward_proxy_client',
+          'write_state': 'pending',
+          'systemd_activation_pending': (
+            forward_proxy_client_previous_state_manifest.systemd_activation_pending
+            | default(false)
+          ),
+          'restart_pending_services': (
+            forward_proxy_client_previous_state_manifest.restart_pending_services
+            | default([])
+          ),
+          'restart_activated_services': (
+            forward_proxy_client_previous_state_manifest.restart_activated_services
+            | default([])
+          ),
+          'managed_paths': forward_proxy_client_previous_state_manifest.managed_paths,
+          'managed_checksums': forward_proxy_client_previous_state_manifest.managed_checksums,
+          'managed_modes': forward_proxy_client_previous_state_manifest.managed_modes,
+          'pending_managed_paths': forward_proxy_client_managed_paths_effective_internal,
+          'pending_managed_checksums': forward_proxy_client_desired_checksums_internal,
+          'pending_managed_modes': forward_proxy_client_managed_modes_effective_internal
+        } | to_nice_json
+      }}
+    dest: "{{ forward_proxy_client_state_marker_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0600"
+  when:
+    - not ansible_check_mode
+    - forward_proxy_client_file_transition_required_internal | bool
+
+- name: Render apt proxy policy
+  ansible.builtin.template:
+    src: apt-proxy.conf.j2
+    dest: "{{ forward_proxy_client_apt_config_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+  register: forward_proxy_client_apt_config_result
+
+- name: Render interactive proxy environment
+  ansible.builtin.template:
+    src: proxy-environment.sh.j2
+    dest: "{{ forward_proxy_client_profile_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+  register: forward_proxy_client_profile_result
+
+- name: Render process proxy environment
+  ansible.builtin.template:
+    src: proxy-environment.conf.j2
+    dest: "{{ forward_proxy_client_environment_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+  register: forward_proxy_client_environment_result
+
+- name: Render systemd proxy defaults
+  ansible.builtin.template:
+    src: systemd-environment.conf.j2
+    dest: "{{ forward_proxy_client_systemd_environment_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+  register: forward_proxy_client_systemd_environment_result
+
+- name: Render client-container proxy defaults
+  ansible.builtin.template:
+    src: containers-proxy.conf.j2
+    dest: "{{ forward_proxy_client_containers_config_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0644"
+  register: forward_proxy_client_containers_config_result
+  when: forward_proxy_client_container_enabled | bool
+
+- name: Remove previously owned client-container proxy defaults
+  ansible.builtin.file:
+    path: "{{ forward_proxy_client_containers_config_path }}"
+    state: absent
+  register: forward_proxy_client_containers_remove_result
+  when:
+    - not forward_proxy_client_container_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+    - >-
+      forward_proxy_client_containers_config_path
+      in (
+        forward_proxy_client_previous_state_manifest
+        | default({'managed_paths': []})
+      ).managed_paths
+
+- name: Determine whether managed Ubuntu proxy-client state changed
+  ansible.builtin.set_fact:
+    forward_proxy_client_managed_state_changed_internal: >-
+      {{
+        forward_proxy_client_apt_config_result.changed
+        or forward_proxy_client_profile_result.changed
+        or forward_proxy_client_environment_result.changed
+        or forward_proxy_client_systemd_environment_result.changed
+        or forward_proxy_client_containers_config_result.changed | default(false)
+        or forward_proxy_client_containers_remove_result.changed | default(false)
+      }}
+
+- name: Determine pending Ubuntu proxy-client activation work
+  ansible.builtin.set_fact:
+    forward_proxy_client_systemd_activation_pending_internal: >-
+      {{
+        forward_proxy_client_previous_state_manifest.systemd_activation_pending | default(false)
+        or forward_proxy_client_systemd_environment_result.changed
+      }}
+    forward_proxy_client_restart_pending_services_internal: >-
+      {{
+        (
+          forward_proxy_client_previous_state_manifest.restart_pending_services | default([])
+          + (
+              forward_proxy_client_restart_services
+              if forward_proxy_client_managed_state_changed_internal | bool
+              else (
+                forward_proxy_client_restart_services
+                | difference(
+                    forward_proxy_client_previous_state_manifest.restart_activated_services
+                    | default([])
+                  )
+              )
+            )
+        ) | unique | list
+      }}
+    forward_proxy_client_restart_activated_services_internal: >-
+      {{ forward_proxy_client_previous_state_manifest.restart_activated_services | default([]) }}
+
+- name: Inspect rendered forward proxy client files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+    checksum_algorithm: sha256
+  loop: "{{ forward_proxy_client_managed_paths_effective_internal }}"
+  register: forward_proxy_client_managed_asset_stats
+  when: not ansible_check_mode
+
+- name: Verify rendered forward proxy client files before recording ownership
+  ansible.builtin.assert:
+    that:
+      - item.0.0.stat.isreg | default(false)
+      - not item.0.0.stat.islnk | default(false)
+      - item.0.0.stat.checksum is match('^[a-f0-9]{64}\Z')
+      - item.0.0.stat.checksum == item.1
+      - item.0.0.stat.mode == item.0.1
+      - >-
+        item.0.0.stat.pw_name | default('') == forward_proxy_client_file_owner | string
+        or item.0.0.stat.uid | string == forward_proxy_client_file_owner | string
+      - >-
+        item.0.0.stat.gr_name | default('') == forward_proxy_client_file_group | string
+        or item.0.0.stat.gid | string == forward_proxy_client_file_group | string
+    fail_msg: >-
+      Every recorded proxy-client asset must retain the exact regular-file,
+      owner, group, mode, and checksum boundary.
+  loop: >-
+    {{
+      forward_proxy_client_managed_asset_stats.results
+      | zip(forward_proxy_client_managed_modes_effective_internal)
+      | zip(forward_proxy_client_desired_checksums_internal)
+      | list
+    }}
+  loop_control:
+    label: "{{ item.0.0.item }}"
+  when: not ansible_check_mode
+
+- name: Record pending forward proxy client activation and file ownership
+  ansible.builtin.copy:
+    content: >-
+      {{
+        {
+          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v6',
+          'owner': 'lit.ubuntu.forward_proxy_client',
+          'write_state': 'stable',
+          'systemd_activation_pending': forward_proxy_client_systemd_activation_pending_internal | bool,
+          'restart_pending_services': forward_proxy_client_restart_pending_services_internal,
+          'restart_activated_services': forward_proxy_client_restart_activated_services_internal,
+          'managed_paths': forward_proxy_client_managed_paths_effective_internal,
+          'managed_checksums': (
+            forward_proxy_client_managed_asset_stats.results
+            | map(attribute='stat.checksum') | list
+          ),
+          'managed_modes': forward_proxy_client_managed_modes_effective_internal,
+          'pending_managed_paths': [],
+          'pending_managed_checksums': [],
+          'pending_managed_modes': []
+        } | to_nice_json
+      }}
+    dest: "{{ forward_proxy_client_state_marker_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0600"
+  when: not ansible_check_mode
+
+- name: Reload systemd manager after changing proxy client defaults
+  ansible.builtin.systemd:
+    daemon_reexec: true
+    scope: "{{ forward_proxy_client_systemd_scope }}"
+  when:
+    - not ansible_check_mode
+    - forward_proxy_client_manage_systemd | bool
+    - forward_proxy_client_systemd_activation_pending_internal | bool
+
+- name: Restart opted-in proxy client services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    scope: "{{ forward_proxy_client_systemd_scope }}"
+  loop: "{{ forward_proxy_client_restart_pending_services_internal }}"
+  when:
+    - not ansible_check_mode
+    - forward_proxy_client_manage_systemd | bool
+    - forward_proxy_client_restart_now | bool
+    - forward_proxy_client_restart_pending_services_internal | length > 0
+
+- name: Clear completed Ubuntu proxy-client activation work
+  ansible.builtin.set_fact:
+    forward_proxy_client_systemd_activation_pending_internal: >-
+      {{
+        false
+        if forward_proxy_client_manage_systemd | bool
+        else forward_proxy_client_systemd_activation_pending_internal
+      }}
+    forward_proxy_client_restart_pending_services_internal: >-
+      {{
+        []
+        if (
+          forward_proxy_client_manage_systemd | bool
+          and forward_proxy_client_restart_now | bool
+        )
+        else forward_proxy_client_restart_pending_services_internal
+      }}
+    forward_proxy_client_restart_activated_services_internal: >-
+      {{
+        (
+          forward_proxy_client_restart_activated_services_internal
+          + forward_proxy_client_restart_pending_services_internal
+        ) | unique | list
+        if (
+          forward_proxy_client_manage_systemd | bool
+          and forward_proxy_client_restart_now | bool
+        )
+        else forward_proxy_client_restart_activated_services_internal
+      }}
+  when: not ansible_check_mode
+
+- name: Record completed forward proxy client activation state
+  ansible.builtin.copy:
+    content: >-
+      {{
+        {
+          'schema': 'lit.ubuntu.forward_proxy_client.managed-state/v6',
+          'owner': 'lit.ubuntu.forward_proxy_client',
+          'write_state': 'stable',
+          'systemd_activation_pending': forward_proxy_client_systemd_activation_pending_internal | bool,
+          'restart_pending_services': forward_proxy_client_restart_pending_services_internal,
+          'restart_activated_services': forward_proxy_client_restart_activated_services_internal,
+          'managed_paths': forward_proxy_client_managed_paths_effective_internal,
+          'managed_checksums': (
+            forward_proxy_client_managed_asset_stats.results
+            | map(attribute='stat.checksum') | list
+          ),
+          'managed_modes': forward_proxy_client_managed_modes_effective_internal,
+          'pending_managed_paths': [],
+          'pending_managed_checksums': [],
+          'pending_managed_modes': []
+        } | to_nice_json
+      }}
+    dest: "{{ forward_proxy_client_state_marker_path }}"
+    owner: "{{ forward_proxy_client_file_owner }}"
+    group: "{{ forward_proxy_client_file_group }}"
+    mode: "0600"
+  when: not ansible_check_mode

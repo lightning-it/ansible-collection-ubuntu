@@ -1,0 +1,11 @@
+# Managed by lit.ubuntu.forward_proxy_client. Out-of-band changes are rejected.
+[containers]
+http_proxy = true
+env = [
+  "http_proxy={{ forward_proxy_client_container_url_internal }}",
+  "https_proxy={{ forward_proxy_client_container_url_internal }}",
+  "HTTP_PROXY={{ forward_proxy_client_container_url_internal }}",
+  "HTTPS_PROXY={{ forward_proxy_client_container_url_internal }}",
+  "no_proxy={{ forward_proxy_client_no_proxy | join(',') }}",
+  "NO_PROXY={{ forward_proxy_client_no_proxy | join(',') }}",
+]
