@@ -40,7 +40,8 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             lock_parent,
         )
         acquire = by_name["Acquire the bounded per-host proxy-client transition lock"]
-        command = acquire["ansible.builtin.command"]
+        attempt = acquire["block"][0]
+        command = attempt["ansible.builtin.command"]
         self.assertEqual(
             command["argv"],
             [
@@ -50,15 +51,16 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            acquire["until"], "forward_proxy_client_lock_acquisition.rc == 0"
+            attempt["until"], "forward_proxy_client_lock_acquisition.rc == 0"
         )
-        self.assertIs(acquire["changed_when"], False)
-        self.assertEqual(acquire["delay"], 1)
-        self.assertEqual(acquire["retries"], "{{ forward_proxy_client_lock_timeout }}")
-        lock_assertion = by_name["Require the exclusive proxy-client transition lock"]
+        self.assertIs(attempt["changed_when"], False)
+        self.assertNotIn("failed_when", attempt)
+        self.assertEqual(attempt["delay"], 1)
+        self.assertEqual(attempt["retries"], "{{ forward_proxy_client_lock_timeout }}")
+        lock_failure = acquire["rescue"][0]["ansible.builtin.fail"]["msg"]
         self.assertIn(
-            "forward_proxy_client_lock_acquisition.rc == 0",
-            lock_assertion["ansible.builtin.assert"]["that"],
+            "not acquired within the bounded timeout",
+            lock_failure,
         )
         locked = by_name[
             "Apply the complete proxy-client transition under one host lock"
@@ -481,6 +483,8 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         self.assertIn('loop: "{{ forward_proxy_client_trusted_parent_paths }}"', main)
         self.assertIn("forward_proxy_client_approved_no_proxy_domains", assertions)
+        self.assertIn("item == (item | trim)", assertions)
+        self.assertIn("item is match('^\\S+\\Z')", assertions)
         self.assertIn("(?:/(?:[89]|[12][0-9]|3[0-2]))?", assertions)
         self.assertNotIn("(?:/[0-9]{1,3})?", assertions)
         self.assertIn("'/' not in item", assertions)

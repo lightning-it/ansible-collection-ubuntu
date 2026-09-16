@@ -387,6 +387,9 @@
 - name: Validate forward proxy client bypass entries
   ansible.builtin.assert:
     that:
+      - item is string
+      - item == (item | trim)
+      - item is match('^\S+\Z')
       - item | length <= 253
       - >-
         item in ['localhost', '127.0.0.1', '127.0.0.1/32', '::1']

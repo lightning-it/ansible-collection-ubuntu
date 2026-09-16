@@ -21,27 +21,25 @@
   when: not ansible_check_mode
 
 - name: Acquire the bounded per-host proxy-client transition lock
-  ansible.builtin.command:
-    argv:
-      - /usr/bin/mkdir
-      - --mode=0700
-      - "{{ forward_proxy_client_lock_path }}"
-  register: forward_proxy_client_lock_acquisition
-  changed_when: false
-  failed_when: false
-  retries: "{{ forward_proxy_client_lock_timeout }}"
-  delay: 1
-  until: forward_proxy_client_lock_acquisition.rc == 0
   when: not ansible_check_mode
-
-- name: Require the exclusive proxy-client transition lock
-  ansible.builtin.assert:
-    that:
-      - forward_proxy_client_lock_acquisition.rc == 0
-    fail_msg: >-
-      The per-host proxy-client transition lock was not acquired within the
-      bounded timeout. Stop without inspecting or changing managed state.
-  when: not ansible_check_mode
+  block:
+    - name: Attempt the bounded per-host proxy-client transition lock
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/mkdir
+          - --mode=0700
+          - "{{ forward_proxy_client_lock_path }}"
+      register: forward_proxy_client_lock_acquisition
+      changed_when: false
+      retries: "{{ forward_proxy_client_lock_timeout }}"
+      delay: 1
+      until: forward_proxy_client_lock_acquisition.rc == 0
+  rescue:
+    - name: Refuse to continue without the exclusive proxy-client transition lock
+      ansible.builtin.fail:
+        msg: >-
+          The per-host proxy-client transition lock was not acquired within the
+          bounded timeout. Stop without inspecting or changing managed state.
 
 - name: Apply the complete proxy-client transition under one host lock
   block:
