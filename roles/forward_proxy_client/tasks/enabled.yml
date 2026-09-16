@@ -12,23 +12,8 @@
           != forward_proxy_client_managed_modes_effective_internal
       }}
 
-- name: Reinspect the pending marker parent before recording a transition
-  ansible.builtin.stat:
-    path: "{{ forward_proxy_client_state_marker_path | dirname }}"
-    follow: false
-  register: forward_proxy_client_pending_marker_parent
-  when:
-    - not ansible_check_mode
-    - forward_proxy_client_file_transition_required_internal | bool
-
-- name: Require the pending marker parent before recording a transition
-  ansible.builtin.assert:
-    that:
-      - forward_proxy_client_pending_marker_parent.stat.isdir | default(false)
-      - not forward_proxy_client_pending_marker_parent.stat.islnk | default(false)
-    fail_msg: >-
-      The exact managed-state parent must exist as a validated non-symlink
-      directory before recording a recoverable proxy-client transition.
+- name: Revalidate the complete parent chain before recording a transition
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
   when:
     - not ansible_check_mode
     - forward_proxy_client_file_transition_required_internal | bool
@@ -65,9 +50,14 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0600"
+    follow: false
+    unsafe_writes: false
   when:
     - not ansible_check_mode
     - forward_proxy_client_file_transition_required_internal | bool
+
+- name: Revalidate the complete parent chain before rendering apt policy
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
 
 - name: Render apt proxy policy
   ansible.builtin.template:
@@ -76,7 +66,12 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+    follow: false
+    unsafe_writes: false
   register: forward_proxy_client_apt_config_result
+
+- name: Revalidate the complete parent chain before rendering the interactive environment
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
 
 - name: Render interactive proxy environment
   ansible.builtin.template:
@@ -85,7 +80,12 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+    follow: false
+    unsafe_writes: false
   register: forward_proxy_client_profile_result
+
+- name: Revalidate the complete parent chain before rendering the process environment
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
 
 - name: Render process proxy environment
   ansible.builtin.template:
@@ -94,7 +94,12 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+    follow: false
+    unsafe_writes: false
   register: forward_proxy_client_environment_result
+
+- name: Revalidate the complete parent chain before rendering systemd defaults
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
 
 - name: Render systemd proxy defaults
   ansible.builtin.template:
@@ -103,7 +108,13 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+    follow: false
+    unsafe_writes: false
   register: forward_proxy_client_systemd_environment_result
+
+- name: Revalidate the complete parent chain before rendering container defaults
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
+  when: forward_proxy_client_container_enabled | bool
 
 - name: Render client-container proxy defaults
   ansible.builtin.template:
@@ -112,13 +123,15 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0644"
+    follow: false
+    unsafe_writes: false
   register: forward_proxy_client_containers_config_result
   when: forward_proxy_client_container_enabled | bool
 
 - name: Remove previously owned client-container proxy defaults
-  ansible.builtin.file:
-    path: "{{ forward_proxy_client_containers_config_path }}"
-    state: absent
+  ansible.builtin.include_tasks: remove_managed_path.yml
+  vars:
+    forward_proxy_client_remove_path: "{{ forward_proxy_client_containers_config_path }}"
   register: forward_proxy_client_containers_remove_result
   when:
     - not forward_proxy_client_container_enabled | bool
@@ -154,7 +167,10 @@
         (
           forward_proxy_client_previous_state_manifest.restart_pending_services | default([])
           + (
-              forward_proxy_client_restart_services
+              (
+                forward_proxy_client_previous_state_manifest.restart_activated_services
+                | default([])
+              ) + forward_proxy_client_restart_services
               if forward_proxy_client_managed_state_changed_internal | bool
               else (
                 forward_proxy_client_restart_services
@@ -168,6 +184,15 @@
       }}
     forward_proxy_client_restart_activated_services_internal: >-
       {{ forward_proxy_client_previous_state_manifest.restart_activated_services | default([]) }}
+
+- name: Bind restart work to services opted in for this invocation
+  ansible.builtin.set_fact:
+    forward_proxy_client_restart_execution_services_internal: >-
+      {{
+        forward_proxy_client_restart_pending_services_internal
+        | intersect(forward_proxy_client_restart_services)
+        | list
+      }}
 
 - name: Inspect rendered forward proxy client files
   ansible.builtin.stat:
@@ -206,6 +231,10 @@
     label: "{{ item.0.0.item }}"
   when: not ansible_check_mode
 
+- name: Revalidate the complete parent chain before recording pending activation
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
+  when: not ansible_check_mode
+
 - name: Record pending forward proxy client activation and file ownership
   ansible.builtin.copy:
     content: >-
@@ -232,6 +261,8 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0600"
+    follow: false
+    unsafe_writes: false
   when: not ansible_check_mode
 
 - name: Reload systemd manager after changing proxy client defaults
@@ -248,12 +279,12 @@
     name: "{{ item }}"
     state: restarted
     scope: "{{ forward_proxy_client_systemd_scope }}"
-  loop: "{{ forward_proxy_client_restart_pending_services_internal }}"
+  loop: "{{ forward_proxy_client_restart_execution_services_internal }}"
   when:
     - not ansible_check_mode
     - forward_proxy_client_manage_systemd | bool
     - forward_proxy_client_restart_now | bool
-    - forward_proxy_client_restart_pending_services_internal | length > 0
+    - forward_proxy_client_restart_execution_services_internal | length > 0
 
 - name: Clear completed Ubuntu proxy-client activation work
   ansible.builtin.set_fact:
@@ -265,7 +296,9 @@
       }}
     forward_proxy_client_restart_pending_services_internal: >-
       {{
-        []
+        forward_proxy_client_restart_pending_services_internal
+        | difference(forward_proxy_client_restart_execution_services_internal)
+        | list
         if (
           forward_proxy_client_manage_systemd | bool
           and forward_proxy_client_restart_now | bool
@@ -276,7 +309,7 @@
       {{
         (
           forward_proxy_client_restart_activated_services_internal
-          + forward_proxy_client_restart_pending_services_internal
+          + forward_proxy_client_restart_execution_services_internal
         ) | unique | list
         if (
           forward_proxy_client_manage_systemd | bool
@@ -284,6 +317,10 @@
         )
         else forward_proxy_client_restart_activated_services_internal
       }}
+  when: not ansible_check_mode
+
+- name: Revalidate the complete parent chain before recording completed activation
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
   when: not ansible_check_mode
 
 - name: Record completed forward proxy client activation state
@@ -312,4 +349,6 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0600"
+    follow: false
+    unsafe_writes: false
   when: not ansible_check_mode

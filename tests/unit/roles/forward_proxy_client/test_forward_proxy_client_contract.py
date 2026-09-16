@@ -164,7 +164,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )
         self.assertIn("forward_proxy_client_systemd_environment_result.changed", tasks)
         self.assertIn(
-            'loop: "{{ forward_proxy_client_restart_pending_services_internal }}"',
+            'loop: "{{ forward_proxy_client_restart_execution_services_internal }}"',
             tasks,
         )
         self.assertIn("forward_proxy_client_restart_now | bool", tasks)
@@ -176,6 +176,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             tasks,
         )
         self.assertIn("| difference(", tasks)
+        self.assertIn("| intersect(forward_proxy_client_restart_services)", tasks)
 
     def test_owned_updates_follow_out_of_band_tamper_check(self) -> None:
         tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "transition.yml").read_text())
@@ -419,11 +420,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             "Record recoverable pending proxy-client file transition", enabled
         )
         self.assertIn(
-            "Reinspect the pending marker parent before recording a transition",
-            enabled,
-        )
-        self.assertIn(
-            "Require the pending marker parent before recording a transition",
+            "Revalidate the complete parent chain before recording a transition",
             enabled,
         )
         self.assertIn("'write_state': 'pending'", enabled)
@@ -516,6 +513,12 @@ class ForwardProxyClientContractTests(unittest.TestCase):
                         "forward_proxy_client_restart_pending_services_internal", []
                     )
                 ),
+                "forward_proxy_client_restart_execution_services_internal | length > 0": bool(
+                    context.get(
+                        "forward_proxy_client_restart_execution_services_internal",
+                        [],
+                    )
+                ),
             }
             return all(condition_values[condition] for condition in task["when"])
 
@@ -536,6 +539,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
                         "forward_proxy_client_manage_systemd": manage_systemd,
                         "forward_proxy_client_restart_now": restart_now,
                         "forward_proxy_client_restart_pending_services_internal": (
+                            ["podman.service"] if changed else []
+                        ),
+                        "forward_proxy_client_restart_execution_services_internal": (
                             ["podman.service"] if changed else []
                         ),
                     }
@@ -560,12 +566,64 @@ class ForwardProxyClientContractTests(unittest.TestCase):
                 forward_proxy_client_restart_pending_services_internal=[
                     "podman.service"
                 ],
+                forward_proxy_client_restart_execution_services_internal=[
+                    "podman.service"
+                ],
             )
         )
         self.assertEqual(
             restart_task["ansible.builtin.systemd"]["state"],
             "restarted",
         )
+
+    def test_restart_generation_preserves_omitted_services_until_reselected(
+        self,
+    ) -> None:
+        enabled = (ROLE_ROOT / "tasks" / "enabled.yml").read_text()
+        self.assertIn(
+            "forward_proxy_client_previous_state_manifest.restart_activated_services\n"
+            "                | default([])\n"
+            "              ) + forward_proxy_client_restart_services",
+            enabled,
+        )
+        self.assertIn("| intersect(forward_proxy_client_restart_services)", enabled)
+        self.assertIn(
+            "| difference(forward_proxy_client_restart_execution_services_internal)",
+            enabled,
+        )
+
+    def test_every_adapter_mutation_revalidates_its_parent_chain(self) -> None:
+        enabled = yaml.safe_load((ROLE_ROOT / "tasks" / "enabled.yml").read_text())
+        transition = yaml.safe_load(
+            (ROLE_ROOT / "tasks" / "transition.yml").read_text()
+        )
+        helper = (ROLE_ROOT / "tasks" / "revalidate_mutation_parents.yml").read_text()
+        removal = (ROLE_ROOT / "tasks" / "remove_managed_path.yml").read_text()
+        self.assertIn("forward_proxy_client_trusted_parent_paths", helper)
+        self.assertIn("follow: false", helper)
+        self.assertGreaterEqual(
+            sum(
+                task.get("ansible.builtin.include_tasks")
+                == "revalidate_mutation_parents.yml"
+                for task in enabled
+            ),
+            8,
+        )
+        self.assertIn("revalidate_mutation_parents.yml", removal)
+        self.assertGreaterEqual(
+            sum(
+                task.get("ansible.builtin.include_tasks") == "remove_managed_path.yml"
+                for task in transition
+            ),
+            3,
+        )
+        for task in enabled:
+            module = task.get("ansible.builtin.copy") or task.get(
+                "ansible.builtin.template"
+            )
+            if module:
+                self.assertFalse(module["follow"])
+                self.assertFalse(module["unsafe_writes"])
 
     def test_existing_directories_keep_tighter_permissions(self) -> None:
         main = (ROLE_ROOT / "tasks" / "transition.yml").read_text()

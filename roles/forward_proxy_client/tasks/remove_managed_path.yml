@@ -1,0 +1,8 @@
+---
+- name: Revalidate the complete proxy-client parent chain before removal
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
+
+- name: Remove the exact validated proxy-client path
+  ansible.builtin.file:
+    path: "{{ forward_proxy_client_remove_path }}"
+    state: absent

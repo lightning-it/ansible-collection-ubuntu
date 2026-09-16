@@ -19,8 +19,9 @@ See `roles/forward_proxy_client/defaults/main.yml`.
 Important inputs include:
 
 - `forward_proxy_client_enabled`: render or safely remove Ubuntu client state.
-- `forward_proxy_client_proxy_port`: local host proxy port. The loopback and
-  `host.containers.internal` URLs are derived internally and cannot be overridden.
+- `forward_proxy_client_proxy_port`: local host proxy port. Loopback URLs and
+  container URLs derived from the firewall-pinned destination IPv4 address
+  cannot be overridden.
 - `forward_proxy_client_no_proxy`: exact local/internal bypass tokens.
 - `forward_proxy_client_approved_no_proxy_domains`: reviewed internal DNS
   names/suffixes that may appear in `NO_PROXY`; public destinations remain forbidden.

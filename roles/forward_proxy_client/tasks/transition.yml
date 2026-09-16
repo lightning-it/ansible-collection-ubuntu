@@ -514,6 +514,13 @@
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists
 
+- name: Revalidate the complete parent chain before recording pending disable work
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
+  when:
+    - not ansible_check_mode
+    - not forward_proxy_client_enabled | bool
+    - forward_proxy_client_state_marker.stat.exists
+
 - name: Persist pending proxy-client disable activation work
   ansible.builtin.copy:
     content: >-
@@ -547,9 +554,9 @@
     - forward_proxy_client_state_marker.stat.exists
 
 - name: Remove forward proxy client configuration when disabled
-  ansible.builtin.file:
-    path: "{{ item.item.0.0 }}"
-    state: absent
+  ansible.builtin.include_tasks: remove_managed_path.yml
+  vars:
+    forward_proxy_client_remove_path: "{{ item.item.0.0 }}"
   loop: "{{ forward_proxy_client_previous_asset_stats.results | default([]) }}"
   when:
     - not forward_proxy_client_enabled | bool
@@ -557,9 +564,9 @@
     - item.stat.exists
 
 - name: Remove exact pending-only proxy-client files when disabled
-  ansible.builtin.file:
-    path: "{{ item.item }}"
-    state: absent
+  ansible.builtin.include_tasks: remove_managed_path.yml
+  vars:
+    forward_proxy_client_remove_path: "{{ item.item }}"
   loop: "{{ forward_proxy_client_new_target_stats.results | default([]) }}"
   when:
     - not forward_proxy_client_enabled | bool
@@ -591,9 +598,9 @@
     - forward_proxy_client_restart_now | bool
 
 - name: Remove the forward proxy client managed-state marker when disabled
-  ansible.builtin.file:
-    path: "{{ forward_proxy_client_state_marker_path }}"
-    state: absent
+  ansible.builtin.include_tasks: remove_managed_path.yml
+  vars:
+    forward_proxy_client_remove_path: "{{ forward_proxy_client_state_marker_path }}"
   when:
     - not forward_proxy_client_enabled | bool
     - forward_proxy_client_state_marker.stat.exists
