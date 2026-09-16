@@ -146,8 +146,12 @@
 - name: Bind every internal proxy-client value to its canonical derivation
   ansible.builtin.assert:
     that:
-      - forward_proxy_client_proxy_port_internal == (forward_proxy_client_proxy_port | int)
-      - forward_proxy_client_upstream_port_internal == (forward_proxy_client_upstream_port | int)
+      - >-
+        forward_proxy_client_proxy_port_internal | int
+        == (forward_proxy_client_proxy_port | int)
+      - >-
+        forward_proxy_client_upstream_port_internal | int
+        == (forward_proxy_client_upstream_port | int)
       - >-
         forward_proxy_client_proxy_url_internal
         == 'http://127.0.0.1:' ~ (forward_proxy_client_proxy_port | int | string)

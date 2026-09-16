@@ -5,6 +5,14 @@
     follow: false
   register: forward_proxy_client_state_marker
 
+- name: Reject a dangling forward proxy client state marker
+  ansible.builtin.assert:
+    that:
+      - not forward_proxy_client_state_marker.stat.islnk | default(false)
+    fail_msg: >-
+      The proxy-client state marker path is a symlink. Stop before treating the
+      transition as either owned or unowned state.
+
 - name: Validate the forward proxy client managed-state marker file type
   ansible.builtin.assert:
     that:

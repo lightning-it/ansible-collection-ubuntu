@@ -59,7 +59,10 @@
   ansible.builtin.assert:
     that:
       - >-
-        not forward_proxy_client_directory_before.stat.exists
+        (
+          not forward_proxy_client_directory_before.stat.exists
+          and not forward_proxy_client_directory_before.stat.islnk | default(false)
+        )
         or (
           forward_proxy_client_directory_before.stat.isdir | default(false)
           and not forward_proxy_client_directory_before.stat.islnk | default(false)
@@ -100,7 +103,9 @@
     owner: "{{ forward_proxy_client_file_owner }}"
     group: "{{ forward_proxy_client_file_group }}"
     mode: "0755"
-  when: not forward_proxy_client_directory_before.stat.exists
+  when:
+    - not forward_proxy_client_directory_before.stat.exists
+    - not forward_proxy_client_directory_before.stat.islnk | default(false)
 
 - name: Carry the planned proxy-client directory through check mode
   ansible.builtin.set_fact:
@@ -112,6 +117,7 @@
   when:
     - ansible_check_mode
     - not forward_proxy_client_directory_before.stat.exists
+    - not forward_proxy_client_directory_before.stat.islnk | default(false)
 
 - name: Reinspect the required proxy-client directory before rendering
   ansible.builtin.stat:

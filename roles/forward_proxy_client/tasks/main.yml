@@ -27,7 +27,7 @@
       - --mode=0700
       - "{{ forward_proxy_client_lock_path }}"
   register: forward_proxy_client_lock_acquisition
-  changed_when: forward_proxy_client_lock_acquisition.rc == 0
+  changed_when: false
   failed_when: false
   retries: "{{ forward_proxy_client_lock_timeout }}"
   delay: 1
@@ -52,6 +52,7 @@
       ansible.builtin.file:
         path: "{{ forward_proxy_client_lock_path }}"
         state: absent
+      changed_when: false
       when:
         - not ansible_check_mode
         - forward_proxy_client_lock_acquisition.rc | default(1) == 0

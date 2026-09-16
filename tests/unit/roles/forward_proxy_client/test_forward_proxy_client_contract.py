@@ -52,6 +52,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertEqual(
             acquire["until"], "forward_proxy_client_lock_acquisition.rc == 0"
         )
+        self.assertIs(acquire["changed_when"], False)
         self.assertEqual(acquire["delay"], 1)
         self.assertEqual(acquire["retries"], "{{ forward_proxy_client_lock_timeout }}")
         lock_assertion = by_name["Require the exclusive proxy-client transition lock"]
@@ -71,6 +72,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             "{{ forward_proxy_client_lock_path }}",
         )
         self.assertEqual(release["ansible.builtin.file"]["state"], "absent")
+        self.assertIs(release["changed_when"], False)
         self.assertIn(
             "forward_proxy_client_lock_acquisition.rc | default(1) == 0",
             release["when"],
@@ -125,7 +127,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_upstream_port is integer", assertions)
         self.assertIn("forward_proxy_client_upstream_port is string", assertions)
         self.assertIn(
-            'forward_proxy_client_upstream_port_internal: '
+            "forward_proxy_client_upstream_port_internal: "
             '"{{ forward_proxy_client_upstream_port | int }}"',
             variables,
         )
@@ -212,9 +214,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
             "not forward_proxy_client_container_firewall_access.destination_ipv4.startswith('127.')",
             assertions,
         )
-        self.assertIn(
-            "in host_firewall_observed_ipv4_addresses", firewall_assertions
-        )
+        self.assertIn("in host_firewall_observed_ipv4_addresses", firewall_assertions)
         self.assertIn("192\\.168\\.", assertions)
         self.assertIn("192\\.168\\.", firewall_assertions)
         self.assertIn("172\\.(?:1[6-9]|2[0-9]|3[01])\\.", firewall_assertions)
@@ -368,9 +368,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn("forward_proxy_client_proxy_url_internal", templates)
 
         tasks = yaml.safe_load((ROLE_ROOT / "tasks" / "assert.yml").read_text())
-        canonical = {
-            task["name"]: task for task in tasks
-        }["Bind every internal proxy-client value to its canonical derivation"]
+        canonical = {task["name"]: task for task in tasks}[
+            "Bind every internal proxy-client value to its canonical derivation"
+        ]
         canonical_checks = canonical["ansible.builtin.assert"]["that"]
         self.assertTrue(
             any(
@@ -584,9 +584,7 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         self.assertIn(
             "Reinspect the required proxy-client directory before rendering", ensure
         )
-        self.assertIn(
-            "when: not forward_proxy_client_directory_before.stat.exists", ensure
-        )
+        self.assertIn("- not forward_proxy_client_directory_before.stat.exists", ensure)
         self.assertNotIn("Create forward proxy client managed directories", enabled)
 
     def test_previous_container_paths_retain_a_validated_cleanup_chain(self) -> None:
@@ -669,9 +667,17 @@ class ForwardProxyClientContractTests(unittest.TestCase):
 
     def test_dangling_symlinks_never_satisfy_absent_target_branches(self) -> None:
         transition = (ROLE_ROOT / "tasks" / "transition.yml").read_text()
+        ensure = (ROLE_ROOT / "tasks" / "ensure_directory.yml").read_text()
         self.assertGreaterEqual(
             transition.count("not item.stat.islnk | default(false)"),
             5,
+        )
+        self.assertIn("Reject a dangling forward proxy client state marker", transition)
+        self.assertGreaterEqual(
+            ensure.count(
+                "not forward_proxy_client_directory_before.stat.islnk | default(false)"
+            ),
+            4,
         )
 
     def test_root_documentation_and_molecule_cover_public_adapter_modes(self) -> None:
@@ -702,9 +708,9 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         defaults = (
             REPOSITORY_ROOT / "roles" / "host_firewall" / "defaults" / "main.yml"
         ).read_text()
-        legacy_material = defaults.split(
-            "host_firewall_policy_material:", maxsplit=1
-        )[1].split("host_firewall_policy_material_effective:", maxsplit=1)[0]
+        legacy_material = defaults.split("host_firewall_policy_material:", maxsplit=1)[
+            1
+        ].split("host_firewall_policy_material_effective:", maxsplit=1)[0]
         effective_material = defaults.split(
             "host_firewall_policy_material_effective:", maxsplit=1
         )[1].split("host_firewall_policy_fingerprint:", maxsplit=1)[0]
