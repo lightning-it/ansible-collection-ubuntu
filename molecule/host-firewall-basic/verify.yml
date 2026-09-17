@@ -25,6 +25,8 @@
   hosts: host-firewall.example.test
   become: false
   gather_facts: false
+  environment:
+    PATH: "{{ host_firewall_test_directory }}:/usr/bin:/bin"
   vars_files:
     - vars/egress.yml
   vars:
@@ -39,6 +41,7 @@
     host_firewall_observed_ipv4_addresses:
       - 192.0.2.10
       - 10.0.30.10
+      - 10.88.0.1
     host_firewall_observed_ipv6_addresses: []
     host_firewall_platform_name: Ubuntu
     host_firewall_platform_version: "24.04"
@@ -144,6 +147,103 @@
           - "'ip daddr { 0.0.0.0/0 } udp dport 123' in host_firewall_candidate_content"
           - "'ip daddr { 10.10.30.24/32 } tcp dport 3100' in host_firewall_candidate_content"
           - "'ip daddr { 0.0.0.0/0 } tcp dport 443' in host_firewall_candidate_content"
+
+    - name: Build the hardened proxy egress test policy
+      ansible.builtin.set_fact:
+        host_firewall_proxy_test_egress_policy: >-
+          {{
+            host_firewall_egress_policy
+            | combine(
+                {
+                  'status': 'approved',
+                  'stance': 'deny-by-default',
+                  'functions': host_firewall_egress_policy.functions
+                    | combine(
+                        {
+                          'bootstrap_https': host_firewall_egress_policy.functions.bootstrap_https
+                            | combine(
+                                {
+                                  'enabled': false,
+                                  'status': 'disabled-staged-transfer',
+                                  'destinations_ipv4': []
+                                }
+                              )
+                        }
+                      )
+                }
+              )
+          }}
+
+    - name: Render the direct proxy and container-access candidate
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: check
+        host_firewall_mode: hardened
+        host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+        host_firewall_forward_proxy_egress:
+          enabled: true
+          status: approved
+          mode: direct
+          owner_username: proxy
+          interface: enp1s0
+          destinations_ipv4: [0.0.0.0/0]
+          ports: [80, 443]
+          residual: "Owner-bound direct test policy."
+        host_firewall_forward_proxy_access:
+          enabled: true
+          port: 3128
+          interfaces: [podman0]
+          sources_ipv4: [10.88.0.0/16]
+          destination_ipv4: 10.88.0.1
+
+    - name: Retain the rendered direct proxy candidate
+      ansible.builtin.set_fact:
+        host_firewall_direct_proxy_candidate: "{{ host_firewall_candidate_content }}"
+
+    - name: Render the chained upstream proxy candidate
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: check
+        host_firewall_mode: hardened
+        host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+        host_firewall_forward_proxy_egress:
+          enabled: true
+          status: approved
+          mode: upstream
+          owner_username: proxy
+          interface: enp1s0.4091
+          destinations_ipv4: [10.0.30.25/32]
+          ports: [8080]
+          residual: "Owner-bound customer upstream test policy."
+        host_firewall_forward_proxy_access:
+          enabled: false
+          port: 3128
+          interfaces: []
+          sources_ipv4: []
+          destination_ipv4: ""
+
+    - name: Validate rendered direct and upstream proxy boundaries
+      ansible.builtin.assert:
+        that:
+          - >-
+            'meta skuid ' ~ (ansible_facts.getent_passwd.proxy[1] | string)
+            ~ ' oifname "enp1s0" ip daddr { 0.0.0.0/0 } tcp dport { 80, 443 }'
+            in host_firewall_direct_proxy_candidate
+          - "'set forward_proxy_clients_v4' in host_firewall_direct_proxy_candidate"
+          - >-
+            'iifname { "podman0" } ip saddr @forward_proxy_clients_v4 ip daddr 10.88.0.1 tcp dport 3128'
+            in host_firewall_direct_proxy_candidate
+          - >-
+            'oifname "enp1s0" ip daddr { 0.0.0.0/0 } tcp dport 443 ct state new accept'
+            not in host_firewall_direct_proxy_candidate
+          - >-
+            'meta skuid ' ~ (ansible_facts.getent_passwd.proxy[1] | string)
+            ~ ' oifname "enp1s0.4091" ip daddr { 10.0.30.25/32 } tcp dport { 8080 }'
+            in host_firewall_candidate_content
+          - "'set forward_proxy_clients_v4' not in host_firewall_candidate_content"
+        quiet: true
 
     - name: Confirm every IPv6 source fails the end-to-end IPv4-only boundary
       block:

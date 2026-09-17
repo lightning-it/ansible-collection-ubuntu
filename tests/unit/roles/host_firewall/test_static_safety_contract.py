@@ -132,10 +132,44 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
         self.assertIn("chain output", policy)
         self.assertIn("policy drop", policy)
         self.assertIn("host_firewall_egress_policy.functions", policy)
-        for function in ("dns_udp", "dns_tcp", "ntp", "atlas_loki", "bootstrap_https", "https_proxy"):
+        for function in (
+            "dns_udp",
+            "dns_tcp",
+            "ntp",
+            "atlas_loki",
+            "bootstrap_https",
+            "https_proxy",
+        ):
             self.assertIn(f"  {function}:", defaults)
         self.assertIn("temporary, never-confirmable public exception", egress_assert)
         self.assertIn("CIS baseline requires IPv6", egress_assert)
+        self.assertIn(
+            "meta skuid {{ ansible_facts.getent_passwd["
+            "host_firewall_forward_proxy_egress.owner_username][1] | int }}",
+            policy,
+        )
+        self.assertIn("not host_firewall_egress_policy.functions.bootstrap_https.enabled", egress_assert)
+        self.assertIn("not host_firewall_egress_policy.functions.https_proxy.enabled", egress_assert)
+        self.assertNotIn("  bootstrap_http:", defaults)
+
+    def test_forward_proxy_egress_validates_types_and_local_account_before_render(self) -> None:
+        egress = (ROLE_ROOT / "tasks" / "egress_assert.yml").read_text()
+        main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        self.assertIn("host_firewall_forward_proxy_egress.interface is string", egress)
+        self.assertIn("host_firewall_forward_proxy_egress.owner_username is string", egress)
+        self.assertIn("host_firewall_forward_proxy_access.destination_ipv4 is string", egress)
+        self.assertIn("ansible.builtin.getent:", egress)
+        self.assertIn("database: passwd", egress)
+        self.assertIn("in ansible_facts.getent_passwd", egress)
+        self.assertIn(
+            "ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]",
+            egress,
+        )
+        self.assertIn("is match('^[0-9]+\\Z')", egress)
+        self.assertLess(
+            main.index("import_tasks: egress_assert.yml"),
+            main.index("import_tasks: render.yml"),
+        )
 
     def test_closed_metadata_binds_action_mode_readback_policy_and_egress(self) -> None:
         for field in (

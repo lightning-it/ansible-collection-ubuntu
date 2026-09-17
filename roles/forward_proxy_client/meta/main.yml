@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  role_name: forward_proxy_client
+  namespace: lit
+  author: Lightning IT
+  company: Lightning IT
+  description: Configure Ubuntu host and container clients for the LIT forward proxy.
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - proxy
+    - security
+    - ubuntu
+    - apt
+
+dependencies: []

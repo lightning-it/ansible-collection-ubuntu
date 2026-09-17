@@ -70,6 +70,13 @@ New container forwarding remains denied.
 
 ## Variables
 
+`host_firewall_forward_proxy_egress` optionally binds all hardened public
+HTTP(S) egress to one local service identity (`meta skuid`). Direct mode permits
+that identity on TCP 80/443; upstream mode permits one exact parent proxy and
+port. `host_firewall_forward_proxy_access` separately admits explicit container
+networks to the host-local proxy. Application processes receive no direct
+Internet rule.
+
 See `defaults/main.yml` for the complete interface. Important inputs are:
 
 - `host_firewall_action`: `plan`, `preview`, `check`, `apply`, `confirm`, `rollback`, or `readback`.

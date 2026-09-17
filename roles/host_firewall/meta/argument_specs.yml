@@ -130,6 +130,10 @@ argument_specs:
         type: str
       host_firewall_egress_policy:
         type: dict
+      host_firewall_forward_proxy_egress:
+        type: dict
+      host_firewall_forward_proxy_access:
+        type: dict
       host_firewall_cis_ipv6_required:
         type: bool
       host_firewall_provider_ipv6_filter_enabled:

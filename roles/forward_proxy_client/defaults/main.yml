@@ -1,0 +1,63 @@
+---
+forward_proxy_client_enabled: false
+forward_proxy_client_manage_systemd: true
+forward_proxy_client_restart_services: []
+forward_proxy_client_restart_now: false
+forward_proxy_client_file_owner: root
+forward_proxy_client_file_group: root
+forward_proxy_client_systemd_scope: system
+forward_proxy_client_lock_path: /run/lock/lit-ubuntu-forward-proxy-client.lock
+forward_proxy_client_lock_timeout: 30
+
+# Map the distribution-neutral service interface without creating a collection
+# dependency. Consumer automation invokes lit.supplementary.forward_proxy and
+# this operating-system adapter separately.
+forward_proxy_client_proxy_port: "{{ forward_proxy_port | default(3128) }}"
+forward_proxy_client_listen_addresses: "{{ forward_proxy_listen_addresses | default(['127.0.0.1']) }}"
+forward_proxy_client_allowed_clients: "{{ forward_proxy_allowed_clients | default(['127.0.0.1/32']) }}"
+forward_proxy_client_container_enabled: false
+forward_proxy_client_upstream_enabled: "{{ forward_proxy_upstream_enabled | default(false) }}"
+forward_proxy_client_upstream_ipv4: "{{ forward_proxy_upstream_ipv4 | default('') }}"
+forward_proxy_client_upstream_port: "{{ forward_proxy_upstream_port | default(3128) }}"
+
+forward_proxy_client_no_proxy:
+  - localhost
+  - 127.0.0.1
+  - ::1
+forward_proxy_client_approved_no_proxy_domains: []
+forward_proxy_client_internal_domain_suffixes: []
+forward_proxy_client_apt_direct_hosts:
+  - localhost
+  - 127.0.0.1
+
+# Foreign host-firewall inputs are mapped once into this role-owned interface.
+forward_proxy_client_firewall_egress: >-
+  {{ host_firewall_forward_proxy_egress | default({}) }}
+forward_proxy_client_container_firewall_access: >-
+  {{ host_firewall_forward_proxy_access | default({}) }}
+forward_proxy_client_container_firewall_interfaces: >-
+  {{ host_firewall_container_interfaces | default([]) }}
+
+forward_proxy_client_apt_config_path: /etc/apt/apt.conf.d/99-lit-forward-proxy
+forward_proxy_client_profile_path: /etc/profile.d/90-lit-forward-proxy.sh
+forward_proxy_client_environment_path: /etc/environment.d/90-lit-forward-proxy.conf
+forward_proxy_client_systemd_environment_path: /etc/systemd/system.conf.d/90-lit-forward-proxy.conf
+forward_proxy_client_containers_config_path: /etc/containers/containers.conf.d/90-lit-forward-proxy.conf
+forward_proxy_client_state_marker_path: /var/lib/lit-forward-proxy-client/managed.json
+forward_proxy_client_render_root: /tmp/wunder
+
+# Every parent between / and a managed target must be enumerated. The closed
+# chain is lstat-validated before the adapter writes as root.
+forward_proxy_client_trusted_parent_paths:
+  - /etc
+  - /etc/apt
+  - /etc/apt/apt.conf.d
+  - /etc/profile.d
+  - /etc/environment.d
+  - /etc/systemd
+  - /etc/systemd/system.conf.d
+  - /etc/containers
+  - /etc/containers/containers.conf.d
+  - /var
+  - /var/lib
+  - /var/lib/lit-forward-proxy-client

@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - >-
+    Add the lit.ubuntu.forward_proxy_client adapter for APT, host processes,
+    systemd services, and explicitly enabled Podman clients. Extend the
+    hardened nftables role with the matching proxy egress boundaries. The
+    portable Squid service is provided by lit.supplementary.forward_proxy.
