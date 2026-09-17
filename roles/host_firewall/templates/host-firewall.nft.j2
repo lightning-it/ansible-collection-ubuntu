@@ -127,7 +127,7 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
         meta nfproto ipv4 ct state { established, related } accept
         meta nfproto ipv4 ip protocol icmp accept
 {% if host_firewall_forward_proxy_egress.enabled %}
-        meta skuid {{ host_firewall_forward_proxy_egress.owner_username }} oifname "{{ host_firewall_forward_proxy_egress.interface }}" ip daddr { {{ host_firewall_forward_proxy_egress.destinations_ipv4 | join(', ') }} } tcp dport { {{ host_firewall_forward_proxy_egress.ports | join(', ') }} } ct state new accept
+        meta skuid {{ ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1] | int }} oifname "{{ host_firewall_forward_proxy_egress.interface }}" ip daddr { {{ host_firewall_forward_proxy_egress.destinations_ipv4 | join(', ') }} } tcp dport { {{ host_firewall_forward_proxy_egress.ports | join(', ') }} } ct state new accept
 {% endif %}
 {% for function in host_firewall_egress_policy.functions | dict2items %}
 {% if function.value.enabled and host_firewall_mode in function.value.modes %}

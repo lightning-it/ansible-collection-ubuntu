@@ -97,9 +97,15 @@
       - >-
         host_firewall_forward_proxy_egress.owner_username
         in ansible_facts.getent_passwd
+      - >-
+        ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]
+        is string
+      - >-
+        ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]
+        is match('^[0-9]+\Z')
     fail_msg: >-
-      The approved host-local forward proxy account does not exist. Create the
-      exact proxy runtime identity before rendering or applying nftables rules.
+      The approved host-local forward proxy account must exist with a numeric
+      UID before rendering or applying nftables rules.
   when: host_firewall_forward_proxy_egress.enabled | bool
 
 - name: Validate host-local forward proxy destination addresses

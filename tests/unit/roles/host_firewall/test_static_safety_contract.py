@@ -143,7 +143,11 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
             self.assertIn(f"  {function}:", defaults)
         self.assertIn("temporary, never-confirmable public exception", egress_assert)
         self.assertIn("CIS baseline requires IPv6", egress_assert)
-        self.assertIn("meta skuid {{ host_firewall_forward_proxy_egress.owner_username }}", policy)
+        self.assertIn(
+            "meta skuid {{ ansible_facts.getent_passwd["
+            "host_firewall_forward_proxy_egress.owner_username][1] | int }}",
+            policy,
+        )
         self.assertIn("not host_firewall_egress_policy.functions.bootstrap_https.enabled", egress_assert)
         self.assertIn("not host_firewall_egress_policy.functions.https_proxy.enabled", egress_assert)
         self.assertNotIn("  bootstrap_http:", defaults)
@@ -157,6 +161,11 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
         self.assertIn("ansible.builtin.getent:", egress)
         self.assertIn("database: passwd", egress)
         self.assertIn("in ansible_facts.getent_passwd", egress)
+        self.assertIn(
+            "ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]",
+            egress,
+        )
+        self.assertIn("is match('^[0-9]+\\Z')", egress)
         self.assertLess(
             main.index("import_tasks: egress_assert.yml"),
             main.index("import_tasks: render.yml"),

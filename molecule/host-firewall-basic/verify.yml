@@ -25,6 +25,8 @@
   hosts: host-firewall.example.test
   become: false
   gather_facts: false
+  environment:
+    PATH: "{{ host_firewall_test_directory }}:/usr/bin:/bin"
   vars_files:
     - vars/egress.yml
   vars:
@@ -226,7 +228,8 @@
       ansible.builtin.assert:
         that:
           - >-
-            'meta skuid proxy oifname "enp1s0" ip daddr { 0.0.0.0/0 } tcp dport { 80, 443 }'
+            'meta skuid ' ~ (ansible_facts.getent_passwd.proxy[1] | string)
+            ~ ' oifname "enp1s0" ip daddr { 0.0.0.0/0 } tcp dport { 80, 443 }'
             in host_firewall_direct_proxy_candidate
           - "'set forward_proxy_clients_v4' in host_firewall_direct_proxy_candidate"
           - >-
@@ -236,7 +239,8 @@
             'oifname "enp1s0" ip daddr { 0.0.0.0/0 } tcp dport 443 ct state new accept'
             not in host_firewall_direct_proxy_candidate
           - >-
-            'meta skuid proxy oifname "enp1s0.4091" ip daddr { 10.0.30.25/32 } tcp dport { 8080 }'
+            'meta skuid ' ~ (ansible_facts.getent_passwd.proxy[1] | string)
+            ~ ' oifname "enp1s0.4091" ip daddr { 10.0.30.25/32 } tcp dport { 8080 }'
             in host_firewall_candidate_content
           - "'set forward_proxy_clients_v4' not in host_firewall_candidate_content"
         quiet: true

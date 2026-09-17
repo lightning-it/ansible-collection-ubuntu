@@ -99,7 +99,7 @@
             grep --quiet 'type filter hook forward priority 10; policy drop;' <<<"${policy}"
             grep --quiet 'type filter hook output priority 10; policy drop;' <<<"${policy}"
             if grep --quiet 'meta skuid' <<<"${policy}"; then
-              proxy_rule_pattern='meta skuid [a-z_][a-z0-9_-]* '
+              proxy_rule_pattern='meta skuid [0-9]+ '
               proxy_rule_pattern+='oifname "[A-Za-z0-9_.:-]{1,15}" ip daddr \{ '
               proxy_rule_pattern+='([0-9]{1,3}\.){3}[0-9]{1,3}/(0|32)'
               proxy_rule_pattern+='(, ([0-9]{1,3}\.){3}[0-9]{1,3}/(0|32))* \} '
@@ -122,6 +122,24 @@
 
           echo "Unsupported nft test invocation: $*" >&2
           exit 64
+
+    - name: Install deterministic passwd lookup command double
+      ansible.builtin.copy:
+        dest: "{{ host_firewall_test_directory }}/getent"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          if [[ "${1:-}" == passwd && "$#" -eq 1 ]]; then
+            /usr/bin/getent passwd
+            if ! /usr/bin/getent passwd proxy >/dev/null; then
+              echo 'proxy:x:987:987:Forward proxy test identity:/nonexistent:/usr/sbin/nologin'
+            fi
+            exit 0
+          fi
+
+          exec /usr/bin/getent "$@"
 
     - name: Install deterministic systemctl command double
       ansible.builtin.copy:
