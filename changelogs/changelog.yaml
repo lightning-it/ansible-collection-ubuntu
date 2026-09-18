@@ -86,62 +86,10 @@ releases:
       - shared-assets-sync.yml
     release_date: '2026-08-12'
   1.12.0:
+    changes: {}
     fragments:
       - shared-assets-sync.yml
     release_date: '2026-08-13'
-  1.13.0:
-    changes:
-      minor_changes:
-        - Add the lit.ubuntu.forward_proxy_client adapter for APT, host processes,
-          systemd services, and explicitly enabled Podman clients. Extend the hardened
-          nftables role with the matching proxy egress boundaries. The portable Squid
-          service is provided by lit.supplementary.forward_proxy.
-      security_fixes:
-        - Require the host-firewall forward-proxy socket owner to be Ubuntu's exact
-          reserved non-login proxy identity at UID/GID 13 before granting public HTTP(S)
-          egress.
-    fragments:
-      - li-139-forward-proxy.yml
-      - li139-forward-proxy-identity.yml
-      - shared-assets-sync-33596548890.yml
-      - shared-assets-sync-33598491846.yml
-      - shared-assets-sync-33649255083.yml
-      - shared-assets-sync-33662957940.yml
-      - shared-assets-sync-33679596741.yml
-      - shared-assets-sync-33702830342.yml
-      - shared-assets-sync-33719652134.yml
-      - shared-assets-sync-33724840858.yml
-      - shared-assets-sync-33731631342.yml
-      - shared-assets-sync-33751650589.yml
-      - shared-assets-sync-33753528239.yml
-      - shared-assets-sync-33758126535.yml
-      - shared-assets-sync-33769633098.yml
-      - shared-assets-sync-33787829675.yml
-      - shared-assets-sync-33795661465.yml
-      - shared-assets-sync-33802454599.yml
-      - shared-assets-sync-33865501767.yml
-      - shared-assets-sync-33893919183.yml
-      - shared-assets-sync-33940619104.yml
-      - shared-assets-sync-33942846336.yml
-      - shared-assets-sync-33944679429.yml
-      - shared-assets-sync-33946613199.yml
-      - shared-assets-sync-33952599308.yml
-      - shared-assets-sync-33959233524.yml
-      - shared-assets-sync-33962198683.yml
-      - shared-assets-sync-33963696264.yml
-      - shared-assets-sync-33965647026.yml
-      - shared-assets-sync-33968153620.yml
-      - shared-assets-sync-33979792609.yml
-      - shared-assets-sync-34542401941.yml
-      - shared-assets-sync-34682319453.yml
-      - shared-assets-sync-34691001501.yml
-      - shared-assets-sync-34691721320.yml
-      - shared-assets-sync-34765679169.yml
-      - shared-assets-sync-34778441533.yml
-      - shared-assets-sync-35166107371.yml
-      - shared-assets-sync-35172487960.yml
-      - shared-assets-sync.yml
-    release_date: '2026-09-18'
   1.2.0:
     changes:
       bugfixes:
