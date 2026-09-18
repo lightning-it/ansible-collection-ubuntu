@@ -78,7 +78,8 @@ networks to the host-local proxy. Application processes receive no direct
 Internet rule. When enabled, the socket owner must resolve to the reserved
 non-login Ubuntu `proxy` account at exact UID/GID 13. Trusted root must not run
 another service under that identity; the role rejects a renamed, login-capable,
-or numerically different account before rendering the candidate.
+numerically different, directory-backed-only, or duplicate-UID account before
+rendering the candidate. The identity must exist uniquely in `/etc/passwd`.
 
 See `defaults/main.yml` for the complete interface. Important inputs are:
 

@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 ROLE_ROOT = REPOSITORY_ROOT / "roles" / "host_firewall"
+MOLECULE_ROOT = REPOSITORY_ROOT / "molecule" / "host-firewall-basic"
 TRANSACTION = (ROLE_ROOT / "files" / "firewall_transaction.py").read_text()
 
 
@@ -160,13 +161,25 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
         self.assertIn("host_firewall_forward_proxy_access.destination_ipv4 is string", egress)
         self.assertIn("ansible.builtin.getent:", egress)
         self.assertIn("database: passwd", egress)
+        self.assertIn("service: files", egress)
         self.assertIn("in ansible_facts.getent_passwd", egress)
         self.assertIn(
             "ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]",
             egress,
         )
         self.assertIn("is match('^[0-9]+\\Z')", egress)
-        self.assertIn("== '13'", egress)
+        self.assertIn(
+            "ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]\n"
+            "        == '13'",
+            egress,
+        )
+        self.assertIn(
+            "ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][2]\n"
+            "        == '13'",
+            egress,
+        )
+        self.assertIn("selectattr('value.1', 'equalto', '13')", egress)
+        self.assertIn("== [host_firewall_forward_proxy_egress.owner_username]", egress)
         self.assertIn(
             "in ['/usr/sbin/nologin', '/sbin/nologin', '/bin/false']",
             egress,
@@ -175,6 +188,16 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
         self.assertLess(
             main.index("import_tasks: egress_assert.yml"),
             main.index("import_tasks: render.yml"),
+        )
+
+        negative = (MOLECULE_ROOT / "verify-forward-proxy-identity.tasks.yml.inc").read_text()
+        verify = (MOLECULE_ROOT / "verify.yml").read_text()
+        for case in ("wrong UID", "wrong GID", "login-capable shell", "duplicate UID"):
+            self.assertIn(f"name: {case}", verify)
+        self.assertIn("Attempt to render with the invalid local proxy identity", negative)
+        self.assertIn(
+            "Require the exact local forward proxy account before rendering nftables",
+            negative,
         )
 
     def test_closed_metadata_binds_action_mode_readback_policy_and_egress(self) -> None:

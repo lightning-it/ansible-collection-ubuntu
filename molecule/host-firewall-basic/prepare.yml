@@ -131,9 +131,11 @@
           #!/usr/bin/env bash
           set -euo pipefail
 
-          if [[ "${1:-}" == passwd && "$#" -eq 1 ]]; then
-            /usr/bin/getent passwd
-            if ! /usr/bin/getent passwd proxy >/dev/null; then
+          if [[ " $* " == *' passwd '* ]]; then
+            /usr/bin/getent -s files passwd | awk -F: '$1 != "proxy" && $3 != "13"'
+            if [[ -f /tmp/wunder/lit-host-firewall-molecule/passwd-fixture ]]; then
+              cat /tmp/wunder/lit-host-firewall-molecule/passwd-fixture
+            else
               echo 'proxy:x:13:13:Forward proxy test identity:/nonexistent:/usr/sbin/nologin'
             fi
             exit 0

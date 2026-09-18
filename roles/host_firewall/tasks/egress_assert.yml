@@ -89,6 +89,7 @@
 - name: Read the local account database for the forward proxy identity
   ansible.builtin.getent:
     database: passwd
+    service: files
   when: host_firewall_forward_proxy_egress.enabled | bool
 
 - name: Require the exact local forward proxy account before rendering nftables
@@ -113,12 +114,20 @@
         ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][2]
         == '13'
       - >-
+        ansible_facts.getent_passwd
+        | dict2items
+        | selectattr('value.1', 'equalto', '13')
+        | map(attribute='key')
+        | list
+        == [host_firewall_forward_proxy_egress.owner_username]
+      - >-
         ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][5]
         in ['/usr/sbin/nologin', '/sbin/nologin', '/bin/false']
     fail_msg: >-
       The approved host-local forward proxy account must be the reserved,
       non-login Ubuntu proxy identity with exact UID/GID 13 before rendering
-      or applying nftables rules. Root remains the trusted host boundary and
+      or applying nftables rules. The local files database must contain no
+      second account with UID 13. Root remains the trusted host boundary and
       must not launch another service under this reserved identity.
   when: host_firewall_forward_proxy_egress.enabled | bool
 
