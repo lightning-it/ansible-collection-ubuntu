@@ -4,6 +4,14 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.13.0
+=======
+
+Bugfixes
+--------
+
+- Restore the protected REP-60 exact-revision review trust root on main, bind workflow dispatches to the selected base commit, and fail closed on non-object GitHub pull-request JSON.
+
 v1.12.0
 =======
 

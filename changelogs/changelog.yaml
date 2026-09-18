@@ -86,10 +86,18 @@ releases:
       - shared-assets-sync.yml
     release_date: '2026-08-12'
   1.12.0:
-    changes: {}
     fragments:
       - shared-assets-sync.yml
     release_date: '2026-08-13'
+  1.13.0:
+    changes:
+      bugfixes:
+        - Restore the protected REP-60 exact-revision review trust root on main, bind
+          workflow dispatches to the selected base commit, and fail closed on non-object
+          GitHub pull-request JSON.
+    fragments:
+      - rep60-main-trust-root-bootstrap.yml
+    release_date: '2026-09-18'
   1.2.0:
     changes:
       bugfixes:
