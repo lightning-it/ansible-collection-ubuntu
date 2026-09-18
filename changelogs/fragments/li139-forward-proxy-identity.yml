@@ -1,0 +1,6 @@
+---
+security_fixes:
+  - >-
+    Require the host-firewall forward-proxy socket owner to be Ubuntu's exact
+    reserved non-login proxy identity at UID/GID 13 before granting public
+    HTTP(S) egress.

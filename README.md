@@ -84,7 +84,8 @@ Ubuntu-native package and repository management.
   Install and validate a minimal systemd socket-activated Tang binding service.
 - `lit.ubuntu.host_firewall`
   Apply a fail-closed, Podman-aware nftables policy through rollback-protected plan, check, apply, confirm, readback,
-  and rollback phases.
+  and rollback phases. Its optional forward-proxy egress boundary requires the unique host-local, non-login
+  `proxy` identity at exact UID/GID 13; directory-only or duplicate-UID identities fail before policy rendering.
 - `lit.ubuntu.forward_proxy_client`
   Configure Ubuntu APT, process, systemd, and optional Podman clients for the
   separately deployed portable forward proxy.

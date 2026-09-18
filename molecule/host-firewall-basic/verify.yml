@@ -245,6 +245,26 @@
           - "'set forward_proxy_clients_v4' not in host_firewall_candidate_content"
         quiet: true
 
+    - name: Prove invalid local proxy identities fail before rendering
+      ansible.builtin.include_tasks: verify-forward-proxy-identity.tasks.yml.inc
+      loop:
+        - name: wrong UID
+          passwd_records:
+            - "proxy:x:14:13:Wrong UID:/nonexistent:/usr/sbin/nologin"
+        - name: wrong GID
+          passwd_records:
+            - "proxy:x:13:14:Wrong GID:/nonexistent:/usr/sbin/nologin"
+        - name: login-capable shell
+          passwd_records:
+            - "proxy:x:13:13:Login shell:/nonexistent:/bin/bash"
+        - name: duplicate UID
+          passwd_records:
+            - "proxy:x:13:13:Forward proxy:/nonexistent:/usr/sbin/nologin"
+            - "proxy-shadow:x:13:13:Duplicate UID:/nonexistent:/usr/sbin/nologin"
+      loop_control:
+        loop_var: host_firewall_invalid_identity_case
+        label: "{{ host_firewall_invalid_identity_case.name }}"
+
     - name: Confirm every IPv6 source fails the end-to-end IPv4-only boundary
       block:
         - name: Attempt plan with one IPv6 management source
