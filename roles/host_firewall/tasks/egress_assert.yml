@@ -16,6 +16,228 @@
       Egress must use the complete v1 function contract. An omitted or additional function never creates an implicit
       network grant.
 
+- name: Validate the host-local forward proxy egress boundary
+  ansible.builtin.assert:
+    that:
+      - host_firewall_forward_proxy_egress is mapping
+      - >-
+        host_firewall_forward_proxy_egress.keys() | list | sort
+        == ['destinations_ipv4', 'enabled', 'interface', 'mode', 'owner_username', 'ports', 'residual', 'status']
+      - host_firewall_forward_proxy_egress.enabled is boolean
+      - host_firewall_forward_proxy_egress.status in ['approved', 'disabled']
+      - host_firewall_forward_proxy_egress.interface is string
+      - host_firewall_forward_proxy_egress.owner_username is string
+      - >-
+        not host_firewall_forward_proxy_egress.enabled
+        or host_firewall_forward_proxy_egress.status == 'approved'
+      - >-
+        not host_firewall_forward_proxy_egress.enabled
+        or host_firewall_forward_proxy_egress.interface
+            is match('^[A-Za-z0-9_.:-]{1,15}\Z')
+      - host_firewall_forward_proxy_egress.mode in ['direct', 'upstream']
+      - host_firewall_forward_proxy_egress.owner_username == 'proxy'
+      - host_firewall_forward_proxy_egress.destinations_ipv4 is sequence
+      - host_firewall_forward_proxy_egress.destinations_ipv4 is not string
+      - host_firewall_forward_proxy_egress.ports is sequence
+      - host_firewall_forward_proxy_egress.ports is not string
+      - host_firewall_forward_proxy_egress.residual is string
+      - >-
+        not host_firewall_forward_proxy_egress.enabled
+        or host_firewall_forward_proxy_egress.mode != 'direct'
+        or host_firewall_forward_proxy_egress.residual | trim | length >= 20
+      - >-
+        not host_firewall_forward_proxy_egress.enabled
+        or (
+          host_firewall_mode == 'hardened'
+          and host_firewall_forward_proxy_egress.status == 'approved'
+          and host_firewall_forward_proxy_egress.interface
+              in [host_firewall_public_interface, host_firewall_management_interface]
+          and host_firewall_forward_proxy_egress.destinations_ipv4 | length >= 1
+          and host_firewall_forward_proxy_egress.ports | length >= 1
+          and not host_firewall_egress_policy.functions.bootstrap_https.enabled
+          and not host_firewall_egress_policy.functions.https_proxy.enabled
+        )
+      - >-
+        host_firewall_forward_proxy_egress.enabled
+        or (
+          host_firewall_forward_proxy_egress.status == 'disabled'
+          and host_firewall_forward_proxy_egress.destinations_ipv4 | length == 0
+          and host_firewall_forward_proxy_egress.ports | length == 0
+        )
+      - >-
+        not host_firewall_forward_proxy_egress.enabled
+        or host_firewall_forward_proxy_egress.mode != 'direct'
+        or (
+          host_firewall_forward_proxy_egress.interface == host_firewall_public_interface
+          and host_firewall_forward_proxy_egress.destinations_ipv4 == ['0.0.0.0/0']
+          and host_firewall_forward_proxy_egress.ports == [80, 443]
+        )
+      - >-
+        not host_firewall_forward_proxy_egress.enabled
+        or host_firewall_forward_proxy_egress.mode != 'upstream'
+        or (
+          host_firewall_forward_proxy_egress.destinations_ipv4 | length == 1
+          and host_firewall_forward_proxy_egress.destinations_ipv4[0]
+              is match(host_firewall_ipv4_host_cidr_pattern)
+          and host_firewall_forward_proxy_egress.ports | length == 1
+        )
+    fail_msg: >-
+      Hardened Internet egress must belong only to the host-local proxy user.
+      Direct mode is TCP 80/443 on the public interface; upstream mode is one
+      exact proxy host and port. Legacy application HTTPS grants stay disabled.
+
+- name: Read the local account database for the forward proxy identity
+  ansible.builtin.getent:
+    database: passwd
+    service: files
+  when: host_firewall_forward_proxy_egress.enabled | bool
+
+- name: Require the exact local forward proxy account before rendering nftables
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_forward_proxy_egress.owner_username
+        in ansible_facts.getent_passwd
+      - >-
+        ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]
+        is string
+      - >-
+        ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]
+        is match('^[0-9]+\Z')
+      - >-
+        ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username]
+        | length >= 6
+      - >-
+        ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1]
+        == '13'
+      - >-
+        ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][2]
+        == '13'
+      - >-
+        ansible_facts.getent_passwd
+        | dict2items
+        | selectattr('value.1', 'equalto', '13')
+        | map(attribute='key')
+        | list
+        == [host_firewall_forward_proxy_egress.owner_username]
+      - >-
+        ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][5]
+        in ['/usr/sbin/nologin', '/sbin/nologin', '/bin/false']
+    fail_msg: >-
+      The approved host-local forward proxy account must be the reserved,
+      non-login Ubuntu proxy identity with exact UID/GID 13 before rendering
+      or applying nftables rules. The local files database must contain no
+      second account with UID 13. Root remains the trusted host boundary and
+      must not launch another service under this reserved identity.
+  when: host_firewall_forward_proxy_egress.enabled | bool
+
+- name: Validate host-local forward proxy destination addresses
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - >-
+        item is match(
+          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}/(?:0|32)\\Z'
+        )
+    fail_msg: "Forward proxy destinations must be one explicit IPv4 host or the reviewed direct /0."
+  loop: "{{ host_firewall_forward_proxy_egress.destinations_ipv4 }}"
+
+- name: Validate host-local forward proxy egress ports
+  ansible.builtin.assert:
+    that:
+      - item is integer
+      - item >= 1
+      - item <= 65535
+    fail_msg: "Forward proxy egress ports must be explicit TCP ports."
+  loop: "{{ host_firewall_forward_proxy_egress.ports }}"
+
+- name: Validate container access to the host-local forward proxy
+  ansible.builtin.assert:
+    that:
+      - host_firewall_forward_proxy_access is mapping
+      - >-
+        host_firewall_forward_proxy_access.keys() | list | sort
+        == ['destination_ipv4', 'enabled', 'interfaces', 'port', 'sources_ipv4']
+      - host_firewall_forward_proxy_access.enabled is boolean
+      - host_firewall_forward_proxy_access.port is integer
+      - host_firewall_forward_proxy_access.port >= 1024
+      - host_firewall_forward_proxy_access.port <= 65535
+      - host_firewall_forward_proxy_access.destination_ipv4 is string
+      - host_firewall_forward_proxy_access.interfaces is sequence
+      - host_firewall_forward_proxy_access.interfaces is not string
+      - >-
+        host_firewall_forward_proxy_access.interfaces | unique | list | length
+        == host_firewall_forward_proxy_access.interfaces | length
+      - host_firewall_forward_proxy_access.sources_ipv4 is sequence
+      - host_firewall_forward_proxy_access.sources_ipv4 is not string
+      - >-
+        host_firewall_forward_proxy_access.sources_ipv4 | unique | list | length
+        == host_firewall_forward_proxy_access.sources_ipv4 | length
+      - >-
+        not host_firewall_forward_proxy_access.enabled
+        or (
+          host_firewall_forward_proxy_egress.enabled
+          and host_firewall_forward_proxy_access.interfaces | length >= 1
+          and host_firewall_forward_proxy_access.interfaces
+              | difference(host_firewall_container_interfaces) | length == 0
+          and host_firewall_forward_proxy_access.sources_ipv4 | length >= 1
+          and host_firewall_forward_proxy_access.destination_ipv4
+              is match(host_firewall_ipv4_pattern)
+          and not host_firewall_forward_proxy_access.destination_ipv4.startswith('127.')
+          and host_firewall_forward_proxy_access.destination_ipv4
+              in host_firewall_observed_ipv4_addresses
+        )
+      - >-
+        host_firewall_forward_proxy_access.enabled
+        or (
+          host_firewall_forward_proxy_access.interfaces | length == 0
+          and host_firewall_forward_proxy_access.sources_ipv4 | length == 0
+          and host_firewall_forward_proxy_access.destination_ipv4 | length == 0
+        )
+    fail_msg: >-
+      Container proxy access requires the enabled local proxy, exact container
+      interfaces, source CIDRs, one host destination, and one non-privileged port.
+
+- name: Validate container forward proxy source networks
+  ansible.builtin.assert:
+    that:
+      - >-
+        item is match(
+          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}'
+          '/(?:[1-9]|[12][0-9]|3[0-2])\Z'
+        )
+      - >-
+        item is match(
+          '^10\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:[89]|[12][0-9]|3[0-2])\Z'
+        )
+        or item is match(
+          '^172\.(?:1[6-9]|2[0-9]|3[01])\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:1[2-9]|2[0-9]|3[0-2])\Z'
+        )
+        or item is match(
+          '^192\.168\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:1[6-9]|2[0-9]|3[0-2])\Z'
+        )
+      - >-
+        (
+          (item.split('/')[0].split('.')[0] | int) * 16777216
+          + (item.split('/')[0].split('.')[1] | int) * 65536
+          + (item.split('/')[0].split('.')[2] | int) * 256
+          + (item.split('/')[0].split('.')[3] | int)
+        ) % (2 ** (32 - (item.split('/')[1] | int))) == 0
+    fail_msg: >-
+      Container forward proxy sources must be exact RFC1918 IPv4 CIDRs;
+      globally routable networks are forbidden.
+  loop: "{{ host_firewall_forward_proxy_access.sources_ipv4 }}"
+
 - name: Validate every isolated egress function contract
   ansible.builtin.assert:
     that:
@@ -71,8 +293,8 @@
       - >-
         item.1
         is match(
-          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])'
-          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}/(?:0|32)\\Z'
+          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}/(?:0|32)\\Z'
         )
     fail_msg: "Egress IPv4 destinations must be canonical /32 hosts or an explicitly checked /0 exception."
   loop: >-
@@ -168,7 +390,7 @@
     _ntp: "{{ host_firewall_egress_policy.functions.ntp }}"
     _atlas: "{{ host_firewall_egress_policy.functions.atlas_loki }}"
 
-- name: Enforce mode-specific HTTPS egress boundary
+- name: Enforce mode-specific image bootstrap and proxy egress boundary
   ansible.builtin.assert:
     that:
       - >-
@@ -209,8 +431,9 @@
       - _proxy.destinations_ipv6 | length == 0
       - not _bootstrap_https.mtls_required | bool
     fail_msg: >-
-      Bootstrap HTTPS is a temporary, never-confirmable public exception. Hardened mode must disable it and either
-      use one approved management proxy /32 on TCP 3128 or use controller-pull/staged transfer with no HTTPS rule.
+      Bootstrap HTTPS is a temporary, never-confirmable public exception.
+      Hardened mode must disable it and either use one approved management
+      proxy /32 on TCP 3128 or use controller-pull/staged transfer.
   vars:
     _bootstrap_https: "{{ host_firewall_egress_policy.functions.bootstrap_https }}"
     _proxy: "{{ host_firewall_egress_policy.functions.https_proxy }}"

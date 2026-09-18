@@ -1,0 +1,42 @@
+---
+- name: Prepare a deterministic fresh proxy-client test tree
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Inspect the pre-provisioned proxy-client lock parent
+      ansible.builtin.stat:
+        path: /tmp/wunder
+        follow: false
+      register: forward_proxy_client_prepared_parent
+      check_mode: false
+
+    - name: Require a safe pre-provisioned proxy-client lock parent
+      ansible.builtin.assert:
+        that:
+          - forward_proxy_client_prepared_parent.stat.isdir | default(false)
+          - not forward_proxy_client_prepared_parent.stat.islnk | default(false)
+          - >-
+            forward_proxy_client_prepared_parent.stat.mode
+              is match('^0[0-7][0145][0145]\Z')
+            or (
+              forward_proxy_client_prepared_parent.stat.mode == '1777'
+              and forward_proxy_client_prepared_parent.stat.uid == 0
+              and forward_proxy_client_prepared_parent.stat.gid == 0
+            )
+        fail_msg: >-
+          Devtools must pre-provision /tmp/wunder as a safe non-symlink
+          directory before this rootless scenario runs.
+
+    - name: Remove only the scenario-owned proxy-client test root
+      ansible.builtin.file:
+        path: /tmp/wunder/lit-forward-proxy-client-molecule
+        state: absent
+      check_mode: false
+
+    - name: Remove only the scenario-owned stale proxy-client lock
+      ansible.builtin.file:
+        path: /tmp/wunder/lit-forward-proxy-client-molecule.lock
+        state: absent
+      check_mode: false

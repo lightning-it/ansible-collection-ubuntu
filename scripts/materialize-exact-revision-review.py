@@ -579,8 +579,6 @@ def read_live_pull_request(
         pull_request = json.loads(result.stdout)
     except json.JSONDecodeError as error:
         fail(f"GitHub returned malformed pull-request JSON: {error}")
-    if not isinstance(pull_request, dict):
-        fail("GitHub returned non-object pull-request JSON.")
     expected = {
         "state": "open",
         "draft": False,

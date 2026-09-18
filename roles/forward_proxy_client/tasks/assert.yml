@@ -1,0 +1,535 @@
+---
+- name: Validate Ubuntu forward proxy client interface
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_enabled is boolean
+      - forward_proxy_client_manage_systemd is boolean
+      - forward_proxy_client_restart_services is sequence
+      - forward_proxy_client_restart_services is not string
+      - >-
+        forward_proxy_client_restart_services | unique | list | length
+        == forward_proxy_client_restart_services | length
+      - forward_proxy_client_restart_now is boolean
+      - forward_proxy_client_file_owner is match('^(?:[a-z_][a-z0-9_-]{0,31}|0|[1-9][0-9]{0,9})\Z')
+      - forward_proxy_client_file_group is match('^(?:[a-z_][a-z0-9_-]{0,31}|0|[1-9][0-9]{0,9})\Z')
+      - forward_proxy_client_render_root is match('^/tmp/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\Z')
+      - >-
+        forward_proxy_client_file_owner not in ['root', '0']
+        or (
+          (
+            forward_proxy_client_all_managed_paths_internal
+            + [forward_proxy_client_state_marker_path]
+          )
+          | select('match', '^/tmp(?:/|$)') | list | length == 0
+        )
+      - >-
+        forward_proxy_client_file_owner in ['root', '0']
+        or (
+          not forward_proxy_client_manage_systemd
+          and (
+            (
+              forward_proxy_client_all_managed_paths_internal
+              + [forward_proxy_client_state_marker_path]
+            )
+            | reject(
+                'match',
+                '^' ~ (forward_proxy_client_render_root | regex_escape) ~ '(?:/|$)'
+              ) | list | length == 0
+          )
+        )
+      - >-
+        forward_proxy_client_file_group in ['root', '0']
+        or (
+          not forward_proxy_client_manage_systemd
+          and (
+            (
+              forward_proxy_client_all_managed_paths_internal
+              + [forward_proxy_client_state_marker_path]
+            )
+            | reject(
+                'match',
+                '^' ~ (forward_proxy_client_render_root | regex_escape) ~ '(?:/|$)'
+              ) | list | length == 0
+          )
+        )
+      - forward_proxy_client_systemd_scope == 'system'
+      - forward_proxy_client_lock_timeout is integer
+      - forward_proxy_client_lock_timeout >= 1
+      - forward_proxy_client_lock_timeout <= 300
+      - >-
+        forward_proxy_client_lock_path
+        is match('^/[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*\.lock\Z')
+      - >-
+        forward_proxy_client_lock_path.startswith('/run/lock/')
+        or forward_proxy_client_lock_path.startswith(forward_proxy_client_render_root.rstrip('/') ~ '/')
+      - >-
+        forward_proxy_client_file_owner not in ['root', '0']
+        or forward_proxy_client_lock_path.startswith('/run/lock/')
+      - forward_proxy_client_lock_path not in forward_proxy_client_all_managed_paths_internal
+      - forward_proxy_client_lock_path != forward_proxy_client_state_marker_path
+      - >-
+        forward_proxy_client_proxy_port is integer
+        or (
+          forward_proxy_client_proxy_port is string
+          and forward_proxy_client_proxy_port is match('^[1-9][0-9]{0,4}\Z')
+        )
+      - forward_proxy_client_proxy_port | int >= 1024
+      - forward_proxy_client_proxy_port | int <= 65535
+      - forward_proxy_client_listen_addresses is sequence
+      - forward_proxy_client_listen_addresses is not string
+      - forward_proxy_client_listen_addresses | length > 0
+      - >-
+        forward_proxy_client_listen_addresses | unique | list | length
+        == forward_proxy_client_listen_addresses | length
+      - "'127.0.0.1' in forward_proxy_client_listen_addresses"
+      - forward_proxy_client_allowed_clients is sequence
+      - forward_proxy_client_allowed_clients is not string
+      - "'127.0.0.1/32' in forward_proxy_client_allowed_clients"
+      - forward_proxy_client_container_enabled is boolean
+      - >-
+        not forward_proxy_client_container_enabled
+        or forward_proxy_client_listen_addresses | difference(['127.0.0.1']) | length > 0
+      - forward_proxy_client_no_proxy is sequence
+      - forward_proxy_client_no_proxy is not string
+      - forward_proxy_client_approved_no_proxy_domains is sequence
+      - forward_proxy_client_approved_no_proxy_domains is not string
+      - forward_proxy_client_internal_domain_suffixes is sequence
+      - forward_proxy_client_internal_domain_suffixes is not string
+      - >-
+        forward_proxy_client_internal_domain_suffixes | unique | list | length
+        == forward_proxy_client_internal_domain_suffixes | length
+      - >-
+        forward_proxy_client_approved_no_proxy_domains | length == 0
+        or forward_proxy_client_internal_domain_suffixes | length > 0
+      - >-
+        forward_proxy_client_approved_no_proxy_domains | unique | list | length
+        == forward_proxy_client_approved_no_proxy_domains | length
+      - forward_proxy_client_apt_direct_hosts is sequence
+      - forward_proxy_client_apt_direct_hosts is not string
+      - forward_proxy_client_trusted_parent_paths is sequence
+      - forward_proxy_client_trusted_parent_paths is not string
+      - forward_proxy_client_trusted_parent_paths | length > 0
+      - >-
+        forward_proxy_client_trusted_parent_paths | unique | list | length
+        == forward_proxy_client_trusted_parent_paths | length
+      - forward_proxy_client_upstream_enabled is boolean
+      - >-
+        forward_proxy_client_upstream_port is integer
+        or (
+          forward_proxy_client_upstream_port is string
+          and forward_proxy_client_upstream_port is match('^[1-9][0-9]{0,4}\Z')
+        )
+      - forward_proxy_client_upstream_port | int >= 1
+      - forward_proxy_client_upstream_port | int <= 65535
+      - >-
+        not forward_proxy_client_upstream_enabled
+        or (
+          forward_proxy_client_upstream_ipv4 is match(
+            '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+            '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}\Z'
+          )
+          and not forward_proxy_client_upstream_ipv4.startswith('127.')
+          and forward_proxy_client_upstream_ipv4.split('.')[0] | int >= 1
+          and forward_proxy_client_upstream_ipv4.split('.')[0] | int <= 223
+        )
+      - >-
+        forward_proxy_client_apt_direct_hosts | unique | list | length
+        == forward_proxy_client_apt_direct_hosts | length
+      - >-
+        forward_proxy_client_apt_direct_hosts | difference(forward_proxy_client_no_proxy) | length == 0
+      - >-
+        forward_proxy_client_apt_direct_hosts | difference(['localhost', '127.0.0.1']) | length == 0
+    fail_msg: >-
+      Ubuntu proxy-client inputs must point to the loopback service and define
+      exact host and optional container integration boundaries.
+
+- name: Bind every internal proxy-client value to its canonical derivation
+  ansible.builtin.assert:
+    that:
+      - >-
+        forward_proxy_client_proxy_port_internal | int
+        == (forward_proxy_client_proxy_port | int)
+      - >-
+        forward_proxy_client_upstream_port_internal | int
+        == (forward_proxy_client_upstream_port | int)
+      - >-
+        forward_proxy_client_proxy_url_internal
+        == 'http://127.0.0.1:' ~ (forward_proxy_client_proxy_port | int | string)
+      - >-
+        forward_proxy_client_container_url_internal
+        == (
+          'http://' ~ forward_proxy_client_container_firewall_access.destination_ipv4
+            ~ ':' ~ (forward_proxy_client_proxy_port | int | string)
+          if forward_proxy_client_container_enabled | bool
+          else forward_proxy_client_proxy_url_internal
+        )
+      - >-
+        forward_proxy_client_base_managed_paths_internal
+        == [
+          forward_proxy_client_apt_config_path,
+          forward_proxy_client_profile_path,
+          forward_proxy_client_environment_path,
+          forward_proxy_client_systemd_environment_path
+        ]
+      - >-
+        forward_proxy_client_base_managed_modes_internal
+        == ['0644', '0644', '0644', '0644']
+      - >-
+        forward_proxy_client_all_managed_paths_internal
+        == forward_proxy_client_base_managed_paths_internal
+          + [forward_proxy_client_containers_config_path]
+      - >-
+        forward_proxy_client_all_managed_modes_internal
+        == forward_proxy_client_base_managed_modes_internal + ['0644']
+      - >-
+        forward_proxy_client_all_managed_mode_map_internal
+        == dict(
+          forward_proxy_client_all_managed_paths_internal
+          | zip(forward_proxy_client_all_managed_modes_internal)
+        )
+      - >-
+        forward_proxy_client_internal_domain_suffix_pattern_internal
+        == (
+          forward_proxy_client_internal_domain_suffixes
+          | map('regex_replace', '^\\.', '')
+          | map('regex_escape')
+          | join('|')
+        )
+      - >-
+        forward_proxy_client_managed_paths_effective_internal
+        == (
+          forward_proxy_client_all_managed_paths_internal
+          if forward_proxy_client_container_enabled | bool
+          else forward_proxy_client_base_managed_paths_internal
+        )
+      - >-
+        forward_proxy_client_managed_modes_effective_internal
+        == (
+          forward_proxy_client_all_managed_modes_internal
+          if forward_proxy_client_container_enabled | bool
+          else forward_proxy_client_base_managed_modes_internal
+        )
+      - >-
+        forward_proxy_client_managed_directories_internal
+        == (
+          forward_proxy_client_managed_paths_effective_internal
+          + [forward_proxy_client_state_marker_path]
+        ) | map('dirname') | unique | list
+    fail_msg: >-
+      Internal proxy-client values are derived security boundaries and cannot
+      be overridden independently of their validated public inputs.
+
+- name: Validate Ubuntu forward proxy client listen addresses
+  ansible.builtin.assert:
+    that:
+      - >-
+        item is match(
+          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}\Z'
+        )
+      - >-
+        item == '127.0.0.1'
+        or item is match(
+          '^10\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\Z'
+        )
+        or item is match(
+          '^172\\.(?:1[6-9]|2[0-9]|3[01])\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\Z'
+        )
+        or item is match(
+          '^192\\.168\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\Z'
+        )
+    fail_msg: >-
+      Proxy listeners must be unique exact loopback or RFC1918 IPv4
+      addresses; arbitrary or public listener identities are forbidden.
+  loop: "{{ forward_proxy_client_listen_addresses }}"
+
+- name: Validate opted-in service restarts
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9_.@-]{1,128}\Z')
+    fail_msg: "Opted-in proxy client services must use exact systemd unit names."
+  loop: "{{ forward_proxy_client_restart_services }}"
+
+- name: Validate Ubuntu forward proxy client networks
+  ansible.builtin.assert:
+    that:
+      - >-
+        item is match(
+          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}'
+          '/(?:[1-9]|[12][0-9]|3[0-2])\Z'
+        )
+      - >-
+        item == '127.0.0.1/32'
+        or item is match(
+          '^10\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:[89]|[12][0-9]|3[0-2])\Z'
+        )
+        or item is match(
+          '^172\.(?:1[6-9]|2[0-9]|3[01])\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:1[2-9]|2[0-9]|3[0-2])\Z'
+        )
+        or item is match(
+          '^192\.168\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:1[6-9]|2[0-9]|3[0-2])\Z'
+        )
+      - >-
+        (
+          (item.split('/')[0].split('.')[0] | int) * 16777216
+          + (item.split('/')[0].split('.')[1] | int) * 65536
+          + (item.split('/')[0].split('.')[2] | int) * 256
+          + (item.split('/')[0].split('.')[3] | int)
+        ) % (2 ** (32 - (item.split('/')[1] | int))) == 0
+    fail_msg: >-
+      Proxy clients must be exact loopback or RFC1918 CIDRs; globally routable
+      client networks are forbidden.
+  loop: "{{ forward_proxy_client_allowed_clients }}"
+
+- name: Validate the Ubuntu proxy owner firewall boundary
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_firewall_egress is mapping
+      - forward_proxy_client_firewall_egress.get('enabled', false) is boolean
+      - forward_proxy_client_firewall_egress.get('enabled', false)
+      - forward_proxy_client_firewall_egress.get('status', '') == 'approved'
+      - forward_proxy_client_firewall_egress.get('owner_username', '') == 'proxy'
+      - >-
+        forward_proxy_client_firewall_egress.get('mode', '')
+        == ('upstream' if forward_proxy_client_upstream_enabled else 'direct')
+      - >-
+        forward_proxy_client_firewall_egress.get('ports', [])
+        == (
+          [forward_proxy_client_upstream_port_internal | int]
+          if forward_proxy_client_upstream_enabled
+          else [80, 443]
+        )
+      - >-
+        forward_proxy_client_firewall_egress.get('interface', '')
+        is match('^[A-Za-z0-9_.:-]{1,15}\Z')
+      - >-
+        forward_proxy_client_firewall_egress.get('destinations_ipv4', [])
+        == (
+          [forward_proxy_client_upstream_ipv4 ~ '/32']
+          if forward_proxy_client_upstream_enabled
+          else ['0.0.0.0/0']
+        )
+    fail_msg: >-
+      The Ubuntu host firewall must bind the exact proxy identity, direct or
+      upstream mode, and destination ports used by the Squid container.
+  when: forward_proxy_client_enabled | bool
+
+- name: Require the client-container firewall contract
+  ansible.builtin.assert:
+    that:
+      - forward_proxy_client_container_firewall_access is mapping
+      - forward_proxy_client_container_firewall_interfaces is sequence
+      - forward_proxy_client_container_firewall_interfaces is not string
+    fail_msg: >-
+      Container proxy propagation requires the live, inventory-pinned host
+      firewall access contract and container interface list.
+  when:
+    - forward_proxy_client_enabled | bool
+    - forward_proxy_client_container_enabled | bool
+
+- name: Validate the client-container firewall contract
+  ansible.builtin.assert:
+    that:
+      - >-
+        forward_proxy_client_container_firewall_access.keys() | list | sort
+        == ['destination_ipv4', 'enabled', 'interfaces', 'port', 'sources_ipv4']
+      - forward_proxy_client_container_firewall_access.enabled is boolean
+      - forward_proxy_client_container_firewall_access.enabled
+      - forward_proxy_client_container_firewall_access.port is integer
+      - >-
+        forward_proxy_client_container_firewall_access.port | int
+        == forward_proxy_client_proxy_port_internal | int
+      - >-
+        forward_proxy_client_container_firewall_access.destination_ipv4
+        in forward_proxy_client_listen_addresses
+      - >-
+        not forward_proxy_client_container_firewall_access.destination_ipv4.startswith('127.')
+      - forward_proxy_client_container_firewall_access.interfaces | length > 0
+      - >-
+        forward_proxy_client_container_firewall_access.interfaces
+        | unique | list | length
+        == forward_proxy_client_container_firewall_access.interfaces | length
+      - forward_proxy_client_container_firewall_access.sources_ipv4 | length > 0
+      - >-
+        forward_proxy_client_container_firewall_access.sources_ipv4
+        | unique | list | length
+        == forward_proxy_client_container_firewall_access.sources_ipv4 | length
+      - >-
+        forward_proxy_client_container_firewall_access.sources_ipv4
+        | intersect(['127.0.0.1/32']) | length == 0
+      - >-
+        forward_proxy_client_container_firewall_access.interfaces
+        | difference(forward_proxy_client_container_firewall_interfaces) | length == 0
+      - >-
+        forward_proxy_client_container_firewall_access.sources_ipv4
+        | difference(forward_proxy_client_allowed_clients) | length == 0
+    fail_msg: >-
+      Container propagation must use the exact listener, port, interfaces,
+      and source CIDRs admitted by the Ubuntu host firewall.
+  when:
+    - forward_proxy_client_enabled | bool
+    - forward_proxy_client_container_enabled | bool
+
+- name: Validate forward proxy client bypass entries
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item == (item | trim)
+      - item is match('^\S+\Z')
+      - item | length <= 253
+      - >-
+        item in ['localhost', '127.0.0.1', '127.0.0.1/32', '::1']
+        or item is match(
+          '^10\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:/(?:[89]|[12][0-9]|3[0-2]))?\Z'
+        )
+        or item is match(
+          '^172\\.(?:1[6-9]|2[0-9]|3[01])\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:/(?:1[2-9]|2[0-9]|3[0-2]))?\Z'
+        )
+        or item is match(
+          '^192\\.168\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:/(?:1[6-9]|2[0-9]|3[0-2]))?\Z'
+        )
+        or item in forward_proxy_client_approved_no_proxy_domains
+      - >-
+        '/' not in item
+        or (
+          (
+            (item.split('/')[0].split('.')[0] | int) * 16777216
+            + (item.split('/')[0].split('.')[1] | int) * 65536
+            + (item.split('/')[0].split('.')[2] | int) * 256
+            + (item.split('/')[0].split('.')[3] | int)
+          ) % (2 ** (32 - (item.split('/')[1] | int))) == 0
+        )
+      - "',' not in item"
+      - "'\n' not in item"
+      - "'\r' not in item"
+      - "'\"' not in item"
+    fail_msg: "NO_PROXY entries must be individual host, domain, address, or CIDR tokens."
+  loop: "{{ forward_proxy_client_no_proxy }}"
+
+- name: Validate approved internal proxy-client bypass domains
+  ansible.builtin.assert:
+    that:
+      - item | length <= 253
+      - >-
+        item is match(
+          '^\\.?(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+'
+          '[A-Za-z]{2,63}\Z'
+        )
+      - item not in ['localhost']
+      - >-
+        (item | regex_replace('^\\.', '')) is match(
+          '^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*'
+          '(?:' ~ forward_proxy_client_internal_domain_suffix_pattern_internal ~ ')\\Z'
+        )
+    fail_msg: >-
+      Approved NO_PROXY domains must be explicit reviewed internal DNS names
+      or suffixes; public bypasses require a separate policy decision.
+  loop: "{{ forward_proxy_client_approved_no_proxy_domains }}"
+
+- name: Validate internal proxy-client bypass suffixes
+  ansible.builtin.assert:
+    that:
+      - >-
+        item is match(
+          '^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+'
+          '[A-Za-z]{2,63}\\Z'
+        )
+    fail_msg: >-
+      Internal NO_PROXY suffixes must be explicit canonical DNS suffixes.
+  loop: "{{ forward_proxy_client_internal_domain_suffixes }}"
+
+- name: Validate every trusted proxy-client parent path
+  ansible.builtin.assert:
+    that:
+      - item is match('^/[A-Za-z0-9_./-]+\Z')
+      - item != '/'
+      - "'.' not in item.split('/')"
+      - "'..' not in item.split('/')"
+      - "'//' not in item"
+      - >-
+        item | dirname == '/'
+        or item | dirname in forward_proxy_client_trusted_parent_paths
+    fail_msg: >-
+      Trusted proxy-client parents must form a complete, explicit chain from
+      each managed directory to the filesystem root.
+  loop: "{{ forward_proxy_client_trusted_parent_paths }}"
+
+- name: Bind every managed proxy-client directory to the trusted parent chain
+  ansible.builtin.assert:
+    that:
+      - item in forward_proxy_client_trusted_parent_paths
+    fail_msg: >-
+      Every managed proxy-client target must have its immediate directory in
+      the complete trusted parent chain.
+  loop: "{{ forward_proxy_client_managed_directories_internal }}"
+
+- name: Validate exact apt direct hosts
+  ansible.builtin.assert:
+    that:
+      - item in ['localhost', '127.0.0.1']
+    fail_msg: >-
+      APT DIRECT exceptions are restricted to host-local loopback names and
+      addresses; site-local exceptions need their own reviewed firewall grant.
+  loop: "{{ forward_proxy_client_apt_direct_hosts }}"
+
+- name: Validate managed forward proxy client paths
+  ansible.builtin.assert:
+    that:
+      - item is match('^/[A-Za-z0-9_./-]+\Z')
+      - item != '/'
+      - "'.' not in item.split('/')"
+      - "'..' not in item.split('/')"
+      - "'//' not in item"
+    fail_msg: "Managed forward proxy client paths must be exact absolute paths."
+  loop:
+    - "{{ forward_proxy_client_apt_config_path }}"
+    - "{{ forward_proxy_client_profile_path }}"
+    - "{{ forward_proxy_client_environment_path }}"
+    - "{{ forward_proxy_client_systemd_environment_path }}"
+    - "{{ forward_proxy_client_containers_config_path }}"
+    - "{{ forward_proxy_client_state_marker_path }}"
+
+- name: Require distinct managed forward proxy client paths
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          forward_proxy_client_all_managed_paths_internal
+          + [forward_proxy_client_state_marker_path]
+        ) | unique | list | length
+        == (forward_proxy_client_all_managed_paths_internal | length) + 1
+    fail_msg: "Every Ubuntu proxy-client managed path must be distinct."
+
+- name: Keep the proxy-client lock outside every managed path boundary
+  ansible.builtin.assert:
+    that:
+      - item != forward_proxy_client_lock_path
+      - not item.startswith(forward_proxy_client_lock_path.rstrip('/') ~ '/')
+      - not forward_proxy_client_lock_path.startswith(item.rstrip('/') ~ '/')
+    fail_msg: >-
+      The proxy-client lock must be neither an ancestor nor a descendant of a
+      managed file or state marker.
+  loop: >-
+    {{ forward_proxy_client_all_managed_paths_internal + [forward_proxy_client_state_marker_path] }}

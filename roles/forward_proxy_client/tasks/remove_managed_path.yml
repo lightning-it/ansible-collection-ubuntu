@@ -1,0 +1,55 @@
+---
+- name: Revalidate the complete proxy-client parent chain before removal
+  ansible.builtin.include_tasks: revalidate_mutation_parents.yml
+
+- name: Reinspect the exact proxy-client path at the removal boundary
+  ansible.builtin.stat:
+    path: "{{ forward_proxy_client_remove_path }}"
+    follow: false
+    checksum_algorithm: sha256
+  register: forward_proxy_client_remove_boundary
+
+- name: Require an exact regular owned file before removal
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          forward_proxy_client_remove_allow_absent | default(false) | bool
+          and not forward_proxy_client_remove_boundary.stat.exists
+          and not forward_proxy_client_remove_boundary.stat.islnk | default(false)
+        )
+        or (
+          forward_proxy_client_remove_boundary.stat.isreg | default(false)
+          and not forward_proxy_client_remove_boundary.stat.islnk | default(false)
+          and (
+            forward_proxy_client_remove_checksum | length == 0
+            or forward_proxy_client_remove_boundary.stat.checksum
+              == forward_proxy_client_remove_checksum
+          )
+          and forward_proxy_client_remove_boundary.stat.mode
+            == forward_proxy_client_remove_mode
+          and (
+            forward_proxy_client_remove_boundary.stat.pw_name | default('')
+              == forward_proxy_client_file_owner | string
+            or forward_proxy_client_remove_boundary.stat.uid | string
+              == forward_proxy_client_file_owner | string
+          )
+          and (
+            forward_proxy_client_remove_boundary.stat.gr_name | default('')
+              == forward_proxy_client_file_group | string
+            or forward_proxy_client_remove_boundary.stat.gid | string
+              == forward_proxy_client_file_group | string
+          )
+        )
+    fail_msg: >-
+      The managed proxy-client path changed before removal. Leave it intact
+      instead of recursively deleting a foreign replacement.
+
+- name: Unlink the exact validated proxy-client file without recursion
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/unlink
+      - --
+      - "{{ forward_proxy_client_remove_path }}"
+  changed_when: true
+  when: forward_proxy_client_remove_boundary.stat.exists

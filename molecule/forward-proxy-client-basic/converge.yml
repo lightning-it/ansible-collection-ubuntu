@@ -1,0 +1,118 @@
+---
+- name: Converge Ubuntu forward proxy client configuration
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    forward_proxy_client_test_root: /tmp/wunder/lit-forward-proxy-client-molecule
+    forward_proxy_client_proxy_port: 3128
+    host_firewall_container_interfaces:
+      - podman0
+    host_firewall_forward_proxy_egress:
+      enabled: true
+      status: approved
+      owner_username: proxy
+      mode: direct
+      interface: eth0
+      destinations_ipv4:
+        - 0.0.0.0/0
+      ports:
+        - 80
+        - 443
+      residual: Only the owner-bound proxy may reach reviewed Internet destinations.
+    host_firewall_forward_proxy_access:
+      enabled: true
+      port: 3128
+      interfaces:
+        - podman0
+      sources_ipv4:
+        - 10.89.0.0/24
+      destination_ipv4: 10.89.0.1
+  pre_tasks:
+    - name: Read rootless test UID
+      ansible.builtin.command: id -u
+      register: forward_proxy_client_test_uid
+      check_mode: false
+      changed_when: false
+
+    - name: Read rootless test GID
+      ansible.builtin.command: id -g
+      register: forward_proxy_client_test_gid
+      check_mode: false
+      changed_when: false
+
+    - name: Select a portable non-root managed-file identity
+      ansible.builtin.set_fact:
+        forward_proxy_client_test_uid_effective: >-
+          {{ '1' if forward_proxy_client_test_uid.stdout == '0' else forward_proxy_client_test_uid.stdout }}
+        forward_proxy_client_test_gid_effective: >-
+          {{ '1' if forward_proxy_client_test_gid.stdout == '0' else forward_proxy_client_test_gid.stdout }}
+  roles:
+    - role: lit.ubuntu.forward_proxy_client
+      forward_proxy_client_enabled: true
+      forward_proxy_client_manage_systemd: false
+      forward_proxy_client_file_owner: "{{ forward_proxy_client_test_uid_effective }}"
+      forward_proxy_client_file_group: "{{ forward_proxy_client_test_gid_effective }}"
+      forward_proxy_client_lock_path: /tmp/wunder/lit-forward-proxy-client-molecule.lock
+      forward_proxy_client_container_enabled: true
+      forward_proxy_client_listen_addresses:
+        - 127.0.0.1
+        - 10.89.0.1
+      forward_proxy_client_allowed_clients:
+        - 127.0.0.1/32
+        - 10.89.0.0/24
+      forward_proxy_client_no_proxy:
+        - localhost
+        - 127.0.0.1
+        - .internal.example
+        - apt.internal.example
+      forward_proxy_client_approved_no_proxy_domains:
+        - .internal.example
+        - apt.internal.example
+      forward_proxy_client_internal_domain_suffixes:
+        - internal.example
+      forward_proxy_client_apt_direct_hosts:
+        - localhost
+        - 127.0.0.1
+      forward_proxy_client_apt_config_path: >-
+        {{ forward_proxy_client_test_root }}/etc/apt/99-lit-forward-proxy
+      forward_proxy_client_profile_path: >-
+        {{ forward_proxy_client_test_root }}/etc/profile.d/90-lit-forward-proxy.sh
+      forward_proxy_client_environment_path: >-
+        {{ forward_proxy_client_test_root }}/etc/environment.d/90-lit-forward-proxy.conf
+      forward_proxy_client_systemd_environment_path: >-
+        {{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d/90-lit-forward-proxy.conf
+      forward_proxy_client_containers_config_path: >-
+        {{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d/90-lit-forward-proxy.conf
+      forward_proxy_client_state_marker_path: >-
+        {{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client/managed.json
+      forward_proxy_client_trusted_parent_paths:
+        - /tmp
+        - /tmp/wunder
+        - "{{ forward_proxy_client_test_root }}"
+        - "{{ forward_proxy_client_test_root }}/etc"
+        - "{{ forward_proxy_client_test_root }}/etc/apt"
+        - "{{ forward_proxy_client_test_root }}/etc/profile.d"
+        - "{{ forward_proxy_client_test_root }}/etc/environment.d"
+        - "{{ forward_proxy_client_test_root }}/etc/systemd"
+        - "{{ forward_proxy_client_test_root }}/etc/systemd/system.conf.d"
+        - "{{ forward_proxy_client_test_root }}/etc/containers"
+        - "{{ forward_proxy_client_test_root }}/etc/containers/containers.conf.d"
+        - "{{ forward_proxy_client_test_root }}/var"
+        - "{{ forward_proxy_client_test_root }}/var/lib"
+        - "{{ forward_proxy_client_test_root }}/var/lib/lit-forward-proxy-client"
+  post_tasks:
+    - name: Inspect the fresh-tree proxy-client root after check mode
+      ansible.builtin.stat:
+        path: "{{ forward_proxy_client_test_root }}"
+        follow: false
+      register: forward_proxy_client_check_root_state
+      when: ansible_check_mode
+
+    - name: Require check mode to leave the fresh tree absent
+      ansible.builtin.assert:
+        that:
+          - not forward_proxy_client_check_root_state.stat.exists
+        fail_msg: "Fresh-tree check mode must not create directories or managed files."
+      when: ansible_check_mode

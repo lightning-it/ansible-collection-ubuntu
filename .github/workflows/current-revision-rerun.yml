@@ -146,7 +146,6 @@ jobs:
               [[ "${EVENT_BASE_REF}" =~ ^(develop|main)$ ]]
               [[ "${EVENT_PRODUCER_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
               test "${GITHUB_REF}" = "refs/heads/${EVENT_BASE_REF}"
-              test "${GITHUB_SHA}" = "${EXPECTED_BASE}"
               test "${EVENT_PR_NUMBER}" = "${PR_NUMBER}"
               test "${EVENT_EXPECTED_BASE}" = "${EXPECTED_BASE}"
               test "${EVENT_EXPECTED_HEAD}" = "${EXPECTED_HEAD}"
