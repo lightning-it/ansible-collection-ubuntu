@@ -134,7 +134,7 @@
           if [[ "${1:-}" == passwd && "$#" -eq 1 ]]; then
             /usr/bin/getent passwd
             if ! /usr/bin/getent passwd proxy >/dev/null; then
-              echo 'proxy:x:987:987:Forward proxy test identity:/nonexistent:/usr/sbin/nologin'
+              echo 'proxy:x:13:13:Forward proxy test identity:/nonexistent:/usr/sbin/nologin'
             fi
             exit 0
           fi

@@ -125,7 +125,9 @@ host_firewall_test_evidence_reference: ""
 host_firewall_egress_policy: {}
 # Optional host-local LIT forward-proxy boundary. In hardened mode this is the
 # only rule that may grant public HTTP(S), and it is bound to the proxy service
-# socket owner. Application processes still reach the proxy over loopback.
+# socket owner. The role accepts only Ubuntu's reserved non-login `proxy`
+# identity at exact UID/GID 13; trusted root must not reuse it for another
+# service. Application processes still reach the proxy over loopback.
 host_firewall_forward_proxy_egress:
   enabled: false
   status: disabled

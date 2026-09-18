@@ -75,7 +75,10 @@ HTTP(S) egress to one local service identity (`meta skuid`). Direct mode permits
 that identity on TCP 80/443; upstream mode permits one exact parent proxy and
 port. `host_firewall_forward_proxy_access` separately admits explicit container
 networks to the host-local proxy. Application processes receive no direct
-Internet rule.
+Internet rule. When enabled, the socket owner must resolve to the reserved
+non-login Ubuntu `proxy` account at exact UID/GID 13. Trusted root must not run
+another service under that identity; the role rejects a renamed, login-capable,
+or numerically different account before rendering the candidate.
 
 See `defaults/main.yml` for the complete interface. Important inputs are:
 

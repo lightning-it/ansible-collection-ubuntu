@@ -166,6 +166,12 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
             egress,
         )
         self.assertIn("is match('^[0-9]+\\Z')", egress)
+        self.assertIn("== '13'", egress)
+        self.assertIn(
+            "in ['/usr/sbin/nologin', '/sbin/nologin', '/bin/false']",
+            egress,
+        )
+        self.assertIn("Root remains the trusted host boundary", egress)
         self.assertLess(
             main.index("import_tasks: egress_assert.yml"),
             main.index("import_tasks: render.yml"),
