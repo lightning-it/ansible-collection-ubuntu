@@ -4,6 +4,19 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.13.0
+=======
+
+Minor Changes
+-------------
+
+- Add the lit.ubuntu.forward_proxy_client adapter for APT, host processes, systemd services, and explicitly enabled Podman clients. Extend the hardened nftables role with the matching proxy egress boundaries. The portable Squid service is provided by lit.supplementary.forward_proxy.
+
+Security Fixes
+--------------
+
+- Require the host-firewall forward-proxy socket owner to be Ubuntu's exact reserved non-login proxy identity at UID/GID 13 before granting public HTTP(S) egress.
+
 v1.12.0
 =======
 
