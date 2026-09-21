@@ -4,6 +4,19 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.14.0
+=======
+
+Minor Changes
+-------------
+
+- Add an exact, default-off container-to-management service forwarding contract to ``lit.ubuntu.host_firewall`` for tightly scoped application paths such as Guacamole-to-RDP.
+
+Bugfixes
+--------
+
+- Preserve path-MTU discovery and other related IPv4 ICMP errors for exact container-service forwarding rules while retaining the configured source, destination, protocol, port, and interface boundaries.
+
 v1.13.0
 =======
 
