@@ -36,11 +36,13 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
 
     set container_{{ function.key }}_sources_v4 {
         type ipv4_addr
+        flags interval
         elements = { {{ function.value.sources_ipv4 | join(', ') }} }
     }
 
     set container_{{ function.key }}_destinations_v4 {
         type ipv4_addr
+        flags interval
         elements = { {{ function.value.destinations_ipv4 | join(', ') }} }
     }
 {% endfor %}
