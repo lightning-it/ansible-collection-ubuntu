@@ -142,6 +142,20 @@ releases:
       - shared-assets-sync-35172487960.yml
       - shared-assets-sync.yml
     release_date: '2026-09-18'
+  1.14.0:
+    changes:
+      bugfixes:
+        - Preserve path-MTU discovery and other related IPv4 ICMP errors for exact
+          container-service forwarding rules while retaining the configured source,
+          destination, protocol, port, and interface boundaries.
+      minor_changes:
+        - Add an exact, default-off container-to-management service forwarding contract
+          to ``lit.ubuntu.host_firewall`` for tightly scoped application paths such
+          as Guacamole-to-RDP.
+    fragments:
+      - li139-container-related-icmp.yml
+      - li139-exact-container-service-forwarding.yml
+    release_date: '2026-09-21'
   1.2.0:
     changes:
       bugfixes:
