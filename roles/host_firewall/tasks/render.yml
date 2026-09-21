@@ -33,7 +33,17 @@
       ipv4_only: "{{ host_firewall_egress_policy.ipv4_only }}"
       ipv6_forwarding: denied
       new_container_forwarding: >-
-        {{ 'restricted' if host_firewall_container_service_access | length > 0 else 'denied' }}
+        {{
+          'restricted'
+          if (
+            host_firewall_container_service_access
+            | dict2items
+            | selectattr('value.modes', 'contains', host_firewall_mode)
+            | list
+            | length
+          ) > 0
+          else 'denied'
+        }}
       persistence_include: "{{ host_firewall_persistent_include_path }}"
       root_persistence_file_owned: false
       signed_authorization_verifier: >-

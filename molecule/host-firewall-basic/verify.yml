@@ -160,12 +160,38 @@
           - "'set container_guacamole_rdp_destinations_v4' in host_firewall_candidate_content"
           - >-
             'iifname { "podman1" } ip saddr @container_guacamole_rdp_sources_v4 oifname "enp1s0.4091"
-            ip daddr @container_guacamole_rdp_destinations_v4 tcp dport 3389 ct state new accept'
+            ip daddr @container_guacamole_rdp_destinations_v4 tcp dport 3389
+            ct state { new, established } accept'
             in host_firewall_candidate_content
           - >-
             'iifname "enp1s0.4091" ip saddr @container_guacamole_rdp_destinations_v4 oifname { "podman1" }
             ip daddr @container_guacamole_rdp_sources_v4 tcp sport 3389 ct state { established, related } accept'
             in host_firewall_candidate_content
+          - host_firewall_plan.new_container_forwarding == 'restricted'
+
+    - name: Render an inactive container-service capability
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: check
+        host_firewall_container_service_access:
+          guacamole_rdp:
+            interfaces: [podman1]
+            sources_ipv4: [10.89.0.20/32]
+            destination_interface: enp1s0.4091
+            destinations_ipv4: [10.0.30.22/32]
+            protocol: tcp
+            port: 3389
+            modes: [hardened]
+
+    - name: Validate inactive forwarding is reported and rendered as denied
+      ansible.builtin.assert:
+        that:
+          - host_firewall_plan.new_container_forwarding == 'denied'
+          - >-
+            'iifname { "podman1" } ip saddr @container_guacamole_rdp_sources_v4 oifname "enp1s0.4091"'
+            not in host_firewall_candidate_content
+        quiet: true
 
     - name: Build the hardened proxy egress test policy
       ansible.builtin.set_fact:
