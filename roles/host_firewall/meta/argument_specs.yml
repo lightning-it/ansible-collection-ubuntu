@@ -44,6 +44,8 @@ argument_specs:
         type: dict
       host_firewall_public_service_access:
         type: dict
+      host_firewall_container_service_access:
+        type: dict
       host_firewall_expected_tang_consumer_count:
         type: int
       host_firewall_controller_source_cidrs:

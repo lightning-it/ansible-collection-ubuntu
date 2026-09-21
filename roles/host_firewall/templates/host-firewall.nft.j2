@@ -1,6 +1,6 @@
 #!/usr/sbin/nft -f
 # Managed by lit.ubuntu.host_firewall. Local changes are overwritten.
-# Policy schema: lit.host_firewall.policy/v4
+# Policy schema: lit.host_firewall.policy/v5
 # Mode: {{ host_firewall_mode }}
 # Policy fingerprint: {{ host_firewall_policy_fingerprint }}
 
@@ -31,6 +31,18 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
         elements = { {{ function.value.sources_ipv4 | join(', ') }} }
     }
 {% endif %}
+{% endfor %}
+{% for function in host_firewall_container_service_access | dict2items %}
+
+    set container_{{ function.key }}_sources_v4 {
+        type ipv4_addr
+        elements = { {{ function.value.sources_ipv4 | join(', ') }} }
+    }
+
+    set container_{{ function.key }}_destinations_v4 {
+        type ipv4_addr
+        elements = { {{ function.value.destinations_ipv4 | join(', ') }} }
+    }
 {% endfor %}
 {% if host_firewall_tang_access.sources_ipv4 | length > 0 %}
 
@@ -109,6 +121,12 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
         type filter hook forward priority {{ host_firewall_forward_priority }}; policy drop;
 
         ct state invalid drop
+{% for function in host_firewall_container_service_access | dict2items %}
+{% if host_firewall_mode in function.value.modes %}
+        iifname { {{ function.value.interfaces | map('to_json') | join(', ') }} } ip saddr @container_{{ function.key }}_sources_v4 oifname "{{ function.value.destination_interface }}" ip daddr @container_{{ function.key }}_destinations_v4 {{ function.value.protocol }} dport {{ function.value.port }} ct state new accept
+        iifname "{{ function.value.destination_interface }}" ip saddr @container_{{ function.key }}_destinations_v4 oifname { {{ function.value.interfaces | map('to_json') | join(', ') }} } ip daddr @container_{{ function.key }}_sources_v4 {{ function.value.protocol }} sport {{ function.value.port }} ct state { established, related } accept
+{% endif %}
+{% endfor %}
         iifname "{{ host_firewall_management_interface }}" counter drop
         oifname "{{ host_firewall_management_interface }}" counter drop
         iifname @container_interfaces goto container_guard

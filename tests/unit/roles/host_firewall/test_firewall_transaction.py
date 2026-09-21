@@ -649,6 +649,17 @@ class AddressNormalizationTests(unittest.TestCase):
                         "sources_ipv6": ["2001:0DB8:0:0:0:0:0:20/128"],
                     }
                 },
+                "container_service_access": {
+                    "rdp": {
+                        "interfaces": ["podman1"],
+                        "sources_ipv4": ["10.89.0.20/32"],
+                        "destination_interface": "enp1s0.4091",
+                        "destinations_ipv4": ["10.0.30.22/32"],
+                        "protocol": "tcp",
+                        "port": 3389,
+                        "modes": ["bootstrap", "hardened"],
+                    }
+                },
                 "public_service_access": {},
                 "tang_access": {"port": 80, "sources_ipv4": [], "sources_ipv6": []},
             }
@@ -657,6 +668,11 @@ class AddressNormalizationTests(unittest.TestCase):
         self.assertEqual(normalized["expected_management_ipv6"], "fd00:0:0:30::10")
         self.assertEqual(normalized["control_source_address"], "2001:db8::20")
         self.assertEqual(normalized["management_access"]["openssh"]["sources_ipv6"], ["2001:db8::20/128"])
+        self.assertEqual(normalized["container_service_access"]["rdp"]["sources_ipv4"], ["10.89.0.20/32"])
+        self.assertEqual(
+            normalized["container_service_access"]["rdp"]["destinations_ipv4"],
+            ["10.0.30.22/32"],
+        )
 
 
 if __name__ == "__main__":
