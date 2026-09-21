@@ -170,9 +170,19 @@
             ct state { new, established } accept'
             in host_firewall_candidate_content
           - >-
-            'iifname "enp1s0.4091" ip saddr @container_guacamole_rdp_destinations_v4 oifname { "podman1" }
-            ip daddr @container_guacamole_rdp_sources_v4 tcp sport 3389 ct state { established, related } accept'
+            'iifname "enp1s0.4091" oifname { "podman1" } meta nfproto ipv4 ip protocol icmp
+            icmp type { destination-unreachable, time-exceeded, parameter-problem } ct state related
+            ct original ip saddr @container_guacamole_rdp_sources_v4
+            ct original ip daddr @container_guacamole_rdp_destinations_v4
+            ct original protocol tcp ct original proto-dst 3389 accept'
             in host_firewall_candidate_content
+          - >-
+            'iifname "enp1s0.4091" ip saddr @container_guacamole_rdp_destinations_v4 oifname { "podman1" }
+            ip daddr @container_guacamole_rdp_sources_v4 tcp sport 3389 ct state established accept'
+            in host_firewall_candidate_content
+          - >-
+            'tcp sport 3389 ct state { established, related } accept'
+            not in host_firewall_candidate_content
           - host_firewall_plan.new_container_forwarding == 'restricted'
 
     - name: Render an inactive container-service capability
