@@ -65,8 +65,11 @@ valid signed envelopes remain deployment prerequisites; repository tests do not 
 - An independently reviewed canonical nftables JSON digest for structured readback.
 - External positive and negative connectivity tests for confirmation.
 
-The role does not install packages, change provider firewalls, create DNS, or create application forwarding rules.
-New container forwarding remains denied.
+The role does not install packages, change provider firewalls, or create DNS. New container forwarding remains denied
+unless `host_firewall_container_service_access` declares an exact capability. Each capability is limited to named
+container interfaces and source `/32` addresses, the management interface, destination `/32` addresses, one TCP/UDP
+port, and explicit modes. Return traffic is admitted only for the same endpoints and service port in established or
+related state; no generic container forwarding is created.
 
 ## Variables
 
@@ -92,6 +95,8 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `host_firewall_tang_access`: fixed TCP 80 with explicit IPv4 and IPv6 consumer host lists.
 - `host_firewall_public_service_access`: independent public application functions with fixed protocol/port, explicit
   modes, and exact source-host lists.
+- `host_firewall_container_service_access`: independent container-to-management functions with exact interfaces,
+  source and destination `/32` hosts, protocol/port, and modes. The empty default denies all new forwarding.
 - `host_firewall_expected_*` and `host_firewall_observed_*`: target identity and observed-address binding.
 - `host_firewall_control_source_address` and `host_firewall_control_destination_port`: protected live SSH tuple.
 - `host_firewall_persistent_root_config_path`: administrator-owned root file, always read-only to the role.

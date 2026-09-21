@@ -68,6 +68,12 @@ host_firewall_expected_tang_consumer_count: 3
 # functions. Every service declares one protocol/port and exact source hosts.
 host_firewall_public_service_access: {}
 
+# Exact container-to-management service paths. Each named capability binds
+# source container interfaces and /32 addresses to one management interface,
+# exact /32 destinations, protocol, port, and operating modes. The empty
+# default keeps all new container forwarding denied.
+host_firewall_container_service_access: {}
+
 # Deprecated aggregate inputs are retained only to fail closed with an actionable migration error.
 host_firewall_controller_source_cidrs: []
 host_firewall_recovery_source_cidrs: []
@@ -223,7 +229,7 @@ host_firewall_all_public_service_sources_ipv4: >-
     | list
   }}
 host_firewall_policy_material:
-  schema: lit.host_firewall.policy/v4
+  schema: lit.host_firewall.policy/v5
   mode: "{{ host_firewall_mode }}"
   target: "{{ host_firewall_expected_inventory_hostname }}"
   public_ipv4: "{{ host_firewall_expected_public_ipv4 }}"
@@ -236,6 +242,7 @@ host_firewall_policy_material:
   management_access: "{{ host_firewall_management_access }}"
   tang_access: "{{ host_firewall_tang_access }}"
   public_service_access: "{{ host_firewall_public_service_access }}"
+  container_service_access: "{{ host_firewall_container_service_access }}"
   input_policy: drop
   forward_policy: drop
   output_policy: drop
