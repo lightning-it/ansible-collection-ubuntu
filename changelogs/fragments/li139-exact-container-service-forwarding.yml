@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - >-
+    Add an exact, default-off container-to-management service forwarding
+    contract to ``lit.ubuntu.host_firewall`` for tightly scoped application
+    paths such as Guacamole-to-RDP.

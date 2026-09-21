@@ -270,6 +270,81 @@
     label: "{{ item }}"
   when: host_firewall_enabled | bool
 
+- name: Validate exact container service inventory
+  ansible.builtin.assert:
+    that:
+      - host_firewall_container_service_access is mapping
+      - item.key is match('^[a-z][a-z0-9_]{1,31}\Z')
+      - item.value is mapping
+      - >-
+        item.value.keys() | list | sort
+        == ['destination_interface', 'destinations_ipv4', 'interfaces', 'modes', 'port', 'protocol', 'sources_ipv4']
+      - item.value.interfaces is sequence
+      - item.value.interfaces is not string
+      - item.value.interfaces | length > 0
+      - item.value.interfaces | unique | list | length == item.value.interfaces | length
+      - item.value.interfaces | difference(host_firewall_container_interfaces) | length == 0
+      - item.value.destination_interface == host_firewall_management_interface
+      - item.value.protocol in ['tcp', 'udp']
+      - item.value.port is integer
+      - item.value.port >= 1
+      - item.value.port <= 65535
+      - item.value.modes is sequence
+      - item.value.modes is not string
+      - item.value.modes | length > 0
+      - item.value.modes | difference(['bootstrap', 'hardened']) | length == 0
+      - item.value.sources_ipv4 is sequence
+      - item.value.sources_ipv4 is not string
+      - item.value.sources_ipv4 | length > 0
+      - item.value.sources_ipv4 | unique | list | length == item.value.sources_ipv4 | length
+      - item.value.destinations_ipv4 is sequence
+      - item.value.destinations_ipv4 is not string
+      - item.value.destinations_ipv4 | length > 0
+      - item.value.destinations_ipv4 | unique | list | length == item.value.destinations_ipv4 | length
+    fail_msg: >-
+      Container services require exact container interfaces and /32 endpoints,
+      the management destination interface, fixed TCP/UDP port, and explicit modes.
+  loop: "{{ host_firewall_container_service_access | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: host_firewall_enabled | bool
+
+- name: Validate every container service source as an exact IPv4 host
+  ansible.builtin.assert:
+    that:
+      - item.1 is match(host_firewall_ipv4_host_cidr_pattern)
+    fail_msg: "Container service sources must be exact IPv4 /32 values."
+  loop: >-
+    {{
+      query(
+        'ansible.builtin.subelements',
+        host_firewall_container_service_access | dict2items,
+        'value.sources_ipv4',
+        {'skip_missing': false}
+      )
+    }}
+  loop_control:
+    label: "{{ item.1 }}"
+  when: host_firewall_enabled | bool
+
+- name: Validate every container service destination as an exact IPv4 host
+  ansible.builtin.assert:
+    that:
+      - item.1 is match(host_firewall_ipv4_host_cidr_pattern)
+    fail_msg: "Container service destinations must be exact IPv4 /32 values."
+  loop: >-
+    {{
+      query(
+        'ansible.builtin.subelements',
+        host_firewall_container_service_access | dict2items,
+        'value.destinations_ipv4',
+        {'skip_missing': false}
+      )
+    }}
+  loop_control:
+    label: "{{ item.1 }}"
+  when: host_firewall_enabled | bool
+
 - name: Validate host firewall table, transaction, and command inputs
   ansible.builtin.assert:
     that:
