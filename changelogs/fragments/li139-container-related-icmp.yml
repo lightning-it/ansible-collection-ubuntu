@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    Preserve path-MTU discovery and other related IPv4 ICMP errors for exact
+    container-service forwarding rules while retaining the configured source,
+    destination, protocol, port, and interface boundaries.

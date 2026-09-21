@@ -126,7 +126,8 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
 {% for function in host_firewall_container_service_access | dict2items %}
 {% if host_firewall_mode in function.value.modes %}
         iifname { {{ function.value.interfaces | map('to_json') | join(', ') }} } ip saddr @container_{{ function.key }}_sources_v4 oifname "{{ function.value.destination_interface }}" ip daddr @container_{{ function.key }}_destinations_v4 {{ function.value.protocol }} dport {{ function.value.port }} ct state { new, established } accept
-        iifname "{{ function.value.destination_interface }}" ip saddr @container_{{ function.key }}_destinations_v4 oifname { {{ function.value.interfaces | map('to_json') | join(', ') }} } ip daddr @container_{{ function.key }}_sources_v4 {{ function.value.protocol }} sport {{ function.value.port }} ct state { established, related } accept
+        iifname "{{ function.value.destination_interface }}" oifname { {{ function.value.interfaces | map('to_json') | join(', ') }} } meta nfproto ipv4 ip protocol icmp icmp type { destination-unreachable, time-exceeded, parameter-problem } ct state related ct original ip saddr @container_{{ function.key }}_sources_v4 ct original ip daddr @container_{{ function.key }}_destinations_v4 ct original protocol {{ function.value.protocol }} ct original proto-dst {{ function.value.port }} accept
+        iifname "{{ function.value.destination_interface }}" ip saddr @container_{{ function.key }}_destinations_v4 oifname { {{ function.value.interfaces | map('to_json') | join(', ') }} } ip daddr @container_{{ function.key }}_sources_v4 {{ function.value.protocol }} sport {{ function.value.port }} ct state established accept
 {% endif %}
 {% endfor %}
         iifname "{{ host_firewall_management_interface }}" counter drop
