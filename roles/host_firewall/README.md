@@ -84,6 +84,16 @@ another service under that identity; the role rejects a renamed, login-capable,
 numerically different, directory-backed-only, or duplicate-UID account before
 rendering the candidate. The identity must exist uniquely in `/etc/passwd`.
 
+`host_firewall_container_dns_access` is a separate default-off input function
+for Podman/Aardvark name resolution. When enabled, it renders only TCP and UDP
+port 53 from explicit managed container interfaces and canonical RFC1918 source
+networks to one observed, non-loopback host gateway address. The destination
+must also equal the bridge-specific value in
+`host_firewall_observed_container_bridge_gateways_ipv4` for every selected
+interface. It grants no
+forwarded Internet access and does not inherit proxy, management, or host DNS
+egress destinations.
+
 See `defaults/main.yml` for the complete interface. Important inputs are:
 
 - `host_firewall_action`: `plan`, `preview`, `check`, `apply`, `confirm`, `rollback`, or `readback`.
@@ -98,6 +108,8 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `host_firewall_container_service_access`: independent container-to-management functions with exact interfaces,
   source and destination `/32` hosts, protocol/port, and modes. The empty default denies all new forwarding.
 - `host_firewall_expected_*` and `host_firewall_observed_*`: target identity and observed-address binding.
+- `host_firewall_observed_container_bridge_gateways_ipv4`: read-only discovery evidence mapping each managed
+  container bridge interface to its actual IPv4 gateway; generic observed host addresses cannot authorize DNS.
 - `host_firewall_control_source_address` and `host_firewall_control_destination_port`: protected live SSH tuple.
 - `host_firewall_persistent_root_config_path`: administrator-owned root file, always read-only to the role.
 - `host_firewall_persistent_include_path`: the only persistent policy file owned by the role.
@@ -107,6 +119,8 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `host_firewall_authorization_verifier_binary`: trusted root-owned verifier used for the signed envelope.
 - `host_firewall_egress_policy`: complete target-specific v1 function contract. The empty default intentionally fails
   closed instead of granting generic network access.
+- `host_firewall_container_dns_access`: exact container interfaces, RFC1918 source networks, and bridge-evidence-bound
+  host gateway allowed to reach only the host-local Aardvark listener on TCP/UDP 53.
 - `host_firewall_cis_ipv6_required`: binds the surrounding CIS IPv6 decision. Confirmation fails when that decision
   requires IPv6 while this target's egress baseline is IPv4-only.
 - `host_firewall_change_id`: immutable transaction identifier.
