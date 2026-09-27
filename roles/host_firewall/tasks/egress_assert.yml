@@ -238,6 +238,124 @@
       globally routable networks are forbidden.
   loop: "{{ host_firewall_forward_proxy_access.sources_ipv4 }}"
 
+- name: Validate container access to the host-local Aardvark DNS listener
+  ansible.builtin.assert:
+    that:
+      - host_firewall_container_dns_access is mapping
+      - >-
+        host_firewall_container_dns_access.keys() | list | sort
+        == ['destination_ipv4', 'enabled', 'interfaces', 'sources_ipv4']
+      - host_firewall_container_dns_access.enabled is boolean
+      - host_firewall_container_dns_access.destination_ipv4 is string
+      - host_firewall_observed_container_bridge_gateways_ipv4 is mapping
+      - >-
+        host_firewall_observed_container_bridge_gateways_ipv4.keys() | list
+        | difference(host_firewall_container_interfaces) | length == 0
+      - host_firewall_container_dns_access.interfaces is sequence
+      - host_firewall_container_dns_access.interfaces is not string
+      - >-
+        host_firewall_container_dns_access.interfaces | unique | list | length
+        == host_firewall_container_dns_access.interfaces | length
+      - host_firewall_container_dns_access.sources_ipv4 is sequence
+      - host_firewall_container_dns_access.sources_ipv4 is not string
+      - >-
+        host_firewall_container_dns_access.sources_ipv4 | unique | list | length
+        == host_firewall_container_dns_access.sources_ipv4 | length
+      - >-
+        not host_firewall_container_dns_access.enabled
+        or (
+          host_firewall_container_dns_access.interfaces | length >= 1
+          and host_firewall_container_dns_access.interfaces
+              | difference(host_firewall_container_interfaces) | length == 0
+          and host_firewall_container_dns_access.sources_ipv4 | length >= 1
+          and host_firewall_container_dns_access.destination_ipv4
+              is match(host_firewall_ipv4_pattern)
+          and not host_firewall_container_dns_access.destination_ipv4.startswith('127.')
+          and host_firewall_container_dns_access.destination_ipv4
+              not in host_firewall_host_ipv4_addresses_effective
+          and host_firewall_container_dns_access.destination_ipv4
+              in host_firewall_observed_ipv4_addresses
+          and host_firewall_container_dns_access.interfaces
+              | difference(
+                  host_firewall_observed_container_bridge_gateways_ipv4.keys() | list
+                )
+              | length == 0
+          and host_firewall_container_dns_access.interfaces
+              | map('extract', host_firewall_observed_container_bridge_gateways_ipv4)
+              | unique | list
+              == [host_firewall_container_dns_access.destination_ipv4]
+        )
+      - >-
+        host_firewall_container_dns_access.enabled
+        or (
+          host_firewall_container_dns_access.interfaces | length == 0
+          and host_firewall_container_dns_access.sources_ipv4 | length == 0
+          and host_firewall_container_dns_access.destination_ipv4 | length == 0
+        )
+    fail_msg: >-
+      Container DNS access requires exact managed container interfaces,
+      RFC1918 source networks, and one bridge-specific observed non-loopback
+      gateway shared by every selected interface.
+
+- name: Validate observed container bridge gateway evidence
+  ansible.builtin.assert:
+    that:
+      - item.key is string
+      - item.key | length > 0
+      - item.key in host_firewall_container_interfaces
+      - item.value is string
+      - item.value is match(host_firewall_ipv4_pattern)
+      - not item.value.startswith('127.')
+      - item.value not in host_firewall_host_ipv4_addresses_effective
+      - item.value in host_firewall_observed_ipv4_addresses
+    fail_msg: >-
+      Container bridge gateway evidence must bind one managed interface to an
+      observed non-loopback IPv4 address that is not a public or management
+      host identity.
+  loop: "{{ host_firewall_observed_container_bridge_gateways_ipv4 | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: host_firewall_container_dns_access.enabled | bool
+
+- name: Validate container DNS source networks
+  ansible.builtin.assert:
+    that:
+      - >-
+        item is match(
+          '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)){3}'
+          '/(?:[1-9]|[12][0-9]|3[0-2])\Z'
+        )
+      - >-
+        item is match(
+          '^10\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:[89]|[12][0-9]|3[0-2])\Z'
+        )
+        or item is match(
+          '^172\.(?:1[6-9]|2[0-9]|3[01])\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:1[2-9]|2[0-9]|3[0-2])\Z'
+        )
+        or item is match(
+          '^192\.168\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)'
+          '/(?:1[6-9]|2[0-9]|3[0-2])\Z'
+        )
+      - >-
+        (
+          (item.split('/')[0].split('.')[0] | int) * 16777216
+          + (item.split('/')[0].split('.')[1] | int) * 65536
+          + (item.split('/')[0].split('.')[2] | int) * 256
+          + (item.split('/')[0].split('.')[3] | int)
+        ) % (2 ** (32 - (item.split('/')[1] | int))) == 0
+    fail_msg: >-
+      Container DNS sources must be exact RFC1918 IPv4 CIDRs; globally
+      routable or non-network-address values are forbidden.
+  loop: "{{ host_firewall_container_dns_access.sources_ipv4 }}"
+
 - name: Validate every isolated egress function contract
   ansible.builtin.assert:
     that:

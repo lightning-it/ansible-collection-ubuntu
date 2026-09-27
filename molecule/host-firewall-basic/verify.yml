@@ -42,7 +42,10 @@
       - 192.0.2.10
       - 10.0.30.10
       - 10.88.0.1
+      - 10.88.0.99
     host_firewall_observed_ipv6_addresses: []
+    host_firewall_observed_container_bridge_gateways_ipv4:
+      podman0: 10.88.0.1
     host_firewall_platform_name: Ubuntu
     host_firewall_platform_version: "24.04"
     host_firewall_public_interface: enp1s0
@@ -257,6 +260,11 @@
           interfaces: [podman0]
           sources_ipv4: [10.88.0.0/16]
           destination_ipv4: 10.88.0.1
+        host_firewall_container_dns_access:
+          enabled: true
+          interfaces: [podman0]
+          sources_ipv4: [10.88.0.0/16]
+          destination_ipv4: 10.88.0.1
 
     - name: Retain the rendered direct proxy candidate
       ansible.builtin.set_fact:
@@ -293,8 +301,15 @@
             ~ ' oifname "enp1s0" ip daddr { 0.0.0.0/0 } tcp dport { 80, 443 }'
             in host_firewall_direct_proxy_candidate
           - "'set forward_proxy_clients_v4' in host_firewall_direct_proxy_candidate"
+          - "'set container_dns_clients_v4' in host_firewall_direct_proxy_candidate"
           - >-
             'iifname { "podman0" } ip saddr @forward_proxy_clients_v4 ip daddr 10.88.0.1 tcp dport 3128'
+            in host_firewall_direct_proxy_candidate
+          - >-
+            'iifname { "podman0" } ip saddr @container_dns_clients_v4 ip daddr 10.88.0.1 udp dport 53'
+            in host_firewall_direct_proxy_candidate
+          - >-
+            'iifname { "podman0" } ip saddr @container_dns_clients_v4 ip daddr 10.88.0.1 tcp dport 53'
             in host_firewall_direct_proxy_candidate
           - >-
             'oifname "enp1s0" ip daddr { 0.0.0.0/0 } tcp dport 443 ct state new accept'
@@ -304,7 +319,60 @@
             ~ ' oifname "enp1s0.4091" ip daddr { 10.0.30.25/32 } tcp dport { 8080 }'
             in host_firewall_candidate_content
           - "'set forward_proxy_clients_v4' not in host_firewall_candidate_content"
+          - "'set container_dns_clients_v4' not in host_firewall_candidate_content"
         quiet: true
+
+    - name: Prove container DNS cannot target a public host identity
+      block:
+        - name: Attempt to render container DNS access to the public address
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: check
+            host_firewall_mode: hardened
+            host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+            host_firewall_container_dns_access:
+              enabled: true
+              interfaces: [podman0]
+              sources_ipv4: [10.88.0.0/16]
+              destination_ipv4: 192.0.2.10
+
+        - name: Fail when public-address container DNS access was accepted
+          ansible.builtin.fail:
+            msg: "Container DNS unexpectedly targeted the public host address."
+
+      rescue:
+        - name: Confirm the container DNS boundary rejected the public address
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Validate container access to the host-local Aardvark DNS listener'
+            quiet: true
+
+    - name: Prove an observed non-gateway address cannot authorize container DNS
+      block:
+        - name: Attempt to render container DNS access to an observed non-gateway address
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: check
+            host_firewall_mode: hardened
+            host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+            host_firewall_container_dns_access:
+              enabled: true
+              interfaces: [podman0]
+              sources_ipv4: [10.88.0.0/16]
+              destination_ipv4: 10.88.0.99
+
+        - name: Fail when observed non-gateway container DNS access was accepted
+          ansible.builtin.fail:
+            msg: "Container DNS unexpectedly targeted an observed non-gateway address."
+
+      rescue:
+        - name: Confirm bridge-specific evidence rejected the observed non-gateway address
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Validate container access to the host-local Aardvark DNS listener'
+            quiet: true
 
     - name: Prove invalid local proxy identities fail before rendering
       ansible.builtin.include_tasks: verify-forward-proxy-identity.tasks.yml.inc
