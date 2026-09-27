@@ -84,6 +84,13 @@ another service under that identity; the role rejects a renamed, login-capable,
 numerically different, directory-backed-only, or duplicate-UID account before
 rendering the candidate. The identity must exist uniquely in `/etc/passwd`.
 
+`host_firewall_container_dns_access` is a separate default-off input function
+for Podman/Aardvark name resolution. When enabled, it renders only TCP and UDP
+port 53 from explicit managed container interfaces and canonical RFC1918 source
+networks to one observed, non-loopback host gateway address. It grants no
+forwarded Internet access and does not inherit proxy, management, or host DNS
+egress destinations.
+
 See `defaults/main.yml` for the complete interface. Important inputs are:
 
 - `host_firewall_action`: `plan`, `preview`, `check`, `apply`, `confirm`, `rollback`, or `readback`.
@@ -107,6 +114,8 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `host_firewall_authorization_verifier_binary`: trusted root-owned verifier used for the signed envelope.
 - `host_firewall_egress_policy`: complete target-specific v1 function contract. The empty default intentionally fails
   closed instead of granting generic network access.
+- `host_firewall_container_dns_access`: exact container interfaces, RFC1918 source networks, and observed host bridge
+  gateway allowed to reach only the host-local Aardvark listener on TCP/UDP 53.
 - `host_firewall_cis_ipv6_required`: binds the surrounding CIS IPv6 decision. Confirmation fails when that decision
   requires IPv6 while this target's egress baseline is IPv4-only.
 - `host_firewall_change_id`: immutable transaction identifier.
