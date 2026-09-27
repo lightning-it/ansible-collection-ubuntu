@@ -10,6 +10,10 @@ host_firewall_expected_public_ipv6: ""
 host_firewall_expected_management_ipv6: ""
 host_firewall_observed_ipv4_addresses: "{{ ansible_facts['all_ipv4_addresses'] | default([]) }}"
 host_firewall_observed_ipv6_addresses: "{{ ansible_facts['all_ipv6_addresses'] | default([]) }}"
+# Read-only discovery must bind every managed container bridge to its actual
+# IPv4 gateway before container DNS can be enabled. A generic observed host
+# address is not sufficient evidence for this security boundary.
+host_firewall_observed_container_bridge_gateways_ipv4: {}
 host_firewall_platform_name: "{{ ansible_facts['distribution'] | default('') }}"
 host_firewall_platform_version: "{{ ansible_facts['distribution_version'] | default('') }}"
 
@@ -157,7 +161,8 @@ host_firewall_forward_proxy_access:
 # exact bridge gateway. This input grant is deliberately independent of host
 # DNS egress and of proxy access: it permits only TCP/UDP 53 from explicitly
 # named container interfaces and RFC1918 source networks to one observed host
-# gateway address.
+# gateway address that is bound to every selected bridge interface by the
+# bridge-specific read-only evidence above.
 host_firewall_container_dns_access:
   enabled: false
   interfaces: []

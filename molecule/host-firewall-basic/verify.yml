@@ -42,7 +42,10 @@
       - 192.0.2.10
       - 10.0.30.10
       - 10.88.0.1
+      - 10.88.0.99
     host_firewall_observed_ipv6_addresses: []
+    host_firewall_observed_container_bridge_gateways_ipv4:
+      podman0: 10.88.0.1
     host_firewall_platform_name: Ubuntu
     host_firewall_platform_version: "24.04"
     host_firewall_public_interface: enp1s0
@@ -340,6 +343,32 @@
 
       rescue:
         - name: Confirm the container DNS boundary rejected the public address
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Validate container access to the host-local Aardvark DNS listener'
+            quiet: true
+
+    - name: Prove an observed non-gateway address cannot authorize container DNS
+      block:
+        - name: Attempt to render container DNS access to an observed non-gateway address
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: check
+            host_firewall_mode: hardened
+            host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+            host_firewall_container_dns_access:
+              enabled: true
+              interfaces: [podman0]
+              sources_ipv4: [10.88.0.0/16]
+              destination_ipv4: 10.88.0.99
+
+        - name: Fail when observed non-gateway container DNS access was accepted
+          ansible.builtin.fail:
+            msg: "Container DNS unexpectedly targeted an observed non-gateway address."
+
+      rescue:
+        - name: Confirm bridge-specific evidence rejected the observed non-gateway address
           ansible.builtin.assert:
             that:
               - ansible_failed_task.name == 'Validate container access to the host-local Aardvark DNS listener'

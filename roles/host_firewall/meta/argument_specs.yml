@@ -27,6 +27,8 @@ argument_specs:
       host_firewall_observed_ipv6_addresses:
         type: list
         elements: str
+      host_firewall_observed_container_bridge_gateways_ipv4:
+        type: dict
       host_firewall_platform_name:
         type: str
       host_firewall_platform_version:

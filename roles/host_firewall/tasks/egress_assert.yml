@@ -247,6 +247,10 @@
         == ['destination_ipv4', 'enabled', 'interfaces', 'sources_ipv4']
       - host_firewall_container_dns_access.enabled is boolean
       - host_firewall_container_dns_access.destination_ipv4 is string
+      - host_firewall_observed_container_bridge_gateways_ipv4 is mapping
+      - >-
+        host_firewall_observed_container_bridge_gateways_ipv4.keys() | list
+        | difference(host_firewall_container_interfaces) | length == 0
       - host_firewall_container_dns_access.interfaces is sequence
       - host_firewall_container_dns_access.interfaces is not string
       - >-
@@ -271,6 +275,15 @@
               not in host_firewall_host_ipv4_addresses_effective
           and host_firewall_container_dns_access.destination_ipv4
               in host_firewall_observed_ipv4_addresses
+          and host_firewall_container_dns_access.interfaces
+              | difference(
+                  host_firewall_observed_container_bridge_gateways_ipv4.keys() | list
+                )
+              | length == 0
+          and host_firewall_container_dns_access.interfaces
+              | map('extract', host_firewall_observed_container_bridge_gateways_ipv4)
+              | unique | list
+              == [host_firewall_container_dns_access.destination_ipv4]
         )
       - >-
         host_firewall_container_dns_access.enabled
@@ -281,7 +294,28 @@
         )
     fail_msg: >-
       Container DNS access requires exact managed container interfaces,
-      RFC1918 source networks, and one observed non-loopback host gateway.
+      RFC1918 source networks, and one bridge-specific observed non-loopback
+      gateway shared by every selected interface.
+
+- name: Validate observed container bridge gateway evidence
+  ansible.builtin.assert:
+    that:
+      - item.key is string
+      - item.key | length > 0
+      - item.key in host_firewall_container_interfaces
+      - item.value is string
+      - item.value is match(host_firewall_ipv4_pattern)
+      - not item.value.startswith('127.')
+      - item.value not in host_firewall_host_ipv4_addresses_effective
+      - item.value in host_firewall_observed_ipv4_addresses
+    fail_msg: >-
+      Container bridge gateway evidence must bind one managed interface to an
+      observed non-loopback IPv4 address that is not a public or management
+      host identity.
+  loop: "{{ host_firewall_observed_container_bridge_gateways_ipv4 | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: host_firewall_container_dns_access.enabled | bool
 
 - name: Validate container DNS source networks
   ansible.builtin.assert:

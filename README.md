@@ -86,6 +86,8 @@ Ubuntu-native package and repository management.
   Apply a fail-closed, Podman-aware nftables policy through rollback-protected plan, check, apply, confirm, readback,
   and rollback phases. Its optional forward-proxy egress boundary requires the unique host-local, non-login
   `proxy` identity at exact UID/GID 13; directory-only or duplicate-UID identities fail before policy rendering.
+  Optional container DNS is default-off and permits only TCP/UDP 53 to a destination bound by read-only evidence to
+  every selected Podman bridge gateway; a generic observed host address cannot authorize that path.
 - `lit.ubuntu.forward_proxy_client`
   Configure Ubuntu APT, process, systemd, and optional Podman clients for the
   separately deployed portable forward proxy.
