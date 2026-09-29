@@ -261,13 +261,11 @@
       - item.value.port <= 65535
       - item.value.modes is sequence
       - item.value.modes is not string
-      - item.value.modes | length > 0
-      - item.value.modes | unique | list | length == item.value.modes | length
-      - item.value.modes | difference(['bootstrap', 'hardened']) | length == 0
+      - item.value.modes == ['hardened']
     fail_msg: >-
       Each container proxy client must bind one safe capability name, one
       managed bridge, one exact /32 source, its observed gateway destination,
-      one non-privileged port, and explicit operating modes. The legacy
+      one non-privileged port, and the only realizable hardened operating mode. The legacy
       aggregate proxy rule may not be active at the same time.
   loop: "{{ host_firewall_forward_proxy_client_access | dict2items }}"
   loop_control:

@@ -147,7 +147,7 @@ None.
 
 ```yaml
 ---
-- name: Check a bootstrap firewall candidate
+- name: Check a hardened firewall candidate with exact proxy clients
   hosts: root_of_trust
   become: true
   gather_facts: true
@@ -156,12 +156,19 @@ None.
       vars:
         host_firewall_enabled: true
         host_firewall_action: check
-        host_firewall_mode: bootstrap
+        host_firewall_mode: hardened
         host_firewall_expected_inventory_hostname: root01.example.net
         host_firewall_expected_public_ipv4: 192.0.2.10
         host_firewall_expected_management_ipv4: 10.0.30.10
         host_firewall_public_interface: enp1s0
         host_firewall_management_interface: enp1s0.4091
+        host_firewall_observed_ipv4_addresses:
+          - 192.0.2.10
+          - 10.0.30.10
+          - 10.89.0.1
+        host_firewall_container_interfaces: [podman1]
+        host_firewall_observed_container_bridge_gateways_ipv4:
+          podman1: 10.89.0.1
         host_firewall_management_access:
           bootstrap_ssh:
             port: 22
@@ -192,6 +199,21 @@ None.
             modes: [bootstrap, hardened]
             sources_ipv4: [198.51.100.20/32]
             sources_ipv6: []
+        host_firewall_forward_proxy_egress:
+          enabled: true
+          status: approved
+          mode: direct
+          owner_username: proxy
+          interface: enp1s0
+          destinations_ipv4: [0.0.0.0/0]
+          ports: [80, 443]
+          residual: "Owner-bound direct egress after proxy hardening."
+        host_firewall_forward_proxy_access:
+          enabled: false
+          port: 3128
+          interfaces: []
+          sources_ipv4: []
+          destination_ipv4: ""
         host_firewall_forward_proxy_client_access:
           keycloak:
             interface: podman1
@@ -201,8 +223,8 @@ None.
             modes: [hardened]
         host_firewall_egress_policy:
           schema: lit.host_firewall.egress/v1
-          status: draft
-          stance: bootstrap-restricted
+          status: approved
+          stance: deny-by-default
           ipv4_only: true
           functions:
             dns_udp:
@@ -254,17 +276,17 @@ None.
               status: approved
               residual: ""
             bootstrap_https:
-              enabled: true
+              enabled: false
               protocol: tcp
               port: 443
               modes: [bootstrap]
               interface: enp1s0
-              destinations_ipv4: [0.0.0.0/0]
+              destinations_ipv4: []
               destinations_ipv6: []
               declared_fqdns: []
               mtls_required: false
-              status: temporary-maintenance
-              residual: "Must be removed before hardened confirmation."
+              status: disabled-staged-transfer
+              residual: "Disabled after hardened proxy cutover."
             https_proxy:
               enabled: false
               protocol: tcp

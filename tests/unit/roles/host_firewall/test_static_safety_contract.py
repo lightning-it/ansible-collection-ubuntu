@@ -162,6 +162,7 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
         self.assertIn("host_firewall_forward_proxy_egress.owner_username is string", egress)
         self.assertIn("host_firewall_forward_proxy_access.destination_ipv4 is string", egress)
         self.assertIn("host_firewall_forward_proxy_client_access is mapping", egress)
+        self.assertIn("item.value.modes == ['hardened']", egress)
         self.assertIn(
             "item.value.destination_ipv4\n"
             "        == host_firewall_observed_container_bridge_gateways_ipv4[item.value.interface]",

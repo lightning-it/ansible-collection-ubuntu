@@ -415,6 +415,73 @@
               - ansible_failed_task.name == 'Bind exact container proxy clients to observed bridge gateways'
             quiet: true
 
+    - name: Exercise every exact proxy-client validation boundary
+      ansible.builtin.include_tasks: tasks/reject-proxy-client.yml
+      loop_control:
+        loop_var: host_firewall_proxy_rejection_case
+        label: "{{ host_firewall_proxy_rejection_case.name }}"
+      loop:
+        - name: aggregate-and-client-coexistence
+          aggregate:
+            enabled: true
+            port: 3128
+            interfaces: [podman0]
+            sources_ipv4: [10.88.0.0/16]
+            destination_ipv4: 10.88.0.1
+          clients:
+            invalid:
+              interface: podman0
+              source_ipv4: 10.88.0.11/32
+              destination_ipv4: 10.88.0.1
+              port: 3128
+              modes: [hardened]
+          expected_failed_task: Validate exact per-client container proxy capabilities
+        - name: globally-routable-source
+          aggregate: &disabled_aggregate
+            enabled: false
+            port: 3128
+            interfaces: []
+            sources_ipv4: []
+            destination_ipv4: ""
+          clients:
+            invalid:
+              interface: podman0
+              source_ipv4: 203.0.113.11/32
+              destination_ipv4: 10.88.0.1
+              port: 3128
+              modes: [hardened]
+          expected_failed_task: Validate exact per-client container proxy source identities
+        - name: non-host-source-prefix
+          aggregate: *disabled_aggregate
+          clients:
+            invalid:
+              interface: podman0
+              source_ipv4: 10.88.0.0/24
+              destination_ipv4: 10.88.0.1
+              port: 3128
+              modes: [hardened]
+          expected_failed_task: Validate exact per-client container proxy capabilities
+        - name: privileged-port
+          aggregate: *disabled_aggregate
+          clients:
+            invalid:
+              interface: podman0
+              source_ipv4: 10.88.0.11/32
+              destination_ipv4: 10.88.0.1
+              port: 80
+              modes: [hardened]
+          expected_failed_task: Validate exact per-client container proxy capabilities
+        - name: unreachable-bootstrap-mode
+          aggregate: *disabled_aggregate
+          clients:
+            invalid:
+              interface: podman0
+              source_ipv4: 10.88.0.11/32
+              destination_ipv4: 10.88.0.1
+              port: 3128
+              modes: [bootstrap]
+          expected_failed_task: Validate exact per-client container proxy capabilities
+
     - name: Prove container DNS cannot target a public host identity
       block:
         - name: Attempt to render container DNS access to the public address
