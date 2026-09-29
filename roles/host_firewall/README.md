@@ -67,9 +67,10 @@ valid signed envelopes remain deployment prerequisites; repository tests do not 
 
 The role does not install packages, change provider firewalls, or create DNS. New container forwarding remains denied
 unless `host_firewall_container_service_access` declares an exact capability. Each capability is limited to named
-container interfaces and source `/32` addresses, the management interface, destination `/32` addresses, one TCP/UDP
-port, and explicit modes. Return traffic is admitted only for the same endpoints and service port in established or
-related state; no generic container forwarding is created.
+container interfaces and source `/32` addresses, either the declared management interface or the same single
+container bridge as destination interface, destination `/32` addresses, one TCP/UDP port, and explicit modes.
+Return traffic is admitted only for the same endpoints and service port in established or related state; no
+generic or cross-bridge container forwarding is created.
 
 ## Variables
 
@@ -105,8 +106,9 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `host_firewall_tang_access`: fixed TCP 80 with explicit IPv4 and IPv6 consumer host lists.
 - `host_firewall_public_service_access`: independent public application functions with fixed protocol/port, explicit
   modes, and exact source-host lists.
-- `host_firewall_container_service_access`: independent container-to-management functions with exact interfaces,
-  source and destination `/32` hosts, protocol/port, and modes. The empty default denies all new forwarding.
+- `host_firewall_container_service_access`: independent container-to-management or narrowly scoped
+  same-bridge container-to-container functions with exact declared interfaces, source and destination `/32`
+  hosts, protocol/port, and modes. The empty default denies all new forwarding.
 - `host_firewall_expected_*` and `host_firewall_observed_*`: target identity and observed-address binding.
 - `host_firewall_observed_container_bridge_gateways_ipv4`: read-only discovery evidence mapping each managed
   container bridge interface to its actual IPv4 gateway; generic observed host addresses cannot authorize DNS.

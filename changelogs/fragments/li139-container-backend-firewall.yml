@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - >-
+    Extend the fail-closed host firewall container-service contract to admit
+    exact same-bridge container backend flows while retaining interface,
+    source, destination, protocol, port, mode, and return-path binding.

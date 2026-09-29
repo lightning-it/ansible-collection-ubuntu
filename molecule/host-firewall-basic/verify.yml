@@ -84,6 +84,14 @@
         sources_ipv4: [198.51.100.20/32]
         sources_ipv6: []
     host_firewall_container_service_access:
+      nginx_keycloak:
+        interfaces: [podman1]
+        sources_ipv4: [10.89.0.10/32]
+        destination_interface: podman1
+        destinations_ipv4: [10.89.0.11/32]
+        protocol: tcp
+        port: 8080
+        modes: [bootstrap, hardened]
       guacamole_rdp:
         interfaces: [podman1]
         sources_ipv4: [10.89.0.20/32]
@@ -148,6 +156,14 @@
           - "'set public_https_sources_v4' in host_firewall_candidate_content"
           - "'@public_https_sources_v4' in host_firewall_candidate_content"
           - "'tcp dport 443' in host_firewall_candidate_content"
+          - >-
+            'iifname { "podman1" } ip saddr @container_nginx_keycloak_sources_v4 oifname "podman1"
+            ip daddr @container_nginx_keycloak_destinations_v4 tcp dport 8080 ct state { new, established } accept'
+            in host_firewall_candidate_content
+          - >-
+            'iifname "podman1" ip saddr @container_nginx_keycloak_destinations_v4 oifname { "podman1" }
+            ip daddr @container_nginx_keycloak_sources_v4 tcp sport 8080 ct state established accept'
+            in host_firewall_candidate_content
           - "'ip6 ' not in host_firewall_candidate_content"
           - "'nfproto ipv6' not in host_firewall_candidate_content"
           - "'meta nfproto ipv4 ct state { established, related } accept' in host_firewall_candidate_content"
@@ -211,6 +227,43 @@
             'iifname { "podman1" } ip saddr @container_guacamole_rdp_sources_v4 oifname "enp1s0.4091"'
             not in host_firewall_candidate_content
         quiet: true
+
+    - name: Retain the valid container-service capabilities for the negative test
+      ansible.builtin.set_fact:
+        host_firewall_valid_container_service_access: "{{ host_firewall_container_service_access }}"
+
+    - name: Prove cross-bridge container forwarding is rejected
+      block:
+        - name: Attempt to render a cross-bridge container capability
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: check
+            host_firewall_container_service_access:
+              invalid_cross_bridge:
+                interfaces: [podman0]
+                sources_ipv4: [10.88.0.10/32]
+                destination_interface: podman1
+                destinations_ipv4: [10.89.0.11/32]
+                protocol: tcp
+                port: 8080
+                modes: [bootstrap, hardened]
+
+        - name: Fail when cross-bridge container forwarding was accepted
+          ansible.builtin.fail:
+            msg: "Cross-bridge container forwarding was unexpectedly accepted."
+
+      rescue:
+        - name: Confirm the exact container-service boundary rejected cross-bridge forwarding
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Validate exact container service inventory'
+            quiet: true
+
+      always:
+        - name: Restore the valid container-service capabilities after the negative test
+          ansible.builtin.set_fact:
+            host_firewall_container_service_access: "{{ host_firewall_valid_container_service_access }}"
 
     - name: Build the hardened proxy egress test policy
       ansible.builtin.set_fact:
