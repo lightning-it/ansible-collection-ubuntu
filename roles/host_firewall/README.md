@@ -70,6 +70,8 @@ unless `host_firewall_container_service_access` declares an exact capability. Ea
 container interfaces and source `/32` addresses, the management interface, destination `/32` addresses, one TCP/UDP
 port, and explicit modes. Return traffic is admitted only for the same endpoints and service port in established or
 related state; no generic container forwarding is created.
+Traffic between a reverse proxy and its backend on the same dedicated Podman bridge remains layer 2; this role does
+not claim or render a host-routed forwarding capability for that path.
 
 ## Variables
 

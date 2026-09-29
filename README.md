@@ -90,7 +90,8 @@ Ubuntu-native package and repository management.
   every selected Podman bridge gateway; a generic observed host address cannot authorize that path. Exact
   per-client proxy capabilities bind one bridge, source `/32`, observed gateway, port, and mode without creating an
   interface/source/destination cross product. Container service forwarding remains restricted to the management
-  interface.
+  interface. Reverse-proxy-to-backend traffic inside one dedicated Podman bridge stays layer 2 and is therefore not
+  represented as host-routed forwarding by this role.
 - `lit.ubuntu.forward_proxy_client`
   Configure Ubuntu APT, process, systemd, and optional Podman clients for the
   separately deployed portable forward proxy.
