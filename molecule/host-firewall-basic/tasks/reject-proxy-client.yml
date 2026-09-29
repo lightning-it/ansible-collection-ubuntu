@@ -1,0 +1,34 @@
+---
+- name: Reject invalid exact proxy-client case
+  block:
+    - name: Attempt invalid exact proxy-client capability
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: check
+        host_firewall_mode: hardened
+        host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+        host_firewall_forward_proxy_egress:
+          enabled: true
+          status: approved
+          mode: direct
+          owner_username: proxy
+          interface: enp1s0
+          destinations_ipv4: [0.0.0.0/0]
+          ports: [80, 443]
+          residual: "Owner-bound direct test policy."
+        host_firewall_forward_proxy_access: "{{ host_firewall_proxy_rejection_case.aggregate }}"
+        host_firewall_forward_proxy_client_access: "{{ host_firewall_proxy_rejection_case.clients }}"
+
+    - name: Fail when invalid exact proxy-client capability was accepted
+      ansible.builtin.fail:
+        msg: >-
+          Invalid exact proxy-client case
+          {{ host_firewall_proxy_rejection_case.name }} was accepted.
+
+  rescue:
+    - name: Confirm exact proxy-client validation rejected the case
+      ansible.builtin.assert:
+        that:
+          - ansible_failed_task.name == host_firewall_proxy_rejection_case.expected_failed_task
+        quiet: true
