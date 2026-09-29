@@ -1,0 +1,5 @@
+---
+trivial:
+  - >-
+    Cover matching and conflicting multi-bridge container DNS gateway evidence,
+    and clarify that evidence is required only for selected managed bridges.
