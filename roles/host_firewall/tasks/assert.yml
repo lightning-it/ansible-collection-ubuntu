@@ -284,12 +284,7 @@
       - item.value.interfaces | length > 0
       - item.value.interfaces | unique | list | length == item.value.interfaces | length
       - item.value.interfaces | difference(host_firewall_container_interfaces) | length == 0
-      - >-
-        item.value.destination_interface == host_firewall_management_interface
-        or (
-          item.value.interfaces | length == 1
-          and item.value.destination_interface == (item.value.interfaces | first)
-        )
+      - item.value.destination_interface == host_firewall_management_interface
       - item.value.protocol in ['tcp', 'udp']
       - item.value.port is integer
       - item.value.port >= 1
@@ -308,8 +303,7 @@
       - item.value.destinations_ipv4 | unique | list | length == item.value.destinations_ipv4 | length
     fail_msg: >-
       Container services require exact container interfaces and /32 endpoints,
-      either the management destination interface or exactly one identical
-      source/destination container bridge, a fixed TCP/UDP port, and explicit modes.
+      the management destination interface, fixed TCP/UDP port, and explicit modes.
   loop: "{{ host_firewall_container_service_access | dict2items }}"
   loop_control:
     label: "{{ item.key }}"

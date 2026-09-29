@@ -87,9 +87,10 @@ Ubuntu-native package and repository management.
   and rollback phases. Its optional forward-proxy egress boundary requires the unique host-local, non-login
   `proxy` identity at exact UID/GID 13; directory-only or duplicate-UID identities fail before policy rendering.
   Optional container DNS is default-off and permits only TCP/UDP 53 to a destination bound by read-only evidence to
-  every selected Podman bridge gateway; a generic observed host address cannot authorize that path. Exact container
-  service capabilities may target the management interface or the same single Podman bridge. They bind source and
-  destination `/32` hosts plus one protocol/port; generic and cross-bridge forwarding remain denied.
+  every selected Podman bridge gateway; a generic observed host address cannot authorize that path. Exact
+  per-client proxy capabilities bind one bridge, source `/32`, observed gateway, port, and mode without creating an
+  interface/source/destination cross product. Container service forwarding remains restricted to the management
+  interface.
 - `lit.ubuntu.forward_proxy_client`
   Configure Ubuntu APT, process, systemd, and optional Podman clients for the
   separately deployed portable forward proxy.

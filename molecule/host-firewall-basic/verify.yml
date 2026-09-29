@@ -43,9 +43,11 @@
       - 10.0.30.10
       - 10.88.0.1
       - 10.88.0.99
+      - 10.89.0.1
     host_firewall_observed_ipv6_addresses: []
     host_firewall_observed_container_bridge_gateways_ipv4:
       podman0: 10.88.0.1
+      podman1: 10.89.0.1
     host_firewall_platform_name: Ubuntu
     host_firewall_platform_version: "24.04"
     host_firewall_public_interface: enp1s0
@@ -84,14 +86,6 @@
         sources_ipv4: [198.51.100.20/32]
         sources_ipv6: []
     host_firewall_container_service_access:
-      nginx_keycloak:
-        interfaces: [podman1]
-        sources_ipv4: [10.89.0.10/32]
-        destination_interface: podman1
-        destinations_ipv4: [10.89.0.11/32]
-        protocol: tcp
-        port: 8080
-        modes: [bootstrap, hardened]
       guacamole_rdp:
         interfaces: [podman1]
         sources_ipv4: [10.89.0.20/32]
@@ -156,14 +150,6 @@
           - "'set public_https_sources_v4' in host_firewall_candidate_content"
           - "'@public_https_sources_v4' in host_firewall_candidate_content"
           - "'tcp dport 443' in host_firewall_candidate_content"
-          - >-
-            'iifname { "podman1" } ip saddr @container_nginx_keycloak_sources_v4 oifname "podman1"
-            ip daddr @container_nginx_keycloak_destinations_v4 tcp dport 8080 ct state { new, established } accept'
-            in host_firewall_candidate_content
-          - >-
-            'iifname "podman1" ip saddr @container_nginx_keycloak_destinations_v4 oifname { "podman1" }
-            ip daddr @container_nginx_keycloak_sources_v4 tcp sport 8080 ct state established accept'
-            in host_firewall_candidate_content
           - "'ip6 ' not in host_firewall_candidate_content"
           - "'nfproto ipv6' not in host_firewall_candidate_content"
           - "'meta nfproto ipv4 ct state { established, related } accept' in host_firewall_candidate_content"
@@ -228,43 +214,6 @@
             not in host_firewall_candidate_content
         quiet: true
 
-    - name: Retain the valid container-service capabilities for the negative test
-      ansible.builtin.set_fact:
-        host_firewall_valid_container_service_access: "{{ host_firewall_container_service_access }}"
-
-    - name: Prove cross-bridge container forwarding is rejected
-      block:
-        - name: Attempt to render a cross-bridge container capability
-          ansible.builtin.include_role:
-            name: lit.ubuntu.host_firewall
-          vars:
-            host_firewall_action: check
-            host_firewall_container_service_access:
-              invalid_cross_bridge:
-                interfaces: [podman0]
-                sources_ipv4: [10.88.0.10/32]
-                destination_interface: podman1
-                destinations_ipv4: [10.89.0.11/32]
-                protocol: tcp
-                port: 8080
-                modes: [bootstrap, hardened]
-
-        - name: Fail when cross-bridge container forwarding was accepted
-          ansible.builtin.fail:
-            msg: "Cross-bridge container forwarding was unexpectedly accepted."
-
-      rescue:
-        - name: Confirm the exact container-service boundary rejected cross-bridge forwarding
-          ansible.builtin.assert:
-            that:
-              - ansible_failed_task.name == 'Validate exact container service inventory'
-            quiet: true
-
-      always:
-        - name: Restore the valid container-service capabilities after the negative test
-          ansible.builtin.set_fact:
-            host_firewall_container_service_access: "{{ host_firewall_valid_container_service_access }}"
-
     - name: Build the hardened proxy egress test policy
       ansible.builtin.set_fact:
         host_firewall_proxy_test_egress_policy: >-
@@ -323,6 +272,46 @@
       ansible.builtin.set_fact:
         host_firewall_direct_proxy_candidate: "{{ host_firewall_candidate_content }}"
 
+    - name: Render exact per-client container proxy capabilities
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: check
+        host_firewall_mode: hardened
+        host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+        host_firewall_forward_proxy_egress:
+          enabled: true
+          status: approved
+          mode: direct
+          owner_username: proxy
+          interface: enp1s0
+          destinations_ipv4: [0.0.0.0/0]
+          ports: [80, 443]
+          residual: "Owner-bound direct test policy."
+        host_firewall_forward_proxy_access:
+          enabled: false
+          port: 3128
+          interfaces: []
+          sources_ipv4: []
+          destination_ipv4: ""
+        host_firewall_forward_proxy_client_access:
+          keycloak:
+            interface: podman0
+            source_ipv4: 10.88.0.11/32
+            destination_ipv4: 10.88.0.1
+            port: 3128
+            modes: [hardened]
+          guacamole:
+            interface: podman1
+            source_ipv4: 10.89.0.20/32
+            destination_ipv4: 10.89.0.1
+            port: 3128
+            modes: [hardened]
+
+    - name: Retain the exact per-client proxy candidate
+      ansible.builtin.set_fact:
+        host_firewall_exact_proxy_candidate: "{{ host_firewall_candidate_content }}"
+
     - name: Render the chained upstream proxy candidate
       ansible.builtin.include_role:
         name: lit.ubuntu.host_firewall
@@ -345,6 +334,7 @@
           interfaces: []
           sources_ipv4: []
           destination_ipv4: ""
+        host_firewall_forward_proxy_client_access: {}
 
     - name: Validate rendered direct and upstream proxy boundaries
       ansible.builtin.assert:
@@ -368,12 +358,62 @@
             'oifname "enp1s0" ip daddr { 0.0.0.0/0 } tcp dport 443 ct state new accept'
             not in host_firewall_direct_proxy_candidate
           - >-
+            'iifname "podman0" ip saddr 10.88.0.11/32 ip daddr 10.88.0.1 tcp dport 3128 ct state new accept'
+            in host_firewall_exact_proxy_candidate
+          - >-
+            'iifname "podman1" ip saddr 10.89.0.20/32 ip daddr 10.89.0.1 tcp dport 3128 ct state new accept'
+            in host_firewall_exact_proxy_candidate
+          - "'set forward_proxy_clients_v4' not in host_firewall_exact_proxy_candidate"
+          - >-
             'meta skuid ' ~ (ansible_facts.getent_passwd.proxy[1] | string)
             ~ ' oifname "enp1s0.4091" ip daddr { 10.0.30.25/32 } tcp dport { 8080 }'
             in host_firewall_candidate_content
           - "'set forward_proxy_clients_v4' not in host_firewall_candidate_content"
           - "'set container_dns_clients_v4' not in host_firewall_candidate_content"
         quiet: true
+
+    - name: Prove an exact proxy client cannot target another bridge gateway
+      block:
+        - name: Attempt a cross-bridge proxy gateway binding
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: check
+            host_firewall_mode: hardened
+            host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+            host_firewall_forward_proxy_egress:
+              enabled: true
+              status: approved
+              mode: direct
+              owner_username: proxy
+              interface: enp1s0
+              destinations_ipv4: [0.0.0.0/0]
+              ports: [80, 443]
+              residual: "Owner-bound direct test policy."
+            host_firewall_forward_proxy_access:
+              enabled: false
+              port: 3128
+              interfaces: []
+              sources_ipv4: []
+              destination_ipv4: ""
+            host_firewall_forward_proxy_client_access:
+              invalid_cross_bridge:
+                interface: podman0
+                source_ipv4: 10.88.0.11/32
+                destination_ipv4: 10.89.0.1
+                port: 3128
+                modes: [hardened]
+
+        - name: Fail when the cross-bridge proxy gateway was accepted
+          ansible.builtin.fail:
+            msg: "An exact proxy client unexpectedly targeted another bridge gateway."
+
+      rescue:
+        - name: Confirm gateway binding rejected the cross-bridge destination
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Bind exact container proxy clients to observed bridge gateways'
+            quiet: true
 
     - name: Prove container DNS cannot target a public host identity
       block:

@@ -67,10 +67,9 @@ valid signed envelopes remain deployment prerequisites; repository tests do not 
 
 The role does not install packages, change provider firewalls, or create DNS. New container forwarding remains denied
 unless `host_firewall_container_service_access` declares an exact capability. Each capability is limited to named
-container interfaces and source `/32` addresses, either the declared management interface or the same single
-container bridge as destination interface, destination `/32` addresses, one TCP/UDP port, and explicit modes.
-Return traffic is admitted only for the same endpoints and service port in established or related state; no
-generic or cross-bridge container forwarding is created.
+container interfaces and source `/32` addresses, the management interface, destination `/32` addresses, one TCP/UDP
+port, and explicit modes. Return traffic is admitted only for the same endpoints and service port in established or
+related state; no generic container forwarding is created.
 
 ## Variables
 
@@ -106,9 +105,11 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `host_firewall_tang_access`: fixed TCP 80 with explicit IPv4 and IPv6 consumer host lists.
 - `host_firewall_public_service_access`: independent public application functions with fixed protocol/port, explicit
   modes, and exact source-host lists.
-- `host_firewall_container_service_access`: independent container-to-management or narrowly scoped
-  same-bridge container-to-container functions with exact declared interfaces, source and destination `/32`
-  hosts, protocol/port, and modes. The empty default denies all new forwarding.
+- `host_firewall_container_service_access`: independent container-to-management functions with exact interfaces,
+  source and destination `/32` hosts, protocol/port, and modes. The empty default denies all new forwarding.
+- `host_firewall_forward_proxy_client_access`: exact container-to-host Squid clients. Every capability binds one
+  managed bridge, one RFC1918 source `/32`, that bridge's observed gateway, one non-privileged port, and modes. It
+  cannot be enabled together with the legacy aggregate `host_firewall_forward_proxy_access` contract.
 - `host_firewall_expected_*` and `host_firewall_observed_*`: target identity and observed-address binding.
 - `host_firewall_observed_container_bridge_gateways_ipv4`: read-only discovery evidence mapping each managed
   container bridge interface to its actual IPv4 gateway; generic observed host addresses cannot authorize DNS.
@@ -189,15 +190,13 @@ None.
             modes: [bootstrap, hardened]
             sources_ipv4: [198.51.100.20/32]
             sources_ipv6: []
-        host_firewall_container_service_access:
-          nginx_keycloak:
-            interfaces: [podman1]
-            sources_ipv4: [10.89.0.10/32]
-            destination_interface: podman1
-            destinations_ipv4: [10.89.0.11/32]
-            protocol: tcp
-            port: 8080
-            modes: [bootstrap, hardened]
+        host_firewall_forward_proxy_client_access:
+          keycloak:
+            interface: podman1
+            source_ipv4: 10.89.0.11/32
+            destination_ipv4: 10.89.0.1
+            port: 3128
+            modes: [hardened]
         host_firewall_egress_policy:
           schema: lit.host_firewall.egress/v1
           status: draft
