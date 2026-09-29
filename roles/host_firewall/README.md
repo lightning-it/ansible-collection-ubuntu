@@ -189,6 +189,15 @@ None.
             modes: [bootstrap, hardened]
             sources_ipv4: [198.51.100.20/32]
             sources_ipv6: []
+        host_firewall_container_service_access:
+          nginx_keycloak:
+            interfaces: [podman1]
+            sources_ipv4: [10.89.0.10/32]
+            destination_interface: podman1
+            destinations_ipv4: [10.89.0.11/32]
+            protocol: tcp
+            port: 8080
+            modes: [bootstrap, hardened]
         host_firewall_egress_policy:
           schema: lit.host_firewall.egress/v1
           status: draft

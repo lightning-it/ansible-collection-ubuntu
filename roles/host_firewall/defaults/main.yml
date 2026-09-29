@@ -72,10 +72,11 @@ host_firewall_expected_tang_consumer_count: 3
 # functions. Every service declares one protocol/port and exact source hosts.
 host_firewall_public_service_access: {}
 
-# Exact container-to-management service paths. Each named capability binds
-# source container interfaces and /32 addresses to one management interface,
-# exact /32 destinations, protocol, port, and operating modes. The empty
-# default keeps all new container forwarding denied.
+# Exact container service paths. Each named capability binds source container
+# interfaces and /32 addresses to either the management interface or the same
+# single container bridge, plus exact /32 destinations, protocol, port, and
+# operating modes. Cross-bridge paths are rejected. The empty default keeps all
+# new container forwarding denied.
 host_firewall_container_service_access: {}
 
 # Deprecated aggregate inputs are retained only to fail closed with an actionable migration error.
