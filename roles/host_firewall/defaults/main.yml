@@ -266,7 +266,6 @@ host_firewall_policy_material:
   tang_access: "{{ host_firewall_tang_access }}"
   public_service_access: "{{ host_firewall_public_service_access }}"
   container_service_access: "{{ host_firewall_container_service_access }}"
-  forward_proxy_client_access: "{{ host_firewall_forward_proxy_client_access }}"
   input_policy: drop
   forward_policy: drop
   output_policy: drop
@@ -284,6 +283,13 @@ host_firewall_policy_material_effective: >-
           host_firewall_forward_proxy_egress.enabled | bool
           or host_firewall_forward_proxy_access.enabled | bool
         )
+        else {}
+      )
+    | combine(
+        {
+          'forward_proxy_client_access': host_firewall_forward_proxy_client_access
+        }
+        if host_firewall_forward_proxy_client_access | length > 0
         else {}
       )
     | combine(
