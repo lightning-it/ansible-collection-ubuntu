@@ -238,6 +238,63 @@
       globally routable networks are forbidden.
   loop: "{{ host_firewall_forward_proxy_access.sources_ipv4 }}"
 
+- name: Validate exact per-client container proxy capabilities
+  ansible.builtin.assert:
+    that:
+      - host_firewall_forward_proxy_client_access is mapping
+      - not host_firewall_forward_proxy_access.enabled
+      - host_firewall_forward_proxy_egress.enabled
+      - host_firewall_observed_container_bridge_gateways_ipv4 is mapping
+      - item.key is match('^[a-z][a-z0-9_]{1,31}\Z')
+      - item.value is mapping
+      - >-
+        item.value.keys() | list | sort
+        == ['destination_ipv4', 'interface', 'modes', 'port', 'source_ipv4']
+      - item.value.interface is string
+      - item.value.interface in host_firewall_container_interfaces
+      - item.value.interface in host_firewall_observed_container_bridge_gateways_ipv4
+      - item.value.source_ipv4 is match(host_firewall_ipv4_host_cidr_pattern)
+      - item.value.destination_ipv4 is match(host_firewall_ipv4_pattern)
+      - not item.value.destination_ipv4.startswith('127.')
+      - item.value.port is integer
+      - item.value.port >= 1024
+      - item.value.port <= 65535
+      - item.value.modes is sequence
+      - item.value.modes is not string
+      - item.value.modes == ['hardened']
+    fail_msg: >-
+      Each container proxy client must bind one safe capability name, one
+      managed bridge, one exact /32 source, its observed gateway destination,
+      one non-privileged port, and the only realizable hardened operating mode. The legacy
+      aggregate proxy rule may not be active at the same time.
+  loop: "{{ host_firewall_forward_proxy_client_access | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Validate exact per-client container proxy source identities
+  ansible.builtin.assert:
+    that:
+      - >-
+        item.value.source_ipv4 is match(
+          '^10\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)/32\\Z'
+        )
+        or item.value.source_ipv4 is match(
+          '^172\\.(?:1[6-9]|2[0-9]|3[01])\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)/32\\Z'
+        )
+        or item.value.source_ipv4 is match(
+          '^192\\.168\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)\\.'
+          '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]?|0)/32\\Z'
+        )
+    fail_msg: >-
+      Exact container proxy clients must use RFC1918 /32 source identities.
+  loop: "{{ host_firewall_forward_proxy_client_access | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}={{ item.value.source_ipv4 }}"
+
 - name: Validate container access to the host-local Aardvark DNS listener
   ansible.builtin.assert:
     that:
@@ -315,7 +372,25 @@
   loop: "{{ host_firewall_observed_container_bridge_gateways_ipv4 | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
-  when: host_firewall_container_dns_access.enabled | bool
+  when: >-
+    host_firewall_container_dns_access.enabled | bool
+    or host_firewall_forward_proxy_client_access | length > 0
+
+- name: Bind exact container proxy clients to observed bridge gateways
+  ansible.builtin.assert:
+    that:
+      - >-
+        item.value.destination_ipv4
+        == host_firewall_observed_container_bridge_gateways_ipv4[item.value.interface]
+      - item.value.destination_ipv4 in host_firewall_observed_ipv4_addresses
+      - item.value.destination_ipv4 not in host_firewall_host_ipv4_addresses_effective
+    fail_msg: >-
+      Each exact container proxy capability must target the read-only observed
+      gateway of its own bridge, never a generic host, public, or management
+      address.
+  loop: "{{ host_firewall_forward_proxy_client_access | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
 
 - name: Validate container DNS source networks
   ansible.builtin.assert:

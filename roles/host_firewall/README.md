@@ -70,6 +70,8 @@ unless `host_firewall_container_service_access` declares an exact capability. Ea
 container interfaces and source `/32` addresses, the management interface, destination `/32` addresses, one TCP/UDP
 port, and explicit modes. Return traffic is admitted only for the same endpoints and service port in established or
 related state; no generic container forwarding is created.
+Traffic between a reverse proxy and its backend on the same dedicated Podman bridge remains layer 2; this role does
+not claim or render a host-routed forwarding capability for that path.
 
 ## Variables
 
@@ -107,6 +109,9 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
   modes, and exact source-host lists.
 - `host_firewall_container_service_access`: independent container-to-management functions with exact interfaces,
   source and destination `/32` hosts, protocol/port, and modes. The empty default denies all new forwarding.
+- `host_firewall_forward_proxy_client_access`: exact container-to-host Squid clients. Every capability binds one
+  managed bridge, one RFC1918 source `/32`, that bridge's observed gateway, one non-privileged port, and modes. It
+  cannot be enabled together with the legacy aggregate `host_firewall_forward_proxy_access` contract.
 - `host_firewall_expected_*` and `host_firewall_observed_*`: target identity and observed-address binding.
 - `host_firewall_observed_container_bridge_gateways_ipv4`: read-only discovery evidence mapping each managed
   container bridge interface to its actual IPv4 gateway; generic observed host addresses cannot authorize DNS.
@@ -142,7 +147,7 @@ None.
 
 ```yaml
 ---
-- name: Check a bootstrap firewall candidate
+- name: Check a hardened firewall candidate with exact proxy clients
   hosts: root_of_trust
   become: true
   gather_facts: true
@@ -151,12 +156,19 @@ None.
       vars:
         host_firewall_enabled: true
         host_firewall_action: check
-        host_firewall_mode: bootstrap
+        host_firewall_mode: hardened
         host_firewall_expected_inventory_hostname: root01.example.net
         host_firewall_expected_public_ipv4: 192.0.2.10
         host_firewall_expected_management_ipv4: 10.0.30.10
         host_firewall_public_interface: enp1s0
         host_firewall_management_interface: enp1s0.4091
+        host_firewall_observed_ipv4_addresses:
+          - 192.0.2.10
+          - 10.0.30.10
+          - 10.89.0.1
+        host_firewall_container_interfaces: [podman1]
+        host_firewall_observed_container_bridge_gateways_ipv4:
+          podman1: 10.89.0.1
         host_firewall_management_access:
           bootstrap_ssh:
             port: 22
@@ -187,10 +199,32 @@ None.
             modes: [bootstrap, hardened]
             sources_ipv4: [198.51.100.20/32]
             sources_ipv6: []
+        host_firewall_forward_proxy_egress:
+          enabled: true
+          status: approved
+          mode: direct
+          owner_username: proxy
+          interface: enp1s0
+          destinations_ipv4: [0.0.0.0/0]
+          ports: [80, 443]
+          residual: "Owner-bound direct egress after proxy hardening."
+        host_firewall_forward_proxy_access:
+          enabled: false
+          port: 3128
+          interfaces: []
+          sources_ipv4: []
+          destination_ipv4: ""
+        host_firewall_forward_proxy_client_access:
+          keycloak:
+            interface: podman1
+            source_ipv4: 10.89.0.11/32
+            destination_ipv4: 10.89.0.1
+            port: 3128
+            modes: [hardened]
         host_firewall_egress_policy:
           schema: lit.host_firewall.egress/v1
-          status: draft
-          stance: bootstrap-restricted
+          status: approved
+          stance: deny-by-default
           ipv4_only: true
           functions:
             dns_udp:
@@ -242,17 +276,17 @@ None.
               status: approved
               residual: ""
             bootstrap_https:
-              enabled: true
+              enabled: false
               protocol: tcp
               port: 443
               modes: [bootstrap]
               interface: enp1s0
-              destinations_ipv4: [0.0.0.0/0]
+              destinations_ipv4: []
               destinations_ipv6: []
               declared_fqdns: []
               mtls_required: false
-              status: temporary-maintenance
-              residual: "Must be removed before hardened confirmation."
+              status: disabled-staged-transfer
+              residual: "Disabled after hardened proxy cutover."
             https_proxy:
               enabled: false
               protocol: tcp
