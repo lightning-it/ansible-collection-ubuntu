@@ -534,6 +534,59 @@
               - ansible_failed_task.name == 'Validate container access to the host-local Aardvark DNS listener'
             quiet: true
 
+    - name: Prove selected container DNS bridges must share one observed gateway
+      block:
+        - name: Attempt container DNS access across bridges with distinct gateways
+          ansible.builtin.include_role:
+            name: lit.ubuntu.host_firewall
+          vars:
+            host_firewall_action: check
+            host_firewall_mode: hardened
+            host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+            host_firewall_container_dns_access:
+              enabled: true
+              interfaces: [podman0, podman1]
+              sources_ipv4: [10.88.0.0/16, 10.89.0.0/16]
+              destination_ipv4: 10.88.0.1
+
+        - name: Fail when distinct bridge gateways were accepted
+          ansible.builtin.fail:
+            msg: "Container DNS unexpectedly accepted distinct selected bridge gateways."
+
+      rescue:
+        - name: Confirm distinct selected bridge gateways were rejected
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Validate container access to the host-local Aardvark DNS listener'
+            quiet: true
+
+    - name: Render container DNS across selected bridges with one observed gateway
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: check
+        host_firewall_mode: hardened
+        host_firewall_egress_policy: "{{ host_firewall_proxy_test_egress_policy }}"
+        host_firewall_observed_container_bridge_gateways_ipv4:
+          podman0: 10.88.0.1
+          podman1: 10.88.0.1
+        host_firewall_container_dns_access:
+          enabled: true
+          interfaces: [podman0, podman1]
+          sources_ipv4: [10.88.0.0/16, 10.89.0.0/16]
+          destination_ipv4: 10.88.0.1
+
+    - name: Confirm matching selected bridge gateways render successfully
+      ansible.builtin.assert:
+        that:
+          - >-
+            'iifname { "podman0", "podman1" } ip saddr @container_dns_clients_v4 ip daddr 10.88.0.1 udp dport 53'
+            in host_firewall_candidate_content
+          - >-
+            'iifname { "podman0", "podman1" } ip saddr @container_dns_clients_v4 ip daddr 10.88.0.1 tcp dport 53'
+            in host_firewall_candidate_content
+        quiet: true
+
     - name: Prove invalid local proxy identities fail before rendering
       ansible.builtin.include_tasks: verify-forward-proxy-identity.tasks.yml.inc
       loop:

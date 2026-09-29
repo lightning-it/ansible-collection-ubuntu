@@ -113,8 +113,9 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
   managed bridge, one RFC1918 source `/32`, that bridge's observed gateway, one non-privileged port, and modes. It
   cannot be enabled together with the legacy aggregate `host_firewall_forward_proxy_access` contract.
 - `host_firewall_expected_*` and `host_firewall_observed_*`: target identity and observed-address binding.
-- `host_firewall_observed_container_bridge_gateways_ipv4`: read-only discovery evidence mapping each managed
-  container bridge interface to its actual IPv4 gateway; generic observed host addresses cannot authorize DNS.
+- `host_firewall_observed_container_bridge_gateways_ipv4`: read-only discovery evidence mapping each selected
+  managed container bridge interface to its actual IPv4 gateway; generic observed host addresses cannot authorize
+  DNS. Unselected managed bridges do not require evidence.
 - `host_firewall_control_source_address` and `host_firewall_control_destination_port`: protected live SSH tuple.
 - `host_firewall_persistent_root_config_path`: administrator-owned root file, always read-only to the role.
 - `host_firewall_persistent_include_path`: the only persistent policy file owned by the role.
