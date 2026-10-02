@@ -1,6 +1,0 @@
----
-minor_changes:
-  - >-
-    Add a default-off, least-privilege container-to-host Aardvark DNS input
-    contract to ``lit.ubuntu.host_firewall`` for exact managed interfaces,
-    RFC1918 source networks, and one observed bridge gateway.
