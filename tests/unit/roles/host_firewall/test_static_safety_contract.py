@@ -156,9 +156,36 @@ class HostFirewallStaticSafetyTests(unittest.TestCase):
     def test_forward_proxy_egress_validates_types_and_local_account_before_render(self) -> None:
         egress = (ROLE_ROOT / "tasks" / "egress_assert.yml").read_text()
         main = (ROLE_ROOT / "tasks" / "main.yml").read_text()
+        policy = (ROLE_ROOT / "templates" / "host-firewall.nft.j2").read_text()
+        defaults = (ROLE_ROOT / "defaults" / "main.yml").read_text()
         self.assertIn("host_firewall_forward_proxy_egress.interface is string", egress)
         self.assertIn("host_firewall_forward_proxy_egress.owner_username is string", egress)
         self.assertIn("host_firewall_forward_proxy_access.destination_ipv4 is string", egress)
+        self.assertIn("host_firewall_forward_proxy_client_access is mapping", egress)
+        self.assertIn("item.value.modes == ['hardened']", egress)
+        self.assertIn(
+            "item.value.destination_ipv4\n"
+            "        == host_firewall_observed_container_bridge_gateways_ipv4[item.value.interface]",
+            egress,
+        )
+        self.assertIn(
+            'iifname "{{ client.value.interface }}" ip saddr {{ client.value.source_ipv4 }}',
+            policy,
+        )
+        self.assertIn("host_firewall_container_dns_access.destination_ipv4 is string", egress)
+        self.assertIn("host_firewall_observed_container_bridge_gateways_ipv4 is mapping", egress)
+        self.assertIn("map('extract', host_firewall_observed_container_bridge_gateways_ipv4)", egress)
+        self.assertIn("udp dport 53 ct state new accept", policy)
+        self.assertIn("tcp dport 53 ct state new accept", policy)
+        self.assertIn("host_firewall_container_dns_access", defaults)
+        self.assertIn("host_firewall_forward_proxy_client_access", defaults)
+        self.assertIn("host_firewall_observed_container_bridge_gateways_ipv4", defaults)
+        verify = (MOLECULE_ROOT / "verify.yml").read_text()
+        self.assertIn("distinct selected bridge gateways were rejected", verify)
+        self.assertIn("matching selected bridge gateways render successfully", verify)
+        readme = (ROLE_ROOT / "README.md").read_text()
+        self.assertIn("each selected\n  managed container bridge interface", readme)
+        self.assertIn("Unselected managed bridges do not require evidence", readme)
         self.assertIn("ansible.builtin.getent:", egress)
         self.assertIn("database: passwd", egress)
         self.assertIn("service: files", egress)

@@ -10,6 +10,10 @@ host_firewall_expected_public_ipv6: ""
 host_firewall_expected_management_ipv6: ""
 host_firewall_observed_ipv4_addresses: "{{ ansible_facts['all_ipv4_addresses'] | default([]) }}"
 host_firewall_observed_ipv6_addresses: "{{ ansible_facts['all_ipv6_addresses'] | default([]) }}"
+# Read-only discovery must bind every managed container bridge to its actual
+# IPv4 gateway before container DNS can be enabled. A generic observed host
+# address is not sufficient evidence for this security boundary.
+host_firewall_observed_container_bridge_gateways_ipv4: {}
 host_firewall_platform_name: "{{ ansible_facts['distribution'] | default('') }}"
 host_firewall_platform_version: "{{ ansible_facts['distribution_version'] | default('') }}"
 
@@ -152,6 +156,25 @@ host_firewall_forward_proxy_access:
   interfaces: []
   sources_ipv4: []
   destination_ipv4: ""
+
+# Exact per-client container-to-host Squid capabilities. This successor
+# contract avoids the interface/source/destination cross product of the legacy
+# aggregate above. Each client is one bridge, one /32 source, one observed
+# gateway destination, one port, and explicit operating modes. Both contracts
+# may not be active together.
+host_firewall_forward_proxy_client_access: {}
+
+# Rootful container networks resolve Podman aliases through Aardvark on the
+# exact bridge gateway. This input grant is deliberately independent of host
+# DNS egress and of proxy access: it permits only TCP/UDP 53 from explicitly
+# named container interfaces and RFC1918 source networks to one observed host
+# gateway address that is bound to every selected bridge interface by the
+# bridge-specific read-only evidence above.
+host_firewall_container_dns_access:
+  enabled: false
+  interfaces: []
+  sources_ipv4: []
+  destination_ipv4: ""
 host_firewall_cis_ipv6_required: "{{ ubtu24cis_ipv6_required | default(false) }}"
 host_firewall_provider_ipv6_filter_enabled: false
 host_firewall_provider_ipv6_filter_evidence_reference: ""
@@ -260,6 +283,20 @@ host_firewall_policy_material_effective: >-
           host_firewall_forward_proxy_egress.enabled | bool
           or host_firewall_forward_proxy_access.enabled | bool
         )
+        else {}
+      )
+    | combine(
+        {
+          'forward_proxy_client_access': host_firewall_forward_proxy_client_access
+        }
+        if host_firewall_forward_proxy_client_access | length > 0
+        else {}
+      )
+    | combine(
+        {
+          'container_dns_access': host_firewall_container_dns_access
+        }
+        if host_firewall_container_dns_access.enabled | bool
         else {}
       )
   }}

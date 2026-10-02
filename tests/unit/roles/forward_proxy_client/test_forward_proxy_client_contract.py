@@ -788,8 +788,14 @@ class ForwardProxyClientContractTests(unittest.TestCase):
         )[1].split("host_firewall_policy_fingerprint:", maxsplit=1)[0]
         self.assertNotIn("forward_proxy_egress", legacy_material)
         self.assertNotIn("forward_proxy_access", legacy_material)
+        self.assertNotIn("forward_proxy_client_access", legacy_material)
         self.assertIn("forward_proxy_egress", effective_material)
         self.assertIn("forward_proxy_access", effective_material)
+        self.assertIn("forward_proxy_client_access", effective_material)
+        self.assertIn(
+            "if host_firewall_forward_proxy_client_access | length > 0",
+            effective_material,
+        )
         self.assertIn("else {}", effective_material)
         self.assertIn(
             "host_firewall_policy_material_effective | to_json | hash('sha256')",
