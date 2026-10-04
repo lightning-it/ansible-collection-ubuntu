@@ -72,6 +72,13 @@ host_firewall_expected_tang_consumer_count: 3
 # functions. Every service declares one protocol/port and exact source hosts.
 host_firewall_public_service_access: {}
 
+# Rootful container publishing traverses DNAT/FORWARD, not host INPUT.
+# Reuse the exact public HTTPS source contract; never create a broad forward.
+host_firewall_published_https_access:
+  enabled: false
+  endpoints: []
+  host_proxy: false
+
 # Exact container-to-management service paths. Each named capability binds
 # source container interfaces and /32 addresses to one management interface,
 # exact /32 destinations, protocol, port, and operating modes. The empty
@@ -274,6 +281,11 @@ host_firewall_policy_material:
 host_firewall_policy_material_effective: >-
   {{
     host_firewall_policy_material
+    | combine(
+        {'published_https_access': host_firewall_published_https_access}
+        if host_firewall_published_https_access.enabled
+        else {}
+      )
     | combine(
         {
           'forward_proxy_egress': host_firewall_forward_proxy_egress,

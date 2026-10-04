@@ -839,6 +839,55 @@
             that:
               - ansible_failed_result is failed
 
+    - name: Plan exact published HTTPS without unrelated container forwarding
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: plan
+        host_firewall_container_service_access: {}
+        host_firewall_published_https_access:
+          enabled: true
+          endpoints:
+            - interface: podman0
+              ipv4: 10.88.0.2
+          host_proxy: false
+
+    - name: Validate the plan reports only the declared DNAT ingress
+      ansible.builtin.assert:
+        that:
+          - host_firewall_plan.new_container_forwarding == 'restricted'
+          - "'ct status dnat' in host_firewall_candidate_content"
+          - "'ct original ip daddr 192.0.2.10' in host_firewall_candidate_content"
+          - "'ct original protocol tcp ct original proto-dst 443' in host_firewall_candidate_content"
+          - "'set container_guacamole_rdp_sources_v4' not in host_firewall_candidate_content"
+          - "'ct status dnat' not in host_firewall_candidate_content.split('chain output {')[1]"
+
+    - name: Plan published HTTPS outside its permitted operating mode
+      ansible.builtin.include_role:
+        name: lit.ubuntu.host_firewall
+      vars:
+        host_firewall_action: plan
+        host_firewall_container_service_access: {}
+        host_firewall_published_https_access:
+          enabled: true
+          endpoints:
+            - interface: podman0
+              ipv4: 10.88.0.2
+          host_proxy: false
+        host_firewall_public_service_access:
+          https:
+            protocol: tcp
+            port: 443
+            modes: [hardened]
+            sources_ipv4: [198.51.100.20/32]
+            sources_ipv6: []
+
+    - name: Validate inactive published ingress stays denied
+      ansible.builtin.assert:
+        that:
+          - host_firewall_plan.new_container_forwarding == 'denied'
+          - "'ct status dnat' not in host_firewall_candidate_content"
+
     - name: Read administrator-owned root config after all safe checks
       ansible.builtin.slurp:
         src: "{{ host_firewall_persistent_root_config_path }}"
