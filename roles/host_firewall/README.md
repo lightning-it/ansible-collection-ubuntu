@@ -17,8 +17,10 @@ inherit management or Tang sources and never permit a broad IPv4 source range.
 
 Rootful container-published HTTPS traverses DNAT and FORWARD instead of INPUT. The default-off
 `host_firewall_published_https_access` capability reuses the existing `https` TCP/443 source and mode contract.
-Each endpoint declares one managed container bridge and one exact RFC1918 container IPv4 address; these must match
-the independently observed reverse-proxy membership. Rules require both the original public destination socket
+Each operator-maintained endpoint declares one managed container bridge and one exact RFC1918 container IPv4 address.
+The role validates the declaration, not live container membership: before applying it, the caller must independently
+verify the actual reverse-proxy membership and keep the declaration current. Stale or mistyped container addresses
+are not detected by this role. Rules require both the original public destination socket
 and the post-DNAT endpoint. Replies and related ICMP errors are bound to the same connection tuple. Direct backend
 access and arbitrary forwarded container traffic remain denied. IPv6 publishing is not supported.
 
