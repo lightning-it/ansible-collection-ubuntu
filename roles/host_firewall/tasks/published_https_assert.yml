@@ -1,0 +1,67 @@
+---
+- name: Validate the default-off published HTTPS contract
+  ansible.builtin.assert:
+    that:
+      - host_firewall_published_https_access is mapping
+      - host_firewall_published_https_access.keys() | list | sort == ['enabled', 'endpoints', 'host_proxy']
+      - host_firewall_published_https_access.enabled is boolean
+      - host_firewall_published_https_access.host_proxy is boolean
+      - host_firewall_published_https_access.endpoints is sequence
+      - host_firewall_published_https_access.endpoints is not string
+      - host_firewall_published_https_access.endpoints is not mapping
+      - >-
+        host_firewall_published_https_access.enabled
+        or (
+          host_firewall_published_https_access.endpoints | length == 0
+          and not host_firewall_published_https_access.host_proxy
+        )
+    fail_msg: "Published HTTPS requires an explicit default-off contract; disabled declarations must be empty."
+
+- name: Bind published HTTPS to the existing exact public service
+  ansible.builtin.assert:
+    that:
+      - host_firewall_public_service_access.get('https', {}) is mapping
+      - host_firewall_public_service_access.get('https', {}).get('protocol', '') == 'tcp'
+      - host_firewall_public_service_access.get('https', {}).get('port', 0) == 443
+      - host_firewall_public_service_access.https.sources_ipv4 | length > 0
+      - host_firewall_public_service_access.https.sources_ipv6 | length == 0
+      - host_firewall_published_https_access.endpoints | length > 0
+      - >-
+        not host_firewall_published_https_access.host_proxy
+        or (
+          host_firewall_forward_proxy_egress.enabled is sameas true
+          and host_firewall_expected_public_ipv4 ~ '/32'
+            in host_firewall_public_service_access.https.sources_ipv4
+        )
+    fail_msg: >-
+      Published HTTPS needs the existing TCP/443 source-host contract. Local hairpin access additionally needs the
+      separately validated forward-proxy identity and the host public address in the HTTPS source contract.
+  when: host_firewall_published_https_access.enabled
+
+- name: Validate each exact private published HTTPS endpoint
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.keys() | list | sort == ['interface', 'ipv4']
+      - item.interface is string
+      - item.interface in host_firewall_container_interfaces
+      - item.interface not in [host_firewall_public_interface, host_firewall_management_interface, 'lo']
+      - item.ipv4 is string
+      - item.ipv4 is match(host_firewall_ipv4_pattern)
+      - item.ipv4 is match('^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)')
+      - item.ipv4 not in host_firewall_observed_ipv4_addresses
+    fail_msg: "Published HTTPS endpoints must be exact RFC1918 container addresses on explicitly managed bridges."
+  loop: "{{ host_firewall_published_https_access.endpoints }}"
+  when: host_firewall_published_https_access.enabled
+
+- name: Reject ambiguous duplicate published HTTPS endpoints
+  ansible.builtin.assert:
+    that:
+      - >-
+        host_firewall_published_https_access.endpoints | map(attribute='ipv4') | unique | list | length
+        == host_firewall_published_https_access.endpoints | length
+      - >-
+        host_firewall_published_https_access.endpoints | map(attribute='interface') | unique | list | length
+        == host_firewall_published_https_access.endpoints | length
+    fail_msg: "Each published HTTPS endpoint must name one unique container address and bridge."
+  when: host_firewall_published_https_access.enabled

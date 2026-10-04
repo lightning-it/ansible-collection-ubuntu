@@ -142,6 +142,15 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
         type filter hook forward priority {{ host_firewall_forward_priority }}; policy drop;
 
         ct state invalid drop
+{% if host_firewall_published_https_access.enabled and host_firewall_mode in host_firewall_public_service_access.https.modes %}
+{% for endpoint in host_firewall_published_https_access.endpoints %}
+        # Published HTTPS is bound to the original public socket AND its exact post-DNAT endpoint.
+        iifname "{{ host_firewall_public_interface }}" oifname "{{ endpoint.interface }}" ip saddr @public_https_sources_v4 ip daddr {{ endpoint.ipv4 }} tcp dport 443 ct state { new, established } ct direction original ct status dnat ct original ip saddr @public_https_sources_v4 ct original ip daddr {{ host_firewall_expected_public_ipv4 }} ct original protocol tcp ct original proto-dst 443 accept
+        iifname "{{ endpoint.interface }}" oifname "{{ host_firewall_public_interface }}" ip saddr {{ endpoint.ipv4 }} ip daddr @public_https_sources_v4 tcp sport 443 ct state established ct direction reply ct status dnat ct original ip saddr @public_https_sources_v4 ct original ip daddr {{ host_firewall_expected_public_ipv4 }} ct original protocol tcp ct original proto-dst 443 accept
+        iifname "{{ host_firewall_public_interface }}" oifname "{{ endpoint.interface }}" ip daddr {{ endpoint.ipv4 }} meta nfproto ipv4 ip protocol icmp icmp type { destination-unreachable, time-exceeded, parameter-problem } ct state related ct status dnat ct original ip saddr @public_https_sources_v4 ct original ip daddr {{ host_firewall_expected_public_ipv4 }} ct original protocol tcp ct original proto-dst 443 accept
+        iifname "{{ endpoint.interface }}" oifname "{{ host_firewall_public_interface }}" ip saddr {{ endpoint.ipv4 }} ip daddr @public_https_sources_v4 meta nfproto ipv4 ip protocol icmp icmp type { destination-unreachable, time-exceeded, parameter-problem } ct state related ct status dnat ct original ip saddr @public_https_sources_v4 ct original ip daddr {{ host_firewall_expected_public_ipv4 }} ct original protocol tcp ct original proto-dst 443 accept
+{% endfor %}
+{% endif %}
 {% for function in host_firewall_container_service_access | dict2items %}
 {% if host_firewall_mode in function.value.modes %}
         iifname { {{ function.value.interfaces | map('to_json') | join(', ') }} } ip saddr @container_{{ function.key }}_sources_v4 oifname "{{ function.value.destination_interface }}" ip daddr @container_{{ function.key }}_destinations_v4 {{ function.value.protocol }} dport {{ function.value.port }} ct state { new, established } accept
@@ -166,6 +175,12 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
         ct state invalid drop
         meta nfproto ipv4 ct state { established, related } accept
         meta nfproto ipv4 ip protocol icmp accept
+{% if host_firewall_published_https_access.enabled and host_firewall_published_https_access.host_proxy and host_firewall_mode in host_firewall_public_service_access.https.modes %}
+{% for endpoint in host_firewall_published_https_access.endpoints %}
+        # Only the validated local Squid identity may follow public HTTPS DNAT back to this endpoint.
+        meta skuid {{ ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1] | int }} oifname "{{ endpoint.interface }}" ip daddr {{ endpoint.ipv4 }} tcp dport 443 ct state { new, established } ct direction original ct status dnat ct original ip daddr {{ host_firewall_expected_public_ipv4 }} ct original protocol tcp ct original proto-dst 443 accept
+{% endfor %}
+{% endif %}
 {% if host_firewall_forward_proxy_egress.enabled %}
         meta skuid {{ ansible_facts.getent_passwd[host_firewall_forward_proxy_egress.owner_username][1] | int }} oifname "{{ host_firewall_forward_proxy_egress.interface }}" ip daddr { {{ host_firewall_forward_proxy_egress.destinations_ipv4 | join(', ') }} } tcp dport { {{ host_firewall_forward_proxy_egress.ports | join(', ') }} } ct state new accept
 {% endif %}

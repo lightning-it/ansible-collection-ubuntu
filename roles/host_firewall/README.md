@@ -11,9 +11,32 @@ approved for more than one function without granting access to any other port. T
 IPv4-only; every IPv6 identity, source, destination, and explicit IPv6 allow path is rejected. IPv6 addresses observed
 on a provider interface receive no allow rule and are therefore denied by the host input, forward, and output policy.
 
-Public application entry points use the separate `host_firewall_public_service_access` mapping. Each named service
+Public host application entry points use the separate `host_firewall_public_service_access` mapping. Each named service
 declares one TCP/UDP port, explicit bootstrap/hardened modes, and exact IPv4 `/32` sources. Public services never
 inherit management or Tang sources and never permit a broad IPv4 source range.
+
+Rootful container-published HTTPS traverses DNAT and FORWARD instead of INPUT. The default-off
+`host_firewall_published_https_access` capability reuses the existing `https` TCP/443 source and mode contract.
+Each operator-maintained endpoint declares one managed container bridge and one exact RFC1918 container IPv4 address.
+The role validates the declaration, not live container membership: before applying it, the caller must independently
+verify the actual reverse-proxy membership and keep the declaration current. Stale or mistyped container addresses
+are not detected by this role. Rules require both the original public destination socket
+and the post-DNAT endpoint. Replies and related ICMP errors are bound to the same connection tuple. Direct backend
+access and arbitrary forwarded container traffic remain denied. IPv6 publishing is not supported.
+
+Set `host_proxy: true` only when the existing validated `proxy` UID/GID 13 must reach this same public HTTPS name
+through host-local DNAT. This additionally requires the host public `/32` in the HTTPS source list and permits only
+that identity, exact bridge, endpoint and original TCP/443 destination. It creates no new NAT rules or listeners.
+The enabled declaration participates in the policy fingerprint; default-off leaves existing policy material unchanged.
+
+```yaml
+host_firewall_published_https_access:
+  enabled: true
+  endpoints:
+    - interface: podman0
+      ipv4: 10.88.0.2
+  host_proxy: false
+```
 
 `plan` renders the candidate and its closed authorization contract. `preview` executes the candidate in an isolated
 network namespace and verifies its canonical readback without changing the host firewall. `check` executes `nft --check` even when Ansible
@@ -65,8 +88,9 @@ valid signed envelopes remain deployment prerequisites; repository tests do not 
 - An independently reviewed canonical nftables JSON digest for structured readback.
 - External positive and negative connectivity tests for confirmation.
 
-The role does not install packages, change provider firewalls, or create DNS. New container forwarding remains denied
-unless `host_firewall_container_service_access` declares an exact capability. Each capability is limited to named
+The role does not install packages, change provider firewalls, or create DNS. Apart from explicitly declared published
+HTTPS, new container forwarding remains denied unless `host_firewall_container_service_access` declares an exact
+capability. Each such capability is limited to named
 container interfaces and source `/32` addresses, the management interface, destination `/32` addresses, one TCP/UDP
 port, and explicit modes. Return traffic is admitted only for the same endpoints and service port in established or
 related state; no generic container forwarding is created.
@@ -107,6 +131,8 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `host_firewall_tang_access`: fixed TCP 80 with explicit IPv4 and IPv6 consumer host lists.
 - `host_firewall_public_service_access`: independent public application functions with fixed protocol/port, explicit
   modes, and exact source-host lists.
+- `host_firewall_published_https_access`: default-off DNAT-bound TCP/443 ingress to exact private container endpoints,
+  optionally including the separately identity-bound local forward-proxy path described above.
 - `host_firewall_container_service_access`: independent container-to-management functions with exact interfaces,
   source and destination `/32` hosts, protocol/port, and modes. The empty default denies all new forwarding.
 - `host_firewall_forward_proxy_client_access`: exact container-to-host Squid clients. Every capability binds one

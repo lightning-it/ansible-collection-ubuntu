@@ -270,6 +270,10 @@
     label: "{{ item }}"
   when: host_firewall_enabled | bool
 
+- name: Validate published container HTTPS boundaries
+  ansible.builtin.import_tasks: published_https_assert.yml
+  when: host_firewall_enabled | bool
+
 - name: Validate exact container service inventory
   ansible.builtin.assert:
     that:
