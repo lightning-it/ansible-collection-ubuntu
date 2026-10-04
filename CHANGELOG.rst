@@ -4,6 +4,15 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.15.0
+=======
+
+Minor Changes
+-------------
+
+- Add a default-off, least-privilege container-to-host Aardvark DNS input contract to ``lit.ubuntu.host_firewall`` for exact managed interfaces, RFC1918 source networks, and one observed bridge gateway.
+- Add fail-closed per-client container-to-host Squid capabilities that bind one bridge, source /32, observed bridge gateway, port, and operating mode without an aggregate interface/source/destination cross product.
+
 v1.14.0
 =======
 

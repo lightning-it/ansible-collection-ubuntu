@@ -1,6 +1,0 @@
----
-minor_changes:
-  - >-
-    Add fail-closed per-client container-to-host Squid capabilities that bind
-    one bridge, source /32, observed bridge gateway, port, and operating mode
-    without an aggregate interface/source/destination cross product.

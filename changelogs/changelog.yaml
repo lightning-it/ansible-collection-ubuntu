@@ -156,6 +156,22 @@ releases:
       - li139-container-related-icmp.yml
       - li139-exact-container-service-forwarding.yml
     release_date: '2026-09-21'
+  1.15.0:
+    changes:
+      minor_changes:
+        - Add a default-off, least-privilege container-to-host Aardvark DNS input
+          contract to ``lit.ubuntu.host_firewall`` for exact managed interfaces, RFC1918
+          source networks, and one observed bridge gateway.
+        - Add fail-closed per-client container-to-host Squid capabilities that bind
+          one bridge, source /32, observed bridge gateway, port, and operating mode
+          without an aggregate interface/source/destination cross product.
+    fragments:
+      - host-firewall-container-dns-multibridge-tests.yml
+      - host-firewall-container-dns.yml
+      - li139-container-backend-firewall.yml
+      - shared-assets-sync-36598566307.yml
+      - shared-assets-sync-36752940932.yml
+    release_date: '2026-10-02'
   1.2.0:
     changes:
       bugfixes:
