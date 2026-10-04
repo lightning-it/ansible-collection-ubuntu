@@ -172,6 +172,15 @@ releases:
       - shared-assets-sync-36598566307.yml
       - shared-assets-sync-36752940932.yml
     release_date: '2026-10-02'
+  1.16.0:
+    changes:
+      bugfixes:
+        - host_firewall - support explicit rootful container HTTPS publishing with
+          exact source, bridge, endpoint and conntrack-DNAT bindings, plus separately
+          identity-bound local proxy hairpin access; defaults remain closed.
+    fragments:
+      - published-container-https.yml
+    release_date: '2026-10-04'
   1.2.0:
     changes:
       bugfixes:

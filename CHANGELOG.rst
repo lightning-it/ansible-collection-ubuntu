@@ -4,6 +4,14 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.16.0
+=======
+
+Bugfixes
+--------
+
+- host_firewall - support explicit rootful container HTTPS publishing with exact source, bridge, endpoint and conntrack-DNAT bindings, plus separately identity-bound local proxy hairpin access; defaults remain closed.
+
 v1.15.0
 =======
 
