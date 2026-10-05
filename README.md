@@ -92,12 +92,20 @@ Ubuntu-native package and repository management.
   interface/source/destination cross product. Container service forwarding remains restricted to the management
   interface. Reverse-proxy-to-backend traffic inside one dedicated Podman bridge stays layer 2 and is therefore not
   represented as host-routed forwarding by this role.
+  `host_firewall_container_dns_clients` defaults to an empty mapping. Its separate per-client mode permits only
+  INPUT UDP/53 from each exact private `/32` client to its observed bridge gateway; it grants no TCP or FORWARD
+  access and cannot coexist with aggregate container DNS access.
 - `lit.ubuntu.forward_proxy_client`
   Configure Ubuntu APT, process, systemd, and optional Podman clients for the
   separately deployed portable forward proxy.
 - `lit.ubuntu.podman`, `lit.ubuntu.gui`, `lit.ubuntu.xrdp`,
   `lit.ubuntu.firefox`, and `lit.ubuntu.vscode`
   Provide optional workstation and remote desktop building blocks.
+  Podman's `podman_dns_authoritative_only` defaults to false. Opting in requires the actual Netavark resolver
+  path in `podman_dns_resolver_executable` and its independently approved SHA256 in `podman_dns_resolver_sha256`.
+  The role validates the effective helper and trusted ancestors before persisting `AARDVARK_NO_PROXY` for future
+  launches. It does not restart an existing resolver or replace occupied networks; runtime cutover and health
+  verification remain separate. See the disabled Podman and exact-DNS examples in `playbooks/example.yml`.
 
 ## Example
 
