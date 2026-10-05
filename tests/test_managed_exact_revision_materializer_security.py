@@ -177,7 +177,7 @@ class ExactRevisionMaterializerTests(unittest.TestCase):
 
     def test_diff_read_guard_rejects_unrelated_decoy_assignments(self) -> None:
         tree, _, original = self._diff_read_fixture()
-        original.value = ast.parse("patch.read_bytes()", mode="eval").body
+        original.value = ast.parse("unprotected_bytes", mode="eval").body
         decoy = "\ndef unrelated_decoy():\n"
         decoy += "".join("    " * depth + "if True:\n" for depth in range(1, 10))
         for assignment in (
@@ -205,6 +205,15 @@ class ExactRevisionMaterializerTests(unittest.TestCase):
         with mock.patch.object(Path, "read_text", return_value=reformatted):
             self.test_diff_read_guard_rejects_unrelated_decoy_assignments()
             self.test_diff_read_guard_rejects_duplicate_verifier_assignments()
+            self.test_diff_read_guard_rejects_direct_read_with_valid_assignments()
+
+    def test_diff_read_guard_rejects_direct_read_with_valid_assignments(self) -> None:
+        tree, verifier, _ = self._diff_read_fixture()
+        verifier.body.append(ast.parse("patch.read_bytes()").body[0])
+        with self.assertRaises(AssertionError):
+            self._assert_protected_diff_reads(
+                ast.unparse(ast.fix_missing_locations(tree))
+            )
 
     def test_unfinished_reservation_is_always_failed_closed(self) -> None:
         workflow = REVIEW_WORKFLOW.read_text(encoding="utf-8")
