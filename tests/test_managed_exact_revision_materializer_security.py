@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import os
 import subprocess
@@ -114,11 +115,31 @@ class ExactRevisionMaterializerTests(unittest.TestCase):
         source = MATERIALIZER.read_text(encoding="utf-8")
         self.assertNotIn("patch.read_bytes()", source)
         self.assertNotIn('(regenerated / "change.patch").read_bytes()', source)
-        self.assertIn('patch, "review diff"', source)
-        self.assertIn(
-            'regenerated / "change.patch", "regenerated diff"',
-            source,
-        )
+        tree = ast.parse(source)
+        assignments = {
+            node.targets[0].id: node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id in {"original_diff", "fresh_diff"}
+        }
+        self.assertEqual({"original_diff", "fresh_diff"}, set(assignments))
+        for name, path, label in (
+            ("original_diff", "patch", "review diff"),
+            ("fresh_diff", "regenerated / 'change.patch'", "regenerated diff"),
+        ):
+            with self.subTest(name=name):
+                call = assignments[name]
+                self.assertIsInstance(call, ast.Call)
+                self.assertEqual("protected_asset_bytes", ast.unparse(call.func))
+                self.assertEqual(2, len(call.args))
+                self.assertEqual(path, ast.unparse(call.args[0]))
+                self.assertEqual(label, ast.literal_eval(call.args[1]))
+                self.assertEqual(
+                    [("maximum", "maximum")],
+                    [(item.arg, ast.unparse(item.value)) for item in call.keywords],
+                )
 
     def test_unfinished_reservation_is_always_failed_closed(self) -> None:
         workflow = REVIEW_WORKFLOW.read_text(encoding="utf-8")
