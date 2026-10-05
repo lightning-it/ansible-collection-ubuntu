@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from pathlib import Path
+import json
 import tomllib
 import unittest
 
@@ -26,6 +27,55 @@ def accepted(task, variables):
 
 
 class AuthoritativeDnsTests(unittest.TestCase):
+    def test_effective_helper_binding_rejects_decoys_or_missing_identity(self):
+        tasks = load(ROLE / "tasks/dns_authoritative.yml")
+        gate = next(task for task in tasks if task["name"] ==
+                    "Bind the approved resolver to the helper Podman actually uses")
+        path = "/usr/lib/podman/aardvark-dns"
+        def check(info):
+            return accepted(gate, {"podman_dns_effective_info": {"stdout": json.dumps(info)},
+                                   "podman_dns_resolver_executable": path})
+        valid = {"host": {"networkBackend": "netavark", "networkBackendInfo": {"dns": {"path": path}}}}
+        self.assertTrue(check(valid))
+        for info in ({}, {"host": {}}, {"host": {"networkBackend": "cni"}},
+                     {"host": {"networkBackend": "netavark", "networkBackendInfo": {"dns": {"path": "/tmp/aardvark-dns"}}}}):
+            with self.subTest(info=info):
+                self.assertFalse(check(info))
+        self.assertFalse(tasks[0]["changed_when"])
+        self.assertFalse(tasks[0]["check_mode"])
+        self.assertTrue(tasks[0]["no_log"])
+
+    def test_resolver_ancestor_gate_rejects_replaceable_or_linked_paths(self):
+        tasks = load(ROLE / "tasks/dns_authoritative.yml")
+        gate = next(task for task in tasks if task["name"] ==
+                    "Reject replaceable or linked resolver directory ancestors")
+        trusted = {"isdir": True, "islnk": False, "uid": 0, "wgrp": False, "woth": False}
+        self.assertTrue(accepted(gate, {"item": {"stat": trusted}}))
+        for field, value in (("isdir", False), ("islnk", True), ("uid", 1000),
+                             ("wgrp", True), ("woth", True)):
+            with self.subTest(field=field):
+                self.assertFalse(accepted(gate, {"item": {"stat": {**trusted, field: value}}}))
+        self.assertFalse(accepted(gate, {"item": {"stat": {}}}))
+        inspect = next(task for task in tasks if task["name"].startswith("Inspect every approved resolver"))
+        self.assertFalse(inspect["ansible.builtin.stat"]["follow"])
+        variables = {"podman_dns_resolver_executable": "/usr/lib/podman/aardvark-dns"}
+        indices = Templar(DataLoader(), variables).template(inspect["loop"])
+        self.assertEqual(indices, [1, 2, 3, 4])
+        paths = [Templar(DataLoader(), {**variables, "item": index}).template(
+            inspect["ansible.builtin.stat"]["path"]) for index in indices]
+        self.assertEqual(paths, ["/", "/usr", "/usr/lib", "/usr/lib/podman"])
+        self.assertLess(tasks.index(gate), next(i for i, task in enumerate(tasks) if "ansible.builtin.copy" in task))
+
+    def test_dangling_config_links_are_rejected_before_creation(self):
+        tasks = load(ROLE / "tasks/dns_authoritative.yml")
+        directory = next(task for task in tasks if task["name"] ==
+                         "Reject unsafe authoritative DNS configuration ancestors")
+        file = next(task for task in tasks if task["name"] == "Reject an unsafe authoritative DNS startup file")
+        for linked in (False, True):
+            absent = {"exists": False, "islnk": linked}
+            self.assertEqual(accepted(directory, {"item": {"stat": absent}}), not linked)
+            self.assertEqual(accepted(file, {"podman_dns_startup_file": {"stat": absent}}), not linked)
+
     def test_input_gate_is_default_off_and_requires_exact_pins(self):
         gate = load(ROLE / "tasks/main.yml")[0]
         defaults = load(ROLE / "defaults/main.yml")

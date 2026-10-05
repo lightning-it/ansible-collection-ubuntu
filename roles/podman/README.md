@@ -33,7 +33,11 @@ None.
 - `podman_dns_authoritative_only`: opt-in no-forwarding startup policy for the
   shared Aardvark resolver (default: `false`, existing policy untouched).
   Requires `podman_dns_resolver_executable` and `podman_dns_resolver_sha256`
-  to identify a reviewed build supporting `AARDVARK_NO_PROXY`, and Podman
+  to identify a reviewed build supporting `AARDVARK_NO_PROXY`. The effective
+  Netavark DNS helper path reported by `podman info` must match that input;
+  every helper ancestor must be a real root-owned non-writable directory.
+  Dangling links at managed configuration paths are rejected before creation.
+  Requires Podman
   4.9.3 or later with append-capable `containers.conf`. The role writes one
   root-owned drop-in and appends the engine variable without replacing other
   engine environment entries. It does not restart a running resolver, alter

@@ -1,4 +1,47 @@
 ---
+- name: Read the effective Podman network helper identity
+  ansible.builtin.command:
+    argv: ["{{ podman_executable_path }}", info, --format, json]
+  register: podman_dns_effective_info
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Bind the approved resolver to the helper Podman actually uses
+  ansible.builtin.assert:
+    that:
+      - (podman_dns_effective_info.stdout | from_json).get('host', {}).get('networkBackend') == 'netavark'
+      - >-
+        (podman_dns_effective_info.stdout | from_json).get('host', {})
+        .get('networkBackendInfo', {}).get('dns', {}).get('path')
+        == podman_dns_resolver_executable
+    fail_msg: The approved resolver must equal the effective Netavark DNS helper reported by Podman.
+    quiet: true
+  no_log: true
+
+- name: Inspect every approved resolver directory ancestor without following links
+  ansible.builtin.stat:
+    path: >-
+      {{ ((podman_dns_resolver_executable | dirname | split('/'))[:item] | join('/')) or '/' }}
+    follow: false
+  loop: "{{ range(1, (podman_dns_resolver_executable | dirname | split('/') | length) + 1) | list }}"
+  register: podman_dns_resolver_ancestors
+  changed_when: false
+
+- name: Reject replaceable or linked resolver directory ancestors
+  ansible.builtin.assert:
+    that:
+      - item.stat.isdir | default(false)
+      - not item.stat.islnk | default(false)
+      - item.stat.uid | default(-1) == 0
+      - not item.stat.wgrp | default(true)
+      - not item.stat.woth | default(true)
+    fail_msg: Every resolver ancestor must be an existing real root-owned non-writable directory.
+    quiet: true
+  loop: "{{ podman_dns_resolver_ancestors.results }}"
+  loop_control:
+    label: "{{ item.stat.path | default('invalid') }}"
+
 - name: Inspect the approved DNS resolver executable
   ansible.builtin.stat:
     path: "{{ podman_dns_resolver_executable }}"
@@ -50,9 +93,10 @@
   ansible.builtin.assert:
     that:
       - >-
-        not item.stat.exists or
-        (item.stat.isdir and not item.stat.islnk and item.stat.uid == 0
-         and not item.stat.wgrp and not item.stat.woth)
+        not item.stat.islnk | default(false) and
+        (not item.stat.exists or
+         (item.stat.isdir and item.stat.uid == 0
+          and not item.stat.wgrp and not item.stat.woth))
     fail_msg: DNS configuration ancestors must be real root-owned non-writable directories.
     quiet: true
   loop: "{{ podman_dns_config_ancestors.results }}"
@@ -70,10 +114,10 @@
   ansible.builtin.assert:
     that:
       - >-
-        not podman_dns_startup_file.stat.exists or
-        (podman_dns_startup_file.stat.isreg and not podman_dns_startup_file.stat.islnk
-         and podman_dns_startup_file.stat.uid == 0
-         and not podman_dns_startup_file.stat.wgrp and not podman_dns_startup_file.stat.woth)
+        not podman_dns_startup_file.stat.islnk | default(false) and
+        (not podman_dns_startup_file.stat.exists or
+         (podman_dns_startup_file.stat.isreg and podman_dns_startup_file.stat.uid == 0
+          and not podman_dns_startup_file.stat.wgrp and not podman_dns_startup_file.stat.woth))
     fail_msg: The role-owned DNS startup file must not be a symlink or untrusted file.
     quiet: true
 
