@@ -7,6 +7,7 @@
   ansible.builtin.package:
     name: "{{ podman_packages }}"
     state: present
+  register: podman_package_install
   when: podman_packages | length > 0
 
 - name: Validate package-provided AppArmor profiles after installation
@@ -123,7 +124,10 @@
 
 - name: Persist the opt-in authoritative-only DNS startup policy
   ansible.builtin.include_tasks: dns_authoritative.yml
-  when: podman_dns_authoritative_only
+  when:
+    - podman_dns_authoritative_only
+    - >-
+      not ansible_check_mode or not (podman_package_install | default({'changed': false})).changed
 
 - name: Reconcile the system Podman API socket
   ansible.builtin.systemd_service:

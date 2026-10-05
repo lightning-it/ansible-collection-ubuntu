@@ -37,6 +37,9 @@ None.
   Netavark DNS helper path reported by `podman info` must match that input;
   every helper ancestor must be a real root-owned non-writable directory.
   Dangling links at managed configuration paths are rejected before creation.
+  If check mode predicts package installation, the DNS taskset is deferred:
+  no executable inspection or startup-file write is attempted. A real apply
+  must still pass every helper and checksum check before writing the policy.
   Requires Podman
   4.9.3 or later with append-capable `containers.conf`. The role writes one
   root-owned drop-in and appends the engine variable without replacing other

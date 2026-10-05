@@ -164,7 +164,26 @@ class AuthoritativeDnsTests(unittest.TestCase):
             self.assertNotIn("ansible.builtin.shell", task)
         include = next(task for task in load(ROLE / "tasks/main.yml")
                        if task.get("ansible.builtin.include_tasks") == "dns_authoritative.yml")
-        self.assertEqual(include["when"], "podman_dns_authoritative_only")
+        self.assertEqual(include["when"][0], "podman_dns_authoritative_only")
+
+    def test_first_install_check_mode_defers_all_executable_dependent_dns_tasks(self):
+        tasks = load(ROLE / 'tasks/main.yml')
+        package = next(task for task in tasks if 'ansible.builtin.package' in task)
+        self.assertEqual(package['register'], 'podman_package_install')
+        include = next(task for task in tasks
+                       if task.get('ansible.builtin.include_tasks') == 'dns_authoritative.yml')
+        for enabled in (False, True):
+            for check_mode in (False, True):
+                for pending_install in (False, True):
+                    variables = {'podman_dns_authoritative_only': enabled,
+                                 'ansible_check_mode': check_mode,
+                                 'podman_package_install': {'changed': pending_install}}
+                    loader = DataLoader()
+                    gate = Conditional(loader=loader)
+                    gate.when = include['when']
+                    with self.subTest(enabled=enabled, check_mode=check_mode, pending=pending_install):
+                        self.assertEqual(gate.evaluate_conditional(Templar(loader, variables), variables),
+                                         enabled and (not check_mode or not pending_install))
 
     def test_version_gate_rejects_older_or_unrecognized_clients(self):
         gate = next(task for task in load(ROLE / "tasks/dns_authoritative.yml")
