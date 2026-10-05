@@ -1075,7 +1075,9 @@ jobs:
           attempt_one_inventory_deadline_ms=''
           test "${attempt_one_inventory_converged}" = true
           # Validate only the converged attempt-one inventory.
-          jq -e '
+          jq -e \
+            --argjson run_id "${run_id}" \
+            --arg head "${EXPECTED_HEAD}" '
             type == "array"
             and length > 0
             and all(.[];
@@ -1086,15 +1088,20 @@ jobs:
               | all(.[]; .total_count == $job_count))
             and all(.[].jobs[];
               type == "object"
-              and (.id | type) == "number" and .id > 0
+              and (.id | type) == "number"
+              and (.id | floor) == .id and .id > 0
               and (.name | type) == "string"
-              and (.run_attempt | type) == "number" and .run_attempt >= 1
+              and .run_id == $run_id
+              and .head_sha == $head
+              and .run_attempt == 1
               and (.steps | type) == "array"
               and has("runner_id")
               and (.runner_id == null
                 or ((.runner_id | type) == "number" and .runner_id > 0))
               and .status == "completed"
               and (.conclusion | type) == "string")
+            and (([.[].jobs[].id] | length)
+              == ([.[].jobs[].id] | unique | length))
           ' <<<"${attempt_one_jobs_pages}" >/dev/null
           attempt_one_jobs=$(jq -c '[.[].jobs[]]' <<<"${attempt_one_jobs_pages}")
           jq -e 'all(.[]; has("runner_id") and (.steps | type) == "array")' <<<"${attempt_one_jobs}" >/dev/null
@@ -1104,6 +1111,27 @@ jobs:
           # is never review evidence. Routed S0 jobs are accepted only as skipped.
           synthetic_evidence_jobs=$(jq -c '[.[] | select(.runner_id == null and (.steps | length) == 0) | select(.name == "Current revision review" or .name == "Protected current-revision verifier") | select(.run_attempt == 1 and .status == "completed" and .conclusion == "success")]' <<<"${attempt_one_jobs}")
           test "$(jq 'length' <<<"${synthetic_evidence_jobs}")" -le 2
+          # A failed reservation is not review PASS evidence. It is only the
+          # exact API check already bound above to this required run, PR and
+          # head. Draft-time failure leaves it in the attempt-one inventory;
+          # count that known record without selecting it as a rerun target.
+          failed_reservation_jobs=$(jq -c \
+            --argjson reservations "${matching_reservations}" \
+            --argjson run_id "${run_id}" \
+            --arg head "${EXPECTED_HEAD}" '
+              [.[] | select(
+                ($reservations | length) == 1
+                and $reservations[0].status == "completed"
+                and $reservations[0].conclusion == "failure"
+                and $reservations[0].head_sha == $head
+                and .id == $reservations[0].id
+                and .run_id == $run_id and .head_sha == $head
+                and .name == "Protected current-revision verifier"
+                and .runner_id == null and (.steps | length) == 0
+                and .run_attempt == 1 and .status == "completed"
+                and .conclusion == "failure")]
+            ' <<<"${attempt_one_jobs}")
+          test "$(jq 'length' <<<"${failed_reservation_jobs}")" -le 1
           synthetic_authorization_jobs=$(jq -c '[.[] | select(.runner_id == null and (.steps | length) == 0) | select(.name == "Authorize exact Supplementary catch-up v5 successor") | select(.run_attempt == 1 and .status == "completed" and .conclusion == "skipped")]' <<<"${attempt_one_jobs}")
           test "$(jq 'length' <<<"${synthetic_authorization_jobs}")" -le 1
           synthetic_promotion_jobs=$(jq -c '[.[] | select(.runner_id == null and (.steps | length) == 0) | select(.name == "Verify aggregated develop-to-main promotion evidence") | select(.run_attempt == 1 and .status == "completed" and .conclusion == "skipped")]' <<<"${attempt_one_jobs}")
@@ -1123,6 +1151,7 @@ jobs:
               <<<"${attempt_one_jobs}" >/dev/null; then
             jq -e \
               --argjson evidence "${synthetic_evidence_jobs}" \
+              --argjson failed_reservation "${failed_reservation_jobs}" \
               --argjson authorization "${synthetic_authorization_jobs}" \
               --argjson promotion "${synthetic_promotion_jobs}" '
                 def runner($name; $conclusion):
@@ -1134,7 +1163,7 @@ jobs:
                     and (.steps | length) == 0 and .conclusion == "skipped")]
                   | length == 1;
                 length == (6 + ($evidence | length) + ($authorization | length)
-                  + ($promotion | length))
+                  + ($promotion | length) + ($failed_reservation | length))
                 and runner("Route protected current-revision verification"; "success")
                 and runner("Legacy protected current-revision verifier"; "failure")
                 and runner("Required current-revision workflow"; "failure")
@@ -1145,7 +1174,7 @@ jobs:
             rerunnable_jobs=$(jq -c '[.[] | select(.name == "Legacy protected current-revision verifier") | select(.runner_id != null and (.steps | length) > 0) | select(.run_attempt == 1) | select(.status == "completed" and .conclusion == "failure")]' <<<"${runner_backed_jobs}")
           else
             test "$(jq 'length' <<<"${attempt_one_jobs}")" -eq \
-              "$(jq -n --argjson authorization "${synthetic_authorization_jobs}" --argjson evidence "${synthetic_evidence_jobs}" --argjson promotion "${synthetic_promotion_jobs}" --argjson runners "${runner_backed_jobs}" '(($authorization | length) + ($evidence | length) + ($promotion | length) + ($runners | length))')"
+              "$(jq -n --argjson authorization "${synthetic_authorization_jobs}" --argjson evidence "${synthetic_evidence_jobs}" --argjson failed_reservation "${failed_reservation_jobs}" --argjson promotion "${synthetic_promotion_jobs}" --argjson runners "${runner_backed_jobs}" '(($authorization | length) + ($evidence | length) + ($failed_reservation | length) + ($promotion | length) + ($runners | length))')"
             test "$(jq 'length' <<<"${runner_backed_jobs}")" -eq 1
             rerunnable_jobs=$(jq -c '[.[] | select(.name == "Required current-revision workflow") | select(.runner_id != null and (.steps | length) > 0) | select(.run_attempt == 1) | select(.status == "completed" and .conclusion == "failure")]' <<<"${runner_backed_jobs}")
           fi
