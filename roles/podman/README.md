@@ -30,6 +30,19 @@ None.
   `/usr/bin/podman`)
 - `podman_validate_executable`: validate a direct `podman --version` invocation
   after optional profile repair (default: `false`)
+- `podman_dns_authoritative_only`: opt-in no-forwarding startup policy for the
+  shared Aardvark resolver (default: `false`, existing policy untouched).
+  Requires `podman_dns_resolver_executable` and `podman_dns_resolver_sha256`
+  to identify a reviewed build supporting `AARDVARK_NO_PROXY`, and Podman
+  4.9.3 or later with append-capable `containers.conf`. The role writes one
+  root-owned drop-in and appends the engine variable without replacing other
+  engine environment entries. It does not restart a running resolver, alter
+  network DNS settings or add firewall permissions. A separate controlled
+  transition must inventory every shared resolver consumer (including secrets
+  services), verify actual daemon policy after lifecycle changes, and prove
+  expected internal resolution, external NXDOMAIN/no-forwarding and restart
+  persistence. Config overrides can supersede the drop-in; its presence alone
+  is not runtime acceptance. HTTP proxy egress remains independent.
 - `podman_system_socket_enabled`: desired root `podman.socket` state when
   management is active; `true` also activates management for backward
   compatibility (default: `false`)

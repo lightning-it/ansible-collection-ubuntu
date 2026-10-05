@@ -1,0 +1,50 @@
+---
+- name: Require a closed per-client DNS capability inventory
+  ansible.builtin.assert:
+    that:
+      - host_firewall_container_dns_clients is mapping
+      - host_firewall_observed_container_bridge_gateways_ipv4 is mapping
+      - >-
+        host_firewall_container_dns_clients | length == 0
+        or not host_firewall_container_dns_access.enabled
+    fail_msg: Per-client DNS rules cannot coexist with aggregate TCP/UDP DNS access.
+    quiet: true
+
+- name: Validate each exact UDP-only DNS peer and its observed gateway
+  ansible.builtin.assert:
+    that:
+      - item.key is string
+      - item.key is match('^[a-z][a-z0-9_]{1,31}\Z')
+      - item.value is mapping
+      - item.value.keys() | sort == ['destination_ipv4', 'interface', 'source_ipv4']
+      - item.value.interface is string
+      - item.value.interface is match('^[A-Za-z0-9_.:-]{1,15}\Z')
+      - item.value.interface in host_firewall_container_interfaces
+      - item.value.interface in host_firewall_observed_container_bridge_gateways_ipv4
+      - item.value.source_ipv4 is string
+      - item.value.source_ipv4 is match(host_firewall_ipv4_host_cidr_pattern)
+      - >-
+        item.value.source_ipv4.startswith('10.')
+        or item.value.source_ipv4.startswith('192.168.')
+        or (item.value.source_ipv4.startswith('172.')
+            and 16 <= item.value.source_ipv4.split('.')[1] | int <= 31)
+      - item.value.destination_ipv4 is string
+      - item.value.destination_ipv4 is match(host_firewall_ipv4_pattern)
+      - >-
+        item.value.destination_ipv4.startswith('10.')
+        or item.value.destination_ipv4.startswith('192.168.')
+        or (item.value.destination_ipv4.startswith('172.')
+            and 16 <= item.value.destination_ipv4.split('.')[1] | int <= 31)
+      - >-
+        item.value.destination_ipv4
+        == host_firewall_observed_container_bridge_gateways_ipv4[item.value.interface]
+      - item.value.destination_ipv4 in host_firewall_observed_ipv4_addresses
+      - item.value.destination_ipv4 not in host_firewall_host_ipv4_addresses_effective
+      - item.value.source_ipv4 != item.value.destination_ipv4 ~ '/32'
+    fail_msg: >-
+      DNS requires one exact RFC1918 /32 client on one managed interface,
+      targeting only that interface's observed private bridge gateway on UDP53.
+    quiet: true
+  loop: "{{ host_firewall_container_dns_clients | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"

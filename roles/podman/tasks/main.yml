@@ -1,4 +1,23 @@
 ---
+- name: Validate authoritative DNS startup inputs
+  ansible.builtin.assert:
+    that:
+      - podman_dns_authoritative_only is boolean
+      - >-
+        not podman_dns_authoritative_only or
+        (podman_dns_resolver_executable is string and
+         podman_dns_resolver_executable is match('^/[a-zA-Z0-9_./-]+/aardvark-dns$') and
+         '/..' not in podman_dns_resolver_executable and
+         '/./' not in podman_dns_resolver_executable and
+         '//' not in podman_dns_resolver_executable)
+      - >-
+        not podman_dns_authoritative_only or
+        (podman_dns_resolver_sha256 is string and
+         podman_dns_resolver_sha256 is match('^[0-9a-f]{64}$'))
+    fail_msg: Authoritative DNS requires an explicitly approved resolver executable and SHA256.
+    quiet: true
+  tags: always
+
 - name: Prechecks
   ansible.builtin.assert:
     that:
@@ -130,6 +149,10 @@
       not ansible_check_mode or
       not (podman_apparmor_profile | default({'changed': false})).changed
   changed_when: false
+
+- name: Persist the opt-in authoritative-only DNS startup policy
+  ansible.builtin.include_tasks: dns_authoritative.yml
+  when: podman_dns_authoritative_only
 
 - name: Reconcile the system Podman API socket
   ansible.builtin.systemd_service:

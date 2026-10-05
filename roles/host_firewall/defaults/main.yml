@@ -182,6 +182,9 @@ host_firewall_container_dns_access:
   interfaces: []
   sources_ipv4: []
   destination_ipv4: ""
+# Independent UDP-only exact /32 clients, each bound to its own bridge gateway.
+# Empty by default; cannot coexist with the legacy aggregate TCP/UDP grant.
+host_firewall_container_dns_clients: {}
 host_firewall_cis_ipv6_required: "{{ ubtu24cis_ipv6_required | default(false) }}"
 host_firewall_provider_ipv6_filter_enabled: false
 host_firewall_provider_ipv6_filter_evidence_reference: ""
@@ -309,6 +312,11 @@ host_firewall_policy_material_effective: >-
           'container_dns_access': host_firewall_container_dns_access
         }
         if host_firewall_container_dns_access.enabled | bool
+        else {}
+      )
+    | combine(
+        {'container_dns_clients': host_firewall_container_dns_clients}
+        if host_firewall_container_dns_clients | length > 0
         else {}
       )
   }}
