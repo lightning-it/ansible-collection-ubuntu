@@ -82,6 +82,7 @@ class ContainerDnsClientTests(unittest.TestCase):
             ("source_ipv4", "8.8.8.8/32"),
             ("source_ipv4", "127.0.0.1/32"),
             ("source_ipv4", "10.88.10.1/32"),
+            ("source_ipv4", "10.88.20.1/32"),
             ("interface", "eth0"),
             ("interface", 'edgea" accept'),
         ):
@@ -91,6 +92,12 @@ class ContainerDnsClientTests(unittest.TestCase):
                 self.rejected(values)
         values = enabled_variables()
         del values["host_firewall_observed_container_bridge_gateways_ipv4"]["edgea"]
+        self.rejected(values)
+
+    def test_non_gateway_host_address_cannot_be_a_dns_client(self):
+        values = enabled_variables()
+        values['host_firewall_observed_ipv4_addresses'].append('192.168.40.5')
+        values['host_firewall_container_dns_clients']['service_a']['source_ipv4'] = '192.168.40.5/32'
         self.rejected(values)
 
     def test_closed_schema_and_legacy_mutual_exclusion(self):

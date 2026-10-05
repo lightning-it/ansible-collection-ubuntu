@@ -41,6 +41,7 @@
       - item.value.destination_ipv4 in host_firewall_observed_ipv4_addresses
       - item.value.destination_ipv4 not in host_firewall_host_ipv4_addresses_effective
       - item.value.source_ipv4 != item.value.destination_ipv4 ~ '/32'
+      - item.value.source_ipv4.split('/')[0] not in host_firewall_observed_ipv4_addresses
     fail_msg: >-
       DNS requires one exact RFC1918 /32 client on one managed interface,
       targeting only that interface's observed private bridge gateway on UDP53.
