@@ -1,35 +1,6 @@
 ---
-- name: Validate authoritative DNS startup inputs
-  ansible.builtin.assert:
-    that:
-      - podman_dns_authoritative_only is boolean
-      - >-
-        not podman_dns_authoritative_only or
-        (podman_dns_resolver_executable is string and
-         podman_dns_resolver_executable is match('^/[a-zA-Z0-9_./-]+/aardvark-dns$') and
-         '/..' not in podman_dns_resolver_executable and
-         '/./' not in podman_dns_resolver_executable and
-         '//' not in podman_dns_resolver_executable)
-      - >-
-        not podman_dns_authoritative_only or
-        (podman_dns_resolver_sha256 is string and
-         podman_dns_resolver_sha256 is match('^[0-9a-f]{64}$'))
-    fail_msg: Authoritative DNS requires an explicitly approved resolver executable and SHA256.
-    quiet: true
-  tags: always
-
 - name: Prechecks
-  ansible.builtin.assert:
-    that:
-      - item is mapping
-      - item.name | default('') is match('^[a-z0-9][a-z0-9._-]*$')
-      - item.executable | default('') is match('^/[^\n]+$')
-      - item.profile_path | default('') is match('^/[^\n]+$')
-    fail_msg: "Helper AppArmor inputs require safe names and absolute paths."
-    quiet: true
-  loop: "{{ podman_helper_apparmor_profiles }}"
-  loop_control:
-    label: "{{ item.name | default('invalid') }}"
+  ansible.builtin.import_tasks: assert.yml
   tags: always
 
 - name: Install podman toolchain
@@ -39,7 +10,7 @@
   when: podman_packages | length > 0
 
 - name: Validate package-provided AppArmor profiles after installation
-  ansible.builtin.import_tasks: assert.yml
+  ansible.builtin.import_tasks: apparmor_preflight.yml
   tags: always
 
 - name: Ensure registries.conf directory exists

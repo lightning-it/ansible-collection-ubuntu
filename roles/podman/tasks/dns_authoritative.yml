@@ -131,6 +131,7 @@
   when: not podman_dns_config_ancestors.results[2].stat.exists
 
 - name: Persist no-forwarding for subsequent Podman resolver launches
+  when: not ansible_check_mode or podman_dns_config_ancestors.results[2].stat.exists
   ansible.builtin.copy:
     dest: /etc/containers/containers.conf.d/90-authoritative-dns.conf
     owner: root

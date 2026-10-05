@@ -27,6 +27,30 @@ def accepted(task, variables):
 
 
 class AuthoritativeDnsTests(unittest.TestCase):
+    def test_side_effect_free_assert_entrypoint_precedes_package_mutation(self):
+        tasks = load(ROLE / 'tasks/main.yml')
+        self.assertEqual(tasks[0]['ansible.builtin.import_tasks'], 'assert.yml')
+        self.assertEqual(tasks[0]['tags'], 'always')
+        assertions = load(ROLE / 'tasks/assert.yml')
+        self.assertTrue(all('ansible.builtin.assert' in task for task in assertions))
+        installed = next(i for i, task in enumerate(tasks) if 'ansible.builtin.package' in task)
+        inspection = next(i for i, task in enumerate(tasks)
+                          if task.get('ansible.builtin.import_tasks') == 'apparmor_preflight.yml')
+        self.assertLess(installed, inspection)
+
+    def test_check_mode_copy_requires_an_existing_destination_directory(self):
+        task = load(ROLE / 'tasks/dns_authoritative.yml')[-1]
+        for check_mode in (False, True):
+            for exists in (False, True):
+                variables = {'ansible_check_mode': check_mode,
+                             'podman_dns_config_ancestors': {'results': [
+                                 {'stat': {}}, {'stat': {}}, {'stat': {'exists': exists}}]}}
+                loader = DataLoader()
+                gate = Conditional(loader=loader)
+                gate.when = [task['when']]
+                self.assertEqual(gate.evaluate_conditional(Templar(loader, variables), variables),
+                                 not check_mode or exists)
+
     def test_effective_helper_binding_rejects_decoys_or_missing_identity(self):
         tasks = load(ROLE / "tasks/dns_authoritative.yml")
         gate = next(task for task in tasks if task["name"] ==
@@ -77,7 +101,7 @@ class AuthoritativeDnsTests(unittest.TestCase):
             self.assertEqual(accepted(file, {"podman_dns_startup_file": {"stat": absent}}), not linked)
 
     def test_input_gate_is_default_off_and_requires_exact_pins(self):
-        gate = load(ROLE / "tasks/main.yml")[0]
+        gate = load(ROLE / "tasks/assert.yml")[0]
         defaults = load(ROLE / "defaults/main.yml")
         self.assertTrue(accepted(gate, defaults))
         valid = {**defaults, "podman_dns_authoritative_only": True,
