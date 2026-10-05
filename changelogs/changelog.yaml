@@ -181,6 +181,17 @@ releases:
     fragments:
       - published-container-https.yml
     release_date: '2026-10-04'
+  1.17.0:
+    changes:
+      minor_changes:
+        - host_firewall - support default-off exact UDP53 clients bound independently
+          to each observed private bridge gateway.
+        - podman - add an opt-in pinned authoritative-only Aardvark startup policy
+          without restarting the shared resolver.
+    fragments:
+      - host-firewall-exact-udp-dns-clients.yml
+      - podman-authoritative-dns-startup.yml
+    release_date: '2026-10-05'
   1.2.0:
     changes:
       bugfixes:
