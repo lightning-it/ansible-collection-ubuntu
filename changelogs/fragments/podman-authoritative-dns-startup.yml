@@ -1,3 +1,0 @@
----
-minor_changes:
-  - podman - add an opt-in pinned authoritative-only Aardvark startup policy without restarting the shared resolver.
