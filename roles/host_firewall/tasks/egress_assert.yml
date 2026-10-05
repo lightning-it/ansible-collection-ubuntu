@@ -295,6 +295,9 @@
   loop_control:
     label: "{{ item.key }}={{ item.value.source_ipv4 }}"
 
+- name: Validate exact UDP-only container DNS capabilities
+  ansible.builtin.import_tasks: container_dns_clients_assert.yml
+
 - name: Validate container access to the host-local Aardvark DNS listener
   ansible.builtin.assert:
     that:
@@ -375,6 +378,7 @@
   when: >-
     host_firewall_container_dns_access.enabled | bool
     or host_firewall_forward_proxy_client_access | length > 0
+    or host_firewall_container_dns_clients | length > 0
 
 - name: Bind exact container proxy clients to observed bridge gateways
   ansible.builtin.assert:

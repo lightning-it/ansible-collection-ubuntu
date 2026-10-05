@@ -47,6 +47,18 @@ argument_specs:
       podman_validate_executable:
         type: bool
         default: false
+      podman_dns_authoritative_only:
+        type: bool
+        default: false
+        description: Persist no-forwarding for future shared resolver launches without restarting it.
+      podman_dns_resolver_executable:
+        type: path
+        default: ""
+        description: Exact approved Aardvark binary supporting the presence-based no-proxy flag.
+      podman_dns_resolver_sha256:
+        type: str
+        default: ""
+        description: Reviewed SHA256 of the approved resolver binary.
       podman_system_socket_enabled:
         type: bool
         default: false

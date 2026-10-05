@@ -120,6 +120,15 @@ interface. It grants no
 forwarded Internet access and does not inherit proxy, management, or host DNS
 egress destinations.
 
+For distinct service bridges, `host_firewall_container_dns_clients` is an empty
+by-default map of named capabilities. Each entry contains exactly `interface`,
+`source_ipv4` (one RFC1918 `/32`) and `destination_ipv4` (that interface's
+read-only observed private gateway). It grants only host INPUT UDP/53, not
+TCP/53 or forwarded DNS. The legacy aggregate DNS grant must remain disabled.
+Every entry is bound into the policy fingerprint. This grant does not configure
+the resolver or prove no-forwarding: verify the resolver policy and positive,
+negative and restart evidence separately before acceptance.
+
 See `defaults/main.yml` for the complete interface. Important inputs are:
 
 - `host_firewall_action`: `plan`, `preview`, `check`, `apply`, `confirm`, `rollback`, or `readback`.

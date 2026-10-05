@@ -35,6 +35,27 @@
       vars:
         forward_proxy_client_enabled: false
 
+    # Disabled demonstration only: approve the actual helper path and SHA256
+    # before opting in. This configures future starts, never an existing daemon.
+    - role: lit.ubuntu.podman
+      when: false
+      vars:
+        podman_dns_authoritative_only: false
+        podman_dns_resolver_executable: /usr/lib/podman/aardvark-dns
+        podman_dns_resolver_sha256: ""
+
+    # Disabled demonstration only. Exact UDP53 clients require read-only bridge
+    # gateway evidence and cannot coexist with aggregate container DNS access.
+    # Example capability (not enabled):
+    #   application_dns:
+    #     interface: appbridge
+    #     source_ipv4: 10.20.1.2/32
+    #     destination_ipv4: 10.20.1.1
+    - role: lit.ubuntu.host_firewall
+      when: false
+      vars:
+        host_firewall_container_dns_clients: {}
+
     - role: lit.ubuntu.users
       vars:
         users_accounts:

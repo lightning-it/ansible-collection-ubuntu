@@ -14,6 +14,11 @@ podman_apparmor_parser_path: /usr/sbin/apparmor_parser
 podman_executable_path: /usr/bin/podman
 podman_validate_executable: false
 
+# Opt-in startup policy only; an existing shared resolver is not restarted.
+podman_dns_authoritative_only: false
+podman_dns_resolver_executable: ""
+podman_dns_resolver_sha256: ""
+
 podman_system_socket_enabled: false
 podman_system_socket_manage: false
 podman_system_socket_service_name: podman.socket

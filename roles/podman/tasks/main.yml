@@ -1,26 +1,17 @@
 ---
 - name: Prechecks
-  ansible.builtin.assert:
-    that:
-      - item is mapping
-      - item.name | default('') is match('^[a-z0-9][a-z0-9._-]*$')
-      - item.executable | default('') is match('^/[^\n]+$')
-      - item.profile_path | default('') is match('^/[^\n]+$')
-    fail_msg: "Helper AppArmor inputs require safe names and absolute paths."
-    quiet: true
-  loop: "{{ podman_helper_apparmor_profiles }}"
-  loop_control:
-    label: "{{ item.name | default('invalid') }}"
+  ansible.builtin.import_tasks: assert.yml
   tags: always
 
 - name: Install podman toolchain
   ansible.builtin.package:
     name: "{{ podman_packages }}"
     state: present
+  register: podman_package_install
   when: podman_packages | length > 0
 
 - name: Validate package-provided AppArmor profiles after installation
-  ansible.builtin.import_tasks: assert.yml
+  ansible.builtin.import_tasks: apparmor_preflight.yml
   tags: always
 
 - name: Ensure registries.conf directory exists
@@ -130,6 +121,13 @@
       not ansible_check_mode or
       not (podman_apparmor_profile | default({'changed': false})).changed
   changed_when: false
+
+- name: Persist the opt-in authoritative-only DNS startup policy
+  ansible.builtin.include_tasks: dns_authoritative.yml
+  when:
+    - podman_dns_authoritative_only
+    - >-
+      not ansible_check_mode or not (podman_package_install | default({'changed': false})).changed
 
 - name: Reconcile the system Podman API socket
   ansible.builtin.systemd_service:

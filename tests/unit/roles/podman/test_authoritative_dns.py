@@ -1,0 +1,209 @@
+"""Evaluate the real role gates and rendered no-forwarding TOML offline."""
+
+from copy import deepcopy
+from pathlib import Path
+import json
+import tomllib
+import unittest
+
+from ansible.parsing.dataloader import DataLoader
+from ansible.playbook.conditional import Conditional
+from ansible.template import Templar
+import yaml
+
+ROOT = Path(__file__).resolve().parents[4]
+ROLE = ROOT / "roles/podman"
+
+
+def load(path):
+    return yaml.safe_load(path.read_text())
+
+
+def accepted(task, variables):
+    loader = DataLoader()
+    gate = Conditional(loader=loader)
+    gate.when = task["ansible.builtin.assert"]["that"]
+    return gate.evaluate_conditional(Templar(loader, variables), variables)
+
+
+class AuthoritativeDnsTests(unittest.TestCase):
+    def test_public_example_keeps_both_dns_capabilities_inactive(self):
+        roles = load(ROOT / 'playbooks/example.yml')[0]['roles']
+        podman = next(role for role in roles if role['role'] == 'lit.ubuntu.podman')
+        firewall = next(role for role in roles if role['role'] == 'lit.ubuntu.host_firewall')
+        self.assertIs(podman['when'], False)
+        self.assertIs(firewall['when'], False)
+        self.assertIs(podman['vars']['podman_dns_authoritative_only'], False)
+        self.assertEqual(podman['vars']['podman_dns_resolver_sha256'], '')
+        self.assertEqual(firewall['vars']['host_firewall_container_dns_clients'], {})
+        overview = (ROOT / 'README.md').read_text()
+        for interface in ('podman_dns_authoritative_only', 'podman_dns_resolver_executable',
+                          'podman_dns_resolver_sha256', 'host_firewall_container_dns_clients'):
+            self.assertIn(interface, overview)
+
+    def test_side_effect_free_assert_entrypoint_precedes_package_mutation(self):
+        tasks = load(ROLE / 'tasks/main.yml')
+        self.assertEqual(tasks[0]['ansible.builtin.import_tasks'], 'assert.yml')
+        self.assertEqual(tasks[0]['tags'], 'always')
+        assertions = load(ROLE / 'tasks/assert.yml')
+        self.assertTrue(all('ansible.builtin.assert' in task for task in assertions))
+        installed = next(i for i, task in enumerate(tasks) if 'ansible.builtin.package' in task)
+        inspection = next(i for i, task in enumerate(tasks)
+                          if task.get('ansible.builtin.import_tasks') == 'apparmor_preflight.yml')
+        self.assertLess(installed, inspection)
+
+    def test_check_mode_copy_requires_an_existing_destination_directory(self):
+        task = load(ROLE / 'tasks/dns_authoritative.yml')[-1]
+        for check_mode in (False, True):
+            for exists in (False, True):
+                variables = {'ansible_check_mode': check_mode,
+                             'podman_dns_config_ancestors': {'results': [
+                                 {'stat': {}}, {'stat': {}}, {'stat': {'exists': exists}}]}}
+                loader = DataLoader()
+                gate = Conditional(loader=loader)
+                gate.when = [task['when']]
+                self.assertEqual(gate.evaluate_conditional(Templar(loader, variables), variables),
+                                 not check_mode or exists)
+
+    def test_effective_helper_binding_rejects_decoys_or_missing_identity(self):
+        tasks = load(ROLE / "tasks/dns_authoritative.yml")
+        gate = next(task for task in tasks if task["name"] ==
+                    "Bind the approved resolver to the helper Podman actually uses")
+        path = "/usr/lib/podman/aardvark-dns"
+        def check(info):
+            return accepted(gate, {"podman_dns_effective_info": {"stdout": json.dumps(info)},
+                                   "podman_dns_resolver_executable": path})
+        valid = {"host": {"networkBackend": "netavark", "networkBackendInfo": {"dns": {"path": path}}}}
+        self.assertTrue(check(valid))
+        for info in ({}, {"host": {}}, {"host": {"networkBackend": "cni"}},
+                     {"host": {"networkBackend": "netavark", "networkBackendInfo": {"dns": {"path": "/tmp/aardvark-dns"}}}}):
+            with self.subTest(info=info):
+                self.assertFalse(check(info))
+        self.assertFalse(tasks[0]["changed_when"])
+        self.assertFalse(tasks[0]["check_mode"])
+        self.assertTrue(tasks[0]["no_log"])
+
+    def test_resolver_ancestor_gate_rejects_replaceable_or_linked_paths(self):
+        tasks = load(ROLE / "tasks/dns_authoritative.yml")
+        gate = next(task for task in tasks if task["name"] ==
+                    "Reject replaceable or linked resolver directory ancestors")
+        trusted = {"isdir": True, "islnk": False, "uid": 0, "wgrp": False, "woth": False}
+        self.assertTrue(accepted(gate, {"item": {"stat": trusted}}))
+        for field, value in (("isdir", False), ("islnk", True), ("uid", 1000),
+                             ("wgrp", True), ("woth", True)):
+            with self.subTest(field=field):
+                self.assertFalse(accepted(gate, {"item": {"stat": {**trusted, field: value}}}))
+        self.assertFalse(accepted(gate, {"item": {"stat": {}}}))
+        inspect = next(task for task in tasks if task["name"].startswith("Inspect every approved resolver"))
+        self.assertFalse(inspect["ansible.builtin.stat"]["follow"])
+        variables = {"podman_dns_resolver_executable": "/usr/lib/podman/aardvark-dns"}
+        indices = Templar(DataLoader(), variables).template(inspect["loop"])
+        self.assertEqual(indices, [1, 2, 3, 4])
+        paths = [Templar(DataLoader(), {**variables, "item": index}).template(
+            inspect["ansible.builtin.stat"]["path"]) for index in indices]
+        self.assertEqual(paths, ["/", "/usr", "/usr/lib", "/usr/lib/podman"])
+        self.assertLess(tasks.index(gate), next(i for i, task in enumerate(tasks) if "ansible.builtin.copy" in task))
+
+    def test_dangling_config_links_are_rejected_before_creation(self):
+        tasks = load(ROLE / "tasks/dns_authoritative.yml")
+        directory = next(task for task in tasks if task["name"] ==
+                         "Reject unsafe authoritative DNS configuration ancestors")
+        file = next(task for task in tasks if task["name"] == "Reject an unsafe authoritative DNS startup file")
+        for linked in (False, True):
+            absent = {"exists": False, "islnk": linked}
+            self.assertEqual(accepted(directory, {"item": {"stat": absent}}), not linked)
+            self.assertEqual(accepted(file, {"podman_dns_startup_file": {"stat": absent}}), not linked)
+
+    def test_input_gate_is_default_off_and_requires_exact_pins(self):
+        gate = load(ROLE / "tasks/assert.yml")[0]
+        defaults = load(ROLE / "defaults/main.yml")
+        self.assertTrue(accepted(gate, defaults))
+        valid = {**defaults, "podman_dns_authoritative_only": True,
+                 "podman_dns_resolver_executable": "/usr/lib/podman/aardvark-dns",
+                 "podman_dns_resolver_sha256": "a" * 64}
+        self.assertTrue(accepted(gate, valid))
+        for key, value in (
+            ("podman_dns_authoritative_only", "true"),
+            ("podman_dns_resolver_executable", "aardvark-dns"),
+            ("podman_dns_resolver_executable", "/usr/../tmp/aardvark-dns"),
+            ("podman_dns_resolver_executable", "/usr//lib/aardvark-dns"),
+            ("podman_dns_resolver_executable", "/usr/lib/other"),
+            ("podman_dns_resolver_sha256", "A" * 64),
+            ("podman_dns_resolver_sha256", "a" * 63),
+        ):
+            with self.subTest(key=key, value=value):
+                self.assertFalse(accepted(gate, {**valid, key: value}))
+
+    def test_binary_gate_rejects_unapproved_or_writable_objects(self):
+        gate = next(task for task in load(ROLE / "tasks/dns_authoritative.yml")
+                    if task["name"] == "Require an immutable approved resolver executable")
+        stat = {"isreg": True, "islnk": False, "uid": 0, "wgrp": False,
+                "woth": False, "executable": True, "checksum": "a" * 64}
+        def check(candidate):
+            return accepted(gate, {"podman_dns_resolver_stat": {"stat": candidate},
+                                   "podman_dns_resolver_sha256": "a" * 64})
+        self.assertTrue(check(stat))
+        for key, value in (("isreg", False), ("islnk", True), ("uid", 1000),
+                           ("wgrp", True), ("woth", True), ("executable", False),
+                           ("checksum", "b" * 64)):
+            candidate = deepcopy(stat)
+            candidate[key] = value
+            with self.subTest(key=key):
+                self.assertFalse(check(candidate))
+        self.assertFalse(check({}))
+
+    def test_startup_configuration_appends_and_does_not_restart(self):
+        tasks = load(ROLE / "tasks/dns_authoritative.yml")
+        copy = tasks[-1]["ansible.builtin.copy"]
+        config = tomllib.loads(copy["content"])
+        self.assertEqual(config, {"engine": {"env": ["AARDVARK_NO_PROXY=1", {"append": True}]}})
+        self.assertEqual(copy["owner"], "root")
+        self.assertEqual(copy["mode"], "0644")
+        for task in tasks:
+            self.assertNotIn("ansible.builtin.systemd_service", task)
+            self.assertNotIn("ansible.builtin.shell", task)
+        include = next(task for task in load(ROLE / "tasks/main.yml")
+                       if task.get("ansible.builtin.include_tasks") == "dns_authoritative.yml")
+        self.assertEqual(include["when"][0], "podman_dns_authoritative_only")
+
+    def test_first_install_check_mode_defers_all_executable_dependent_dns_tasks(self):
+        tasks = load(ROLE / 'tasks/main.yml')
+        package = next(task for task in tasks if 'ansible.builtin.package' in task)
+        self.assertEqual(package['register'], 'podman_package_install')
+        include = next(task for task in tasks
+                       if task.get('ansible.builtin.include_tasks') == 'dns_authoritative.yml')
+        for enabled in (False, True):
+            for check_mode in (False, True):
+                for pending_install in (False, True):
+                    variables = {'podman_dns_authoritative_only': enabled,
+                                 'ansible_check_mode': check_mode,
+                                 'podman_package_install': {'changed': pending_install}}
+                    loader = DataLoader()
+                    gate = Conditional(loader=loader)
+                    gate.when = include['when']
+                    with self.subTest(enabled=enabled, check_mode=check_mode, pending=pending_install):
+                        self.assertEqual(gate.evaluate_conditional(Templar(loader, variables), variables),
+                                         enabled and (not check_mode or not pending_install))
+
+    def test_version_gate_rejects_older_or_unrecognized_clients(self):
+        gate = next(task for task in load(ROLE / "tasks/dns_authoritative.yml")
+                    if task["name"] == "Require the supported append-capable Podman baseline")
+        for version, expected in (("podman version 4.9.3", True),
+                                  ("podman version 5.0.0", True),
+                                  ("podman version 4.9.2", False),
+                                  ("other client 4.9.3", False)):
+            with self.subTest(version=version):
+                self.assertEqual(accepted(gate, {"podman_dns_podman_version": {"stdout": version}}), expected)
+
+    def test_existing_restrictive_directory_is_never_chmodded(self):
+        task = next(task for task in load(ROLE / "tasks/dns_authoritative.yml")
+                    if task["name"] == "Ensure the authoritative DNS configuration directory exists")
+        loader = DataLoader()
+        gate = Conditional(loader=loader)
+        gate.when = [task["when"]]
+        for exists, mode in ((True, "0700"), (True, "0750"), (True, "0755"), (False, "")):
+            variables = {"podman_dns_config_ancestors": {"results": [
+                {"stat": {}}, {"stat": {}}, {"stat": {"exists": exists, "mode": mode}}
+            ]}}
+            with self.subTest(exists=exists, mode=mode):
+                self.assertEqual(gate.evaluate_conditional(Templar(loader, variables), variables), not exists)
