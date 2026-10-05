@@ -117,13 +117,7 @@ class ExactRevisionMaterializerTests(unittest.TestCase):
 
     def _assert_protected_diff_reads(self, source: str) -> None:
         tree = ast.parse(source)
-        verifiers = [
-            node
-            for node in tree.body
-            if isinstance(node, ast.FunctionDef) and node.name == "verify"
-        ]
-        self.assertEqual(1, len(verifiers))
-        nodes = list(ast.walk(verifiers[0]))
+        nodes = list(ast.walk(self._verifier(tree)))
         self.assertFalse(
             any(
                 isinstance(node, ast.Call)
@@ -158,30 +152,59 @@ class ExactRevisionMaterializerTests(unittest.TestCase):
                 [(item.arg, ast.unparse(item.value)) for item in call.keywords],
             )
 
+    def _verifier(self, tree: ast.Module) -> ast.FunctionDef:
+        verifiers = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "verify"
+        ]
+        self.assertEqual(1, len(verifiers))
+        return verifiers[0]
+
+    def _diff_read_fixture(self) -> tuple[ast.Module, ast.FunctionDef, ast.Assign]:
+        tree = ast.parse(MATERIALIZER.read_text(encoding="utf-8"))
+        verifier = self._verifier(tree)
+        originals = [
+            node
+            for node in ast.walk(verifier)
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "original_diff"
+        ]
+        self.assertEqual(1, len(originals))
+        return tree, verifier, originals[0]
+
     def test_diff_read_guard_rejects_unrelated_decoy_assignments(self) -> None:
-        source = MATERIALIZER.read_text(encoding="utf-8")
-        original = 'original_diff = protected_asset_bytes(patch, "review diff", maximum=maximum)'
-        self.assertEqual(1, source.count(original))
-        unsafe = source.replace(original, "original_diff = patch .read_bytes()")
+        tree, _, original = self._diff_read_fixture()
+        original.value = ast.parse("patch.read_bytes()", mode="eval").body
         decoy = "\ndef unrelated_decoy():\n"
         decoy += "".join("    " * depth + "if True:\n" for depth in range(1, 10))
         for assignment in (
-            original,
+            'original_diff = protected_asset_bytes(patch, "review diff", maximum=maximum)',
             'fresh_diff = protected_asset_bytes(regenerated / "change.patch", "regenerated diff", maximum=maximum)',
         ):
             decoy += "    " * 10 + assignment + "\n"
-        with self.assertRaises(AssertionError):
-            self._assert_protected_diff_reads(unsafe + decoy)
-
-    def test_diff_read_guard_rejects_duplicate_verifier_assignments(self) -> None:
-        source = MATERIALIZER.read_text(encoding="utf-8")
-        boundary = "        if original_diff != fresh_diff:"
-        self.assertEqual(1, source.count(boundary))
-        duplicate = '        original_diff = protected_asset_bytes(patch, "review diff", maximum=maximum)\n'
+        tree.body.extend(ast.parse(decoy).body)
         with self.assertRaises(AssertionError):
             self._assert_protected_diff_reads(
-                source.replace(boundary, duplicate + boundary)
+                ast.unparse(ast.fix_missing_locations(tree))
             )
+
+    def test_diff_read_guard_rejects_duplicate_verifier_assignments(self) -> None:
+        tree, verifier, original = self._diff_read_fixture()
+        verifier.body.append(ast.parse(ast.unparse(original)).body[0])
+        with self.assertRaises(AssertionError):
+            self._assert_protected_diff_reads(
+                ast.unparse(ast.fix_missing_locations(tree))
+            )
+
+    def test_diff_read_fixtures_accept_reformatted_materializer(self) -> None:
+        reformatted = ast.unparse(ast.parse(MATERIALIZER.read_text(encoding="utf-8")))
+        self._assert_protected_diff_reads(reformatted)
+        with mock.patch.object(Path, "read_text", return_value=reformatted):
+            self.test_diff_read_guard_rejects_unrelated_decoy_assignments()
+            self.test_diff_read_guard_rejects_duplicate_verifier_assignments()
 
     def test_unfinished_reservation_is_always_failed_closed(self) -> None:
         workflow = REVIEW_WORKFLOW.read_text(encoding="utf-8")

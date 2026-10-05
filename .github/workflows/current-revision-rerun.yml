@@ -1075,7 +1075,9 @@ jobs:
           attempt_one_inventory_deadline_ms=''
           test "${attempt_one_inventory_converged}" = true
           # Validate only the converged attempt-one inventory.
-          jq -e '
+          jq -e \
+            --argjson run_id "${run_id}" \
+            --arg head "${EXPECTED_HEAD}" '
             type == "array"
             and length > 0
             and all(.[];
@@ -1086,15 +1088,20 @@ jobs:
               | all(.[]; .total_count == $job_count))
             and all(.[].jobs[];
               type == "object"
-              and (.id | type) == "number" and .id > 0
+              and (.id | type) == "number"
+              and (.id | floor) == .id and .id > 0
               and (.name | type) == "string"
-              and (.run_attempt | type) == "number" and .run_attempt >= 1
+              and .run_id == $run_id
+              and .head_sha == $head
+              and .run_attempt == 1
               and (.steps | type) == "array"
               and has("runner_id")
               and (.runner_id == null
                 or ((.runner_id | type) == "number" and .runner_id > 0))
               and .status == "completed"
               and (.conclusion | type) == "string")
+            and (([.[].jobs[].id] | length)
+              == ([.[].jobs[].id] | unique | length))
           ' <<<"${attempt_one_jobs_pages}" >/dev/null
           attempt_one_jobs=$(jq -c '[.[].jobs[]]' <<<"${attempt_one_jobs_pages}")
           jq -e 'all(.[]; has("runner_id") and (.steps | type) == "array")' <<<"${attempt_one_jobs}" >/dev/null
