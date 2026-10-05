@@ -27,6 +27,20 @@ def accepted(task, variables):
 
 
 class AuthoritativeDnsTests(unittest.TestCase):
+    def test_public_example_keeps_both_dns_capabilities_inactive(self):
+        roles = load(ROOT / 'playbooks/example.yml')[0]['roles']
+        podman = next(role for role in roles if role['role'] == 'lit.ubuntu.podman')
+        firewall = next(role for role in roles if role['role'] == 'lit.ubuntu.host_firewall')
+        self.assertIs(podman['when'], False)
+        self.assertIs(firewall['when'], False)
+        self.assertIs(podman['vars']['podman_dns_authoritative_only'], False)
+        self.assertEqual(podman['vars']['podman_dns_resolver_sha256'], '')
+        self.assertEqual(firewall['vars']['host_firewall_container_dns_clients'], {})
+        overview = (ROOT / 'README.md').read_text()
+        for interface in ('podman_dns_authoritative_only', 'podman_dns_resolver_executable',
+                          'podman_dns_resolver_sha256', 'host_firewall_container_dns_clients'):
+            self.assertIn(interface, overview)
+
     def test_side_effect_free_assert_entrypoint_precedes_package_mutation(self):
         tasks = load(ROLE / 'tasks/main.yml')
         self.assertEqual(tasks[0]['ansible.builtin.import_tasks'], 'assert.yml')
