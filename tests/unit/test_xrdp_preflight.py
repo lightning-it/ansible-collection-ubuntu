@@ -522,6 +522,16 @@ class XrdpActivationBoundaryTests(unittest.TestCase):
         gate = Conditional(loader=DataLoader()); gate.when = task['when']
         self.assertFalse(gate.evaluate_conditional(Templar(DataLoader(), values), values))
 
+    def test_readable_vault_certificate_does_not_toggle_permissions_between_roles(self):
+        task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                    if t['name'] == 'Ensure the XRDP daemon can read its validated certificate')
+        for mode, gid, changed in [('0644', 0, False), ('0640', 42, False), ('0600', 0, True), ('0640', 0, True)]:
+            values = {'xrdp_tls_enable': True, 'ansible_check_mode': False, '_xrdp_installed': True,
+                'xrdp_tls_key_group': 'ssl-cert', 'ansible_facts': {'getent_group': {'ssl-cert': ['x', '42', '']}},
+                '_xrdp_cert': {'stat': {'exists': True, 'mode': mode, 'gid': gid}}}
+            gate = Conditional(loader=DataLoader()); gate.when = task['when']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), changed)
+
     def test_installed_check_mode_skips_permissions_on_unmaterialized_key(self):
         init_plugin_loader()
         task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())

@@ -62,7 +62,7 @@ first-login wizard. The default empty list preserves normal onboarding.
 prompting (`never`, `normal`, `lts`); the default leaves it unchanged. This
 does not disable package or security updates.
 
-TLS defaults use the package-provided `ssl-cert` group with mode `0640`. The role requires the declared key group to exist and appends the installed `xrdp` daemon to it before setting key permissions. The validated certificate is also reconciled to that group with mode `0640`; every existing ancestor must allow traversal by that group or by other users. Root-group and owner-only key settings are rejected because the configured unprivileged daemon must read its key.
+TLS defaults use the package-provided `ssl-cert` group with mode `0640`. The role requires the declared key group to exist and appends the installed `xrdp` daemon to it before setting key permissions. An unreadable validated certificate is reconciled to that group with mode `0640`; an already readable public certificate keeps its permissions, including a Vault-managed `0644` file. Every existing ancestor must allow traversal by that group or by other users. Root-group and owner-only key settings are rejected because the configured unprivileged daemon must read its key.
 
 TLS key groups are restricted to the dedicated package-owned `ssl-cert` and `xrdp` groups. Privileged and arbitrary custom groups are rejected before changes.
 

@@ -159,6 +159,24 @@
     - not _xrdp_cert.stat.exists
   notify: Restart xrdp
 
+- name: Inspect materialized XRDP TLS certificate without following links
+  ansible.builtin.stat:
+    path: "{{ xrdp_tls_cert_path }}"
+    follow: false
+  register: _xrdp_cert
+  when: xrdp_tls_enable | bool
+
+- name: Require a regular XRDP certificate before daemon access changes
+  ansible.builtin.assert:
+    that:
+      - _xrdp_cert.stat.exists
+      - not (_xrdp_cert.stat.islnk | default(false))
+      - _xrdp_cert.stat.isreg | default(false)
+    quiet: true
+  when:
+    - xrdp_tls_enable | bool
+    - not ansible_check_mode or _xrdp_cert.stat.exists
+
 - name: Inspect materialized XRDP TLS key without following links
   ansible.builtin.stat:
     path: "{{ xrdp_tls_key_path }}"
@@ -226,6 +244,12 @@
   when:
     - xrdp_tls_enable | bool
     - not ansible_check_mode or (_xrdp_installed | bool and (_xrdp_cert.stat.exists | default(false)))
+    - >-
+      (_xrdp_cert.stat.mode | default('0000'))[-1] not in ['4', '5', '6', '7']
+      and not (
+        (_xrdp_cert.stat.mode | default('0000'))[-2] in ['4', '5', '6', '7']
+        and _xrdp_cert.stat.gid | default(-1) == ansible_facts.getent_group[xrdp_tls_key_group][1] | int
+      )
   notify: Restart xrdp
 
 - name: Configure xrdp.ini
