@@ -64,7 +64,7 @@ class XrdpPreflightTests(unittest.TestCase):
             values.update(xrdp_desktop=desktop, xrdp_gnome_private_dbus_session=True)
             values['_xrdp_desktop_effective'] = 'gnome' if desktop == 'auto' else desktop
             content = Templar(DataLoader(), values).template((ROLE / 'templates/startwm.sh.j2').read_text())
-            self.assertIn(f'case "{values["_xrdp_desktop_effective"]}" in', content)
+            self.assertIn(f'case "{desktop}" in', content)
             if desktop in ('auto', 'gnome'):
                 self.assertIn('exec dbus-run-session -- gnome-session', content)
 
