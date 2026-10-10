@@ -6,6 +6,39 @@ umask 077
 # It deliberately contains no LUKS passphrase or other private credential.
 trap 'rm -f -- "$0"' EXIT
 
+# Reject every output and ancestor before install/chmod/redirection can follow a link.
+lit_require_safe_output() {
+  local output="$1" parent="$1" permissions
+  case "$output" in /*) ;; *) return 1 ;; esac
+  while [ "$parent" != / ]; do
+    if [ -L "$parent" ]; then
+      echo 'Refusing linked boot artifact or ancestor.' >&2
+      return 1
+    fi
+    if [ -e "$parent" ]; then
+      [ "$(stat -c '%u:%g' -- "$parent")" = '0:0' ] || return 1
+      permissions="$(stat -c '%a' -- "$parent")"
+      (( (8#$permissions & 8#022) == 0 )) || return 1
+      if [ "$parent" = "$output" ]; then
+        [ -f "$parent" ] || return 1
+      else
+        [ -d "$parent" ] || return 1
+      fi
+    fi
+    parent="$(dirname -- "$parent")"
+  done
+}
+{% for luks_unlock_output in [luks_unlock_dropbear_config_path, luks_unlock_dropbear_authorized_keys_path,
+                             luks_unlock_grub_dropin_path, luks_unlock_initramfs_modules_path,
+                             '/etc/dropbear/initramfs/dropbear_ed25519_host_key',
+                             '/boot/lit-first-boot-hostkey-fingerprints'] %}
+lit_require_safe_output {{ luks_unlock_output | quote }}
+{% endfor %}
+{% if luks_unlock_early_vlans | length > 0 %}
+lit_require_safe_output {{ luks_unlock_early_vlan_script_path | quote }}
+lit_require_safe_output {{ luks_unlock_early_vlan_hook_path | quote }}
+{% endif %}
+
 export DEBIAN_FRONTEND=noninteractive
 apt-get update >/dev/null
 apt-get install -y{% for luks_unlock_package in luks_unlock_dropbear_packages %} {{ luks_unlock_package | quote }}{% endfor %} >/dev/null

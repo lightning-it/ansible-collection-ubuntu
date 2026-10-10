@@ -75,6 +75,20 @@ class XrdpPreflightTests(unittest.TestCase):
                 values[field] = value
                 self.assertFalse(self.accepts(values))
 
+    def test_tls_paths_reject_control_characters_relative_and_identical_inputs(self):
+        task = next(task for task in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+                    if task['name'].startswith('Require distinct absolute TLS paths'))
+        for field in ('xrdp_tls_cert_path', 'xrdp_tls_key_path'):
+            for value in ('relative.pem', '/tmp/leaf\nsecurity_layer=rdp', '/tmp/leaf\r', '/tmp/leaf\t', '/tmp/leaf\x00', '/tmp/leaf\x7f'):
+                values = self.values(); values[field] = value
+                gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+                self.assertFalse(gate.evaluate_conditional(Templar(DataLoader(), values), values))
+        values = self.values(); values['xrdp_tls_key_path'] = values['xrdp_tls_cert_path']
+        gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+        self.assertFalse(gate.evaluate_conditional(Templar(DataLoader(), values), values))
+        values = self.values()
+        self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(), values), values))
+
     def test_auto_and_explicit_gnome_use_private_dbus_but_xfce_does_not(self):
         for desktop in ('auto', 'gnome', 'xfce'):
             values = self.values()

@@ -97,6 +97,15 @@
     quiet: true
   loop: "{{ _xrdp_config_preflight.results }}"
 
+- name: Require distinct absolute TLS paths without INI control characters
+  ansible.builtin.assert:
+    that:
+      - xrdp_tls_cert_path is string and xrdp_tls_cert_path is match('^/[^\x00-\x1f\x7f]+\\Z')
+      - xrdp_tls_key_path is string and xrdp_tls_key_path is match('^/[^\x00-\x1f\x7f]+\\Z')
+      - xrdp_tls_cert_path != xrdp_tls_key_path
+    quiet: true
+  when: xrdp_tls_enable | bool
+
 - name: Inspect existing XRDP TLS output paths before any changes
   ansible.builtin.stat:
     path: "{{ item }}"

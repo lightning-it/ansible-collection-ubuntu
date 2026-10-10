@@ -1,5 +1,5 @@
 """Verify optional pre-root LAN artifacts and reject unsafe boot inputs."""
-import subprocess,tempfile,unittest
+import os,shutil,subprocess,tempfile,unittest
 from pathlib import Path
 import yaml
 from jinja2 import Environment,FileSystemLoader
@@ -110,3 +110,39 @@ class EarlyVlanTests(unittest.TestCase):
   self.assertEqual(cleanup['ansible.builtin.file']['state'],'absent')
   self.assertEqual(cleanup['notify'],'LUKS unlock | Rebuild initramfs')
   self.assertEqual(Templar(DataLoader(),values).template(cleanup['loop']),[values['luks_unlock_early_vlan_script_path'],values['luks_unlock_early_vlan_hook_path']])
+
+ def test_rescue_guard_rejects_linked_output_and_ancestor_without_mutation(self):
+  values=self.values();values.update(luks_unlock_dropbear_options_effective='-p 2222',
+       luks_unlock_kernel_ip_argument_effective='ip=dhcp',luks_unlock_dropbear_authorized_keys=['ssh-ed25519 AAAATEST'])
+  engine=Templar(DataLoader(),values);engine.environment.loader=FileSystemLoader(str(ROOT/'templates'))
+  content=engine.environment.get_template('installimage-post-install.sh.j2').render(**values)
+  function=content.split('lit_require_safe_output() {',1)[1].split('\n}\n',1)[0]
+  function='lit_require_safe_output() {'+function+'\n}\n'
+  for field in ('luks_unlock_early_vlan_script_path','luks_unlock_early_vlan_hook_path'):
+   self.assertLess(content.index('lit_require_safe_output '+values[field]),content.index('cat >'+values[field]))
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);target=root/'target';target.write_text('UNCHANGED');target.chmod(0o640)
+   link=root/'linked';link.symlink_to(target)
+   directory=root/'directory';directory.mkdir();parent=root/'parent';parent.symlink_to(directory,target_is_directory=True)
+   for unsafe in (link,parent/'artifact'):
+    path=root/'guard.sh';path.write_text('set -euo pipefail\n'+function+'lit_require_safe_output "$1"\nprintf MODIFIED >"$1"\n')
+    result=subprocess.run(['/bin/bash',str(path),str(unsafe)],capture_output=True,text=True)
+    self.assertNotEqual(result.returncode,0)
+    self.assertEqual(target.read_text(),'UNCHANGED');self.assertEqual(target.stat().st_mode & 0o777,0o640)
+    self.assertFalse((directory/'artifact').exists())
+
+ def test_installed_directory_guard_rejects_links_and_unsafe_ownership_before_changes(self):
+  tasks=yaml.safe_load((ROOT/'tasks/network.yml').read_text())
+  guard=next(t for t in tasks if t['name'].startswith('Reject unsafe early VLAN artifact directories'))
+  for changes,accepted in [({},True),({'islnk':True},False),({'uid':1000},False),({'gid':1000},False),({'mode':'0777'},False),({'isdir':False},False)]:
+   stat={'exists':True,'islnk':False,'isdir':True,'uid':0,'gid':0,'mode':'0755',**changes}
+   values={'item':{'stat':stat}};gate=Conditional(loader=DataLoader());gate.when=guard['ansible.builtin.assert']['that']
+   self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(),values),values),accepted)
+  with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+   root=Path(temporary);target=root/'target';target.mkdir();target.chmod(0o750);link=root/'linked';link.symlink_to(target,target_is_directory=True)
+   inspect=tasks[0].copy();inspect['loop']=[str(link)]
+   play=[{'hosts':'localhost','gather_facts':False,'vars':{'luks_unlock_early_vlans':[{}]},'tasks':[inspect,guard]}]
+   path=root/'play.yml';path.write_text(yaml.safe_dump(play));config=root/'ansible.cfg';config.write_text('[defaults]\n')
+   result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(path)],capture_output=True,text=True,
+       env={**os.environ,'ANSIBLE_CONFIG':str(config)},timeout=30)
+   self.assertNotEqual(result.returncode,0);self.assertTrue(link.is_symlink());self.assertEqual(target.stat().st_mode & 0o777,0o750)

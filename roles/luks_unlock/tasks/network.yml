@@ -1,4 +1,51 @@
 ---
+- name: Inspect early VLAN directory components without following links
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - /etc
+    - /etc/initramfs-tools
+    - /etc/initramfs-tools/scripts
+    - "{{ luks_unlock_early_vlan_script_path | dirname }}"
+    - "{{ luks_unlock_early_vlan_hook_path | dirname }}"
+  register: luks_unlock_early_vlan_directories
+  when: luks_unlock_early_vlans | length > 0
+
+- name: Reject unsafe early VLAN artifact directories before mutation
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+      - >-
+        not item.stat.exists or (
+        item.stat.isdir | default(false) and item.stat.uid == 0 and item.stat.gid == 0
+        and item.stat.mode is match('^0[0-7][0145][0145]\\Z'))
+    quiet: true
+  loop: "{{ luks_unlock_early_vlan_directories.results | default([]) }}"
+  when: luks_unlock_early_vlans | length > 0
+
+- name: Inspect early VLAN output files without following links
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ luks_unlock_early_vlan_script_path }}"
+    - "{{ luks_unlock_early_vlan_hook_path }}"
+  register: luks_unlock_early_vlan_outputs
+  when: luks_unlock_early_vlans | length > 0
+
+- name: Reject unsafe early VLAN output files before rendering
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+      - >-
+        not item.stat.exists or (
+        item.stat.isreg | default(false) and item.stat.uid == 0 and item.stat.gid == 0
+        and item.stat.mode is match('^0[0-7][0145][0145]\\Z'))
+    quiet: true
+  loop: "{{ luks_unlock_early_vlan_outputs.results | default([]) }}"
+  when: luks_unlock_early_vlans | length > 0
+
 - name: Ensure GRUB drop-in directory exists
   ansible.builtin.file:
     path: "{{ luks_unlock_grub_dropin_path | dirname }}"
@@ -39,6 +86,7 @@
   ansible.builtin.file:
     path: "{{ item | dirname }}"
     state: directory
+    follow: false
     owner: root
     group: root
     mode: '0755'
@@ -51,6 +99,7 @@
   ansible.builtin.template:
     src: "{{ item.template }}"
     dest: "{{ item.path }}"
+    follow: false
     owner: root
     group: root
     mode: '0755'
