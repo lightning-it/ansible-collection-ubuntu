@@ -43,15 +43,17 @@
     - _xrdp_repo_check.rc != 0
 
 - name: Install XRDP packages
-  ansible.builtin.package:
+  ansible.builtin.apt:
     name: "{{ xrdp_packages }}"
     state: present
+    policy_rc_d: 101
   no_log: "{{ xrdp_no_log }}"
 
 - name: Install optional XRDP packages (best-effort)
-  ansible.builtin.package:
+  ansible.builtin.apt:
     name: "{{ xrdp_optional_packages }}"
     state: present
+    policy_rc_d: 101
   failed_when: false
   no_log: "{{ xrdp_no_log }}"
   when: (xrdp_optional_packages | default([]) | length) > 0
@@ -173,6 +175,12 @@
     - xrdp_tls_enable | bool
     - not ansible_check_mode or _xrdp_key.stat.exists
 
+- name: Validate materialized XRDP TLS identity before daemon access changes
+  ansible.builtin.include_tasks: validate_tls_pair.yml
+  when:
+    - xrdp_tls_enable | bool
+    - not ansible_check_mode or (_xrdp_cert.stat.exists and _xrdp_key.stat.exists)
+
 - name: Require the TLS key group installed by packages or the operator
   ansible.builtin.getent:
     database: group
@@ -203,7 +211,7 @@
   when:
     - xrdp_tls_enable | bool
     - xrdp_tls_key_path | length > 0
-    - not ansible_check_mode or _xrdp_installed | bool
+    - not ansible_check_mode or (_xrdp_installed | bool and (_xrdp_key.stat.exists | default(false)))
   notify: Restart xrdp
 
 - name: Configure xrdp.ini

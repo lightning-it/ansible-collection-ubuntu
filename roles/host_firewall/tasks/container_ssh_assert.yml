@@ -37,7 +37,7 @@
       - item.value.port == host_firewall_management_access_contract.openssh.port
       - item.value.modes == ['hardened']
     fail_msg: >-
-      Container SSH requires one private /32 identity on a managed bridge,
+      Container SSH requires one private /32 address on a managed bridge,
       that bridge's observed host gateway, and the hardened OpenSSH port.
   loop: "{{ host_firewall_container_ssh_access | dict2items }}"
   loop_control:

@@ -371,7 +371,7 @@ class TlsPathSafetyTests(unittest.TestCase):
         for task in [task for task in tasks if task['name'] in names]:
             for check, installed, expected in ((True, False, False), (True, True, True), (False, False, True)):
                 values = {'xrdp_tls_enable': True, 'xrdp_tls_key_path': '/etc/xrdp/lit-key.pem',
-                          'ansible_check_mode': check, '_xrdp_installed': installed}
+                          'ansible_check_mode': check, '_xrdp_installed': installed, '_xrdp_key': {'stat': {'exists': True}}}
                 gate = Conditional(loader=DataLoader()); gate.when = task['when']
                 self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)
 
@@ -411,3 +411,71 @@ class TlsPathSafetyTests(unittest.TestCase):
                     'getent_passwd': {'p1005a': ['x', '1001', '1001']}, 'getent_group': {'p1005a': ['x', '1001']}}}
                 gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
                 self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+
+
+class RealTlsPairPreflightTests(unittest.TestCase):
+    def test_existing_pair_is_parsed_and_matched_before_permission_changes(self):
+        with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+            directory = Path(temporary)
+            cert = directory / 'leaf.pem'; key = directory / 'key.pem'; other = directory / 'other.pem'
+            subprocess.run(['openssl', 'req', '-x509', '-nodes', '-newkey', 'rsa:2048',
+                            '-keyout', str(key), '-out', str(cert), '-days', '1', '-subj', '/CN=fixture'],
+                           check=True, capture_output=True)
+            subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-out', str(other),
+                            '-pkeyopt', 'rsa_keygen_bits:2048'], check=True, capture_output=True)
+            unrelated = directory / 'unrelated'; unrelated.write_text('unrelated protected content')
+            unrelated.chmod(0o600)
+            config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
+            preflight = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+            read = [t for t in preflight if t['name'].startswith('Inspect existing XRDP TLS')]
+            validate = next(t for t in preflight if t['name'].startswith('Validate an existing XRDP TLS pair'))
+            validate = copy.deepcopy(validate)
+            validate['ansible.builtin.include_tasks'] = str(ROLE / 'tasks/validate_tls_pair.yml')
+            for label, cert_path, key_path, accepted in [
+                    ('matching', cert, key, True), ('mismatch', cert, other, False),
+                    ('non-key', cert, unrelated, False), ('non-cert', unrelated, key, False)]:
+                with self.subTest(label=label):
+                    marker = directory / ('permission-stage-' + label)
+                    source = directory / 'play.yml'; source.write_text(yaml.safe_dump([{
+                        'hosts': 'localhost', 'gather_facts': False,
+                        'vars': {'xrdp_tls_enable': True, 'xrdp_tls_cert_path': str(cert_path),
+                                 'xrdp_tls_key_path': str(key_path)},
+                        'tasks': read + [validate, {'ansible.builtin.file': {
+                            'path': str(marker), 'state': 'touch', 'mode': '0600'}}]}]))
+                    result = subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)],
+                        check=False, capture_output=True, text=True, timeout=40,
+                        env={**os.environ, 'ANSIBLE_CONFIG': str(config),
+                             'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
+                    self.assertEqual(result.returncode == 0, accepted, result.stdout + result.stderr)
+                    self.assertEqual(marker.exists(), accepted)
+                    self.assertEqual(unrelated.stat().st_mode & 0o777, 0o600)
+                    self.assertEqual(unrelated.read_text(), 'unrelated protected content')
+                    self.assertNotIn('unrelated protected content', result.stdout + result.stderr)
+            main = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+            names = [t['name'] for t in main]
+            self.assertLess(names.index('Validate materialized XRDP TLS identity before daemon access changes'),
+                            names.index('Give the installed XRDP daemon access to its declared key group'))
+
+
+class XrdpActivationBoundaryTests(unittest.TestCase):
+    def test_packages_suppress_vendor_activation_until_configuration(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        for name in ('Install XRDP packages', 'Install optional XRDP packages (best-effort)'):
+            task = next(t for t in tasks if t['name'] == name)
+            self.assertEqual(task['ansible.builtin.apt']['policy_rc_d'], 101)
+        names = [t['name'] for t in tasks]
+        service = next(t for t in tasks if 'ansible.builtin.service' in t
+                       and t['ansible.builtin.service'].get('name') == 'xrdp')
+        self.assertLess(names.index('Configure xrdp.ini'), names.index(service['name']))
+
+    def test_installed_check_mode_skips_permissions_on_unmaterialized_key(self):
+        init_plugin_loader()
+        task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                    if t['name'] == 'Ensure permissions on XRDP TLS key')
+        for check, installed, exists, accepted in [(True, True, False, False),
+                (True, True, True, True), (True, False, False, False), (False, True, True, True)]:
+            values = {'xrdp_tls_enable': True, 'xrdp_tls_key_path': '/etc/xrdp/lit-key.pem',
+                      'ansible_check_mode': check, '_xrdp_installed': installed,
+                      '_xrdp_key': {'stat': {'exists': exists}}}
+            gate = Conditional(loader=DataLoader()); gate.when = task['when']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)

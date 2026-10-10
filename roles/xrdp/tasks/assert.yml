@@ -189,3 +189,10 @@
   when:
     - xrdp_tls_enable | bool
     - xrdp_tls_generate_self_signed | bool
+
+- name: Validate an existing XRDP TLS pair before any package or permission changes
+  ansible.builtin.include_tasks: validate_tls_pair.yml
+  when:
+    - xrdp_tls_enable | bool
+    - _xrdp_tls_path_preflight.results[0].stat.exists
+    - _xrdp_tls_path_preflight.results[1].stat.exists

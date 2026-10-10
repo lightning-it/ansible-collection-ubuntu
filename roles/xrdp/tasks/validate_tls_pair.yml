@@ -1,0 +1,25 @@
+---
+- name: Validate XRDP certificate and key correspondence without changing files
+  no_log: true
+  block:
+    - name: Read declared XRDP certificate metadata
+      community.crypto.x509_certificate_info:
+        path: "{{ xrdp_tls_cert_path }}"
+      register: _xrdp_tls_certificate_metadata
+
+    - name: Read declared XRDP private key public metadata
+      community.crypto.openssl_privatekey_info:
+        path: "{{ xrdp_tls_key_path }}"
+      register: _xrdp_tls_key_metadata
+
+    - name: Require a matching XRDP certificate and private key before daemon access
+      ansible.builtin.assert:
+        that:
+          - _xrdp_tls_certificate_metadata.public_key == _xrdp_tls_key_metadata.public_key
+        quiet: true
+  always:
+    - name: Clear temporary XRDP TLS metadata after validation
+      ansible.builtin.set_fact:
+        _xrdp_tls_certificate_metadata: {}
+        _xrdp_tls_key_metadata: {}
+      changed_when: false
