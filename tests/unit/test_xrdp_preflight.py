@@ -42,9 +42,9 @@ class XrdpPreflightTests(unittest.TestCase):
 
     def test_preflight_precedes_package_file_and_command_tasks(self):
         tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
-        self.assertEqual(tasks[1]['ansible.builtin.import_tasks'], 'assert.yml')
-        self.assertEqual(tasks[1]['tags'], 'always')
-        self.assertEqual(set(tasks[0]) - {'name', 'when'}, {'ansible.builtin.meta'})
+        self.assertEqual(tasks[0]['ansible.builtin.import_tasks'], 'assert.yml')
+        self.assertEqual(tasks[0]['tags'], 'always')
+        self.assertEqual(set(tasks[1]) - {'name', 'when'}, {'ansible.builtin.meta'})
 
     def test_invalid_accounts_desktop_and_session_cannot_reach_mutations(self):
         for field, value in (

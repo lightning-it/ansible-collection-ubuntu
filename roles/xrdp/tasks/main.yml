@@ -1,11 +1,11 @@
 ---
-- name: Skip when disabled
-  ansible.builtin.meta: end_host
-  when: not (xrdp_enabled | bool)
-
 - name: Validate XRDP inputs before host changes
   ansible.builtin.import_tasks: assert.yml
   tags: always
+
+- name: Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (xrdp_enabled | bool)
 
 - name: Gather installed packages (XRDP precheck)
   ansible.builtin.package_facts:
