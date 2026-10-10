@@ -98,3 +98,14 @@ class EarlyVlanTests(unittest.TestCase):
   values=self.values();values.update(luks_unlock_execution_mode="installed",luks_unlock_manage_early_network=False)
   self.assertFalse(self.accepts(values))
   values["luks_unlock_execution_mode"]="rescue_stage";self.assertTrue(self.accepts(values))
+
+ def test_disabled_network_management_still_removes_role_owned_vlan_artifacts(self):
+  tasks=yaml.safe_load((ROOT/'tasks/main.yml').read_text())
+  task=next(t for t in tasks if t.get('ansible.builtin.import_tasks') == 'early_vlan_cleanup.yml')
+  values=self.values();values.update(luks_unlock_execution_mode='installed',luks_unlock_manage_early_network=False,luks_unlock_early_vlans=[])
+  gate=Conditional(loader=DataLoader());gate.when=task['when']
+  self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(),values),values))
+  cleanup=yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text())[0]
+  self.assertEqual(cleanup['ansible.builtin.file']['state'],'absent')
+  self.assertEqual(cleanup['notify'],'LUKS unlock | Rebuild initramfs')
+  self.assertEqual(Templar(DataLoader(),values).template(cleanup['loop']),[values['luks_unlock_early_vlan_script_path'],values['luks_unlock_early_vlan_hook_path']])

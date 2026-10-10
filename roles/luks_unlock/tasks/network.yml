@@ -61,13 +61,3 @@
       path: "{{ luks_unlock_early_vlan_hook_path }}"
   when: luks_unlock_early_vlans | length > 0
   notify: LUKS unlock | Rebuild initramfs
-
-- name: Remove disabled role-owned early VLAN boot artifacts
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "{{ luks_unlock_early_vlan_script_path }}"
-    - "{{ luks_unlock_early_vlan_hook_path }}"
-  when: luks_unlock_early_vlans | length == 0
-  notify: LUKS unlock | Rebuild initramfs
