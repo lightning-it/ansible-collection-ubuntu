@@ -64,6 +64,18 @@ class ContainerSSHTests(unittest.TestCase):
         material = Templar(DataLoader(), values).template(values["host_firewall_policy_material_effective"])
         self.assertEqual(material["container_ssh_access"], values["host_firewall_container_ssh_access"])
 
+    def test_public_observed_gateway_and_host_spoofing_are_rejected(self):
+        values = enabled()
+        values["host_firewall_observed_container_bridge_gateways_ipv4"]["podman0"] = "8.8.8.8"
+        values["host_firewall_observed_ipv4_addresses"].append("8.8.8.8")
+        values["host_firewall_container_ssh_access"]["console"]["destination_ipv4"] = "8.8.8.8"
+        self.assertFalse(accepts(values))
+        for source in ("10.88.0.1", "10.88.0.2"):
+            values = enabled()
+            values["host_firewall_observed_ipv4_addresses"].append("10.88.0.2")
+            values["host_firewall_container_ssh_access"]["console"]["source_ipv4"] = source + "/32"
+            self.assertFalse(accepts(values))
+
     def test_widened_or_unobserved_grants_fail_closed(self):
         for change in ({"source_ipv4": "10.88.0.0/24"}, {"source_ipv4": "8.8.8.8/32"},
                        {"destination_ipv4": "192.0.2.10"}, {"destination_ipv4": "10.89.0.1"},

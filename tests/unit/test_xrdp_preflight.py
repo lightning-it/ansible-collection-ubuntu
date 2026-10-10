@@ -1,6 +1,9 @@
 """Invalid desktop inputs must fail before any host mutation."""
 import copy
 import unittest
+import os
+import subprocess
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -40,6 +43,7 @@ class XrdpPreflightTests(unittest.TestCase):
     def test_preflight_precedes_package_file_and_command_tasks(self):
         tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
         self.assertEqual(tasks[1]['ansible.builtin.import_tasks'], 'assert.yml')
+        self.assertEqual(tasks[1]['tags'], 'always')
         self.assertEqual(set(tasks[0]) - {'name', 'when'}, {'ansible.builtin.meta'})
 
     def test_invalid_accounts_desktop_and_session_cannot_reach_mutations(self):
@@ -86,3 +90,47 @@ class XrdpPreflightTests(unittest.TestCase):
             gate = Conditional(loader=DataLoader())
             gate.when = task['ansible.builtin.assert']['that']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+
+    def test_two_provisioned_accounts_survive_database_discovery(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        reads = [task for task in tasks if 'ansible.builtin.getent' in task]
+        self.assertEqual(len(reads), 2)
+        for task in reads:
+            self.assertNotIn('loop', task)
+            self.assertNotIn('key', task['ansible.builtin.getent'])
+        account_gate = next(task for task in tasks if task['name'].startswith('Require every declared'))
+        home_gate = next(task for task in tasks if task['name'] == 'Validate discovered home directories')
+        facts = {'getent_passwd': {name: ['x', '1001', '1001', '', '/home/' + name, '/bin/bash']
+                                  for name in ('p1005a', 'p1006u')},
+                 'getent_group': {name: ['x', '1001', ''] for name in ('p1005a', 'p1006u')}}
+        for name in ('p1005a', 'p1006u'):
+            values = {'ansible_facts': facts, 'item': name}
+            for task in (account_gate, home_gate):
+                gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+                self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(), values), values))
+        values = {'ansible_facts': facts, 'item': 'missing'}
+        gate = Conditional(loader=DataLoader()); gate.when = account_gate['ansible.builtin.assert']['that']
+        self.assertFalse(gate.evaluate_conditional(Templar(DataLoader(), values), values))
+
+    def test_tang_network_is_an_inline_role_argument(self):
+        spec = yaml.safe_load((ROLE.parent / 'host_firewall/meta/argument_specs.yml').read_text())
+        self.assertEqual(spec['argument_specs']['main']['options']['host_firewall_tang_network'],
+                         {'type': 'str', 'choices': ['public', 'management']})
+
+    def test_real_getent_discovery_keeps_two_accounts(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        reads = [task for task in tasks if 'ansible.builtin.getent' in task]
+        with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+            directory = Path(temporary)
+            config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
+            play = [{'hosts': 'localhost', 'gather_facts': False,
+                     'vars': {'xrdp_gnome_provisioned_users': ['root', 'bin']},
+                     'tasks': reads + [{'ansible.builtin.assert': {'that': [
+                         "'root' in ansible_facts.getent_passwd", "'bin' in ansible_facts.getent_passwd",
+                         "'root' in ansible_facts.getent_group", "'bin' in ansible_facts.getent_group"]}}]}]
+            source = directory / 'play.yml'; source.write_text(yaml.safe_dump(play))
+            result = subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)],
+                                    check=False, capture_output=True, text=True, timeout=30,
+                                    env={**os.environ, 'ANSIBLE_CONFIG': str(config),
+                                         'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

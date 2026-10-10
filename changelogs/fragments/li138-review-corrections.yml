@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - xrdp - preserve all provisioned passwd/group entries and run prechecks during tagged execution.
+  - >-
+    host_firewall - validate the Tang network role parameter and exclude
+    host-spoofed container SSH sources/public gateways.

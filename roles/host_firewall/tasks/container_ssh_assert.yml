@@ -23,6 +23,12 @@
         or item.value.source_ipv4 is match('^172[.](1[6-9]|2[0-9]|3[01])[.]')
       - item.value.destination_ipv4 is match(host_firewall_ipv4_pattern)
       - >-
+        item.value.destination_ipv4.startswith('10.')
+        or item.value.destination_ipv4.startswith('192.168.')
+        or item.value.destination_ipv4 is match('^172[.](1[6-9]|2[0-9]|3[01])[.]')
+      - item.value.source_ipv4 != item.value.destination_ipv4 ~ '/32'
+      - item.value.source_ipv4.split('/')[0] not in host_firewall_observed_ipv4_addresses
+      - >-
         item.value.destination_ipv4
         == host_firewall_observed_container_bridge_gateways_ipv4[item.value.interface]
       - item.value.destination_ipv4 in host_firewall_observed_ipv4_addresses
