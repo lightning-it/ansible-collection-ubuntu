@@ -18,7 +18,9 @@ Only the dedicated package-owned TLS groups `ssl-cert` and `xrdp` are allowed, i
 
 ## Dependencies
 
-None.
+No role dependencies. TLS issuance and read-only certificate/key preflight use
+`/usr/bin/openssl`; OpenSSL must already be available when adopting existing TLS
+files. These checks do not require target Python cryptography packages.
 
 ## Example Playbook
 
