@@ -55,6 +55,16 @@ class ContainerSSHTests(unittest.TestCase):
         material = Templar(DataLoader(), values).template(values["host_firewall_policy_material_effective"])
         self.assertNotIn("container_ssh_access", material)
 
+    def test_disabled_role_validates_capabilities_before_exit(self):
+        tasks = yaml.safe_load((ROLE / "tasks/main.yml").read_text())
+        validation = next(i for i, task in enumerate(tasks) if task.get("ansible.builtin.import_tasks") == "container_ssh_assert.yml")
+        exit_index = next(i for i, task in enumerate(tasks) if task.get("ansible.builtin.meta") == "end_role")
+        self.assertLess(validation, exit_index)
+        self.assertNotIn("when", tasks[validation])
+        values = fixture(); values["host_firewall_enabled"] = False
+        values["host_firewall_container_ssh_access"] = ["invalid"]
+        self.assertFalse(accepts(values))
+
     def test_enabled_is_exact_and_bound_into_fingerprint(self):
         values = enabled()
         self.assertTrue(accepts(values))

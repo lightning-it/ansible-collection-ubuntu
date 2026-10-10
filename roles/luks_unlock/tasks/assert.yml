@@ -193,6 +193,10 @@
 - name: Validate the optional early VLAN sequence
   ansible.builtin.assert:
     that:
+      - >-
+        luks_unlock_early_vlans | length == 0
+        or luks_unlock_execution_mode != 'installed'
+        or luks_unlock_manage_early_network | bool
       - luks_unlock_early_vlans is sequence
       - luks_unlock_early_vlans is not string
       - luks_unlock_early_vlans | map(attribute='name') | unique | length == luks_unlock_early_vlans | length

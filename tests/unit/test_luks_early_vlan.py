@@ -13,7 +13,7 @@ class EarlyVlanTests(unittest.TestCase):
  def setUpClass(cls): init_plugin_loader()
  def values(self):
   values=yaml.safe_load((ROOT/'defaults/main.yml').read_text())
-  values.update(luks_unlock_enabled=True,luks_unlock_network_modules=['igb','8021q'])
+  values.update(luks_unlock_enabled=True,luks_unlock_network_modules=['igb','8021q'],luks_unlock_manage_early_network=True)
   values['luks_unlock_early_vlans']=[{'parent':'eno2','name':'eno2.4091','id':4091,'address':'10.10.30.22','prefix':24,'mtu':1400}]
   return values
  def accepts(self,values):
@@ -93,3 +93,8 @@ class EarlyVlanTests(unittest.TestCase):
                      ('luks_unlock_early_vlan_hook_path','/tmp/hook'),
                      ('luks_unlock_early_vlan_hook_path','/etc/initramfs-tools/hooks/../../escape')):
    values=self.values();values[field]=path;self.assertFalse(self.accepts(values))
+
+ def test_installed_vlans_require_managed_early_network(self):
+  values=self.values();values.update(luks_unlock_execution_mode="installed",luks_unlock_manage_early_network=False)
+  self.assertFalse(self.accepts(values))
+  values["luks_unlock_execution_mode"]="rescue_stage";self.assertTrue(self.accepts(values))
