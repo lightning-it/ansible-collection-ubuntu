@@ -7,7 +7,7 @@
 xrdp_enabled: true
 xrdp_fail_if_unavailable: true
 
-xrdp_listen_address: "0.0.0.0"
+xrdp_listen_address: "127.0.0.1"
 xrdp_listen_port: 3389
 
 xrdp_firewalld_manage: true

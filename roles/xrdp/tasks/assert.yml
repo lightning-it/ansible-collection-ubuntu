@@ -96,3 +96,20 @@
       - not item.stat.exists or item.stat.gid == ansible_facts.getent_group[item.item][1] | int
     quiet: true
   loop: "{{ _xrdp_config_preflight.results }}"
+
+- name: Inspect existing XRDP TLS output paths before any changes
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop: "{{ [xrdp_tls_cert_path, xrdp_tls_key_path] | unique }}"
+  register: _xrdp_tls_path_preflight
+  when: xrdp_tls_enable | bool
+
+- name: Refuse linked or non-regular XRDP TLS output paths before any changes
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+      - not item.stat.exists or (item.stat.isreg | default(false))
+    quiet: true
+  loop: "{{ _xrdp_tls_path_preflight.results | default([]) }}"
+  when: xrdp_tls_enable | bool

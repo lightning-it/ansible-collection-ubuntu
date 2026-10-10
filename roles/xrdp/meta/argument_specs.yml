@@ -5,7 +5,7 @@ argument_specs:
     options:
       xrdp_enabled: {type: bool, default: true}
       xrdp_fail_if_unavailable: {type: bool, default: true}
-      xrdp_listen_address: {type: str, default: "0.0.0.0"}
+      xrdp_listen_address: {type: str, default: "127.0.0.1"}
       xrdp_listen_port: {type: int, default: 3389}
       xrdp_firewalld_manage: {type: bool, default: true}
       xrdp_firewalld_zone: {type: str, default: "public"}

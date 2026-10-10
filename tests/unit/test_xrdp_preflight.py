@@ -1,9 +1,9 @@
 """Invalid desktop inputs must fail before any host mutation."""
 import copy
-import unittest
 import os
 import subprocess
 import tempfile
+import unittest
 from pathlib import Path
 
 import yaml
@@ -187,3 +187,54 @@ class ExistingDirectoryOwnershipTests(unittest.TestCase):
                                             'getent_group': {'p1005a': ['x', '1001']}}}
                 gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
                 self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+
+class TlsPathSafetyTests(unittest.TestCase):
+    def test_default_listener_is_loopback_in_defaults_and_argument_spec(self):
+        defaults = yaml.safe_load((ROLE / 'defaults/main.yml').read_text())
+        spec = yaml.safe_load((ROLE / 'meta/argument_specs.yml').read_text())
+        self.assertEqual(defaults['xrdp_listen_address'], '127.0.0.1')
+        self.assertEqual(spec['argument_specs']['main']['options']['xrdp_listen_address']['default'], '127.0.0.1')
+
+    def test_tls_paths_fail_closed_before_generation_and_permission_changes(self):
+        init_plugin_loader()
+        preflight = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        task = next(task for task in preflight if task['name'].startswith('Refuse linked or non-regular XRDP'))
+        for stat, accepted in (({'exists': False}, True),
+                               ({'exists': True, 'islnk': False, 'isreg': True}, True),
+                               ({'exists': True, 'islnk': True, 'isreg': True}, False),
+                               ({'exists': True, 'islnk': False, 'isreg': False}, False)):
+            values = {'item': {'stat': stat}}
+            gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+        main = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        key_gate = next(task for task in main if task['name'].startswith('Require a regular materialized'))
+        for exists, linked, regular, accepted in ((True, False, True, True), (True, True, True, False),
+                                                  (False, False, False, False), (True, False, False, False)):
+            values = {'_xrdp_key': {'stat': {'exists': exists, 'islnk': linked, 'isreg': regular}}}
+            gate = Conditional(loader=DataLoader()); gate.when = key_gate['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+        names = [task['name'] for task in main]
+        self.assertLess(names.index(key_gate['name']), names.index('Give the installed XRDP daemon access to its declared key group'))
+        chmod = next(task for task in main if task['name'] == 'Ensure permissions on XRDP TLS key')
+        self.assertIs(chmod['ansible.builtin.file']['follow'], False)
+
+    def test_real_stat_detects_tls_key_symlink_without_touching_its_target(self):
+        with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+            directory = Path(temporary)
+            target = directory / 'target'; target.write_text('unrelated key material'); target.chmod(0o600)
+            link = directory / 'key.pem'; link.symlink_to(target)
+            tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+            selected = [task for task in tasks if task['name'].startswith(('Inspect existing XRDP TLS', 'Refuse linked or non-regular XRDP'))]
+            config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
+            source = directory / 'play.yml'; source.write_text(yaml.safe_dump([{
+                'hosts': 'localhost', 'gather_facts': False,
+                'vars': {'xrdp_tls_enable': True, 'xrdp_tls_cert_path': str(target), 'xrdp_tls_key_path': str(link)},
+                'tasks': selected}]))
+            result = subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)],
+                                    check=False, capture_output=True, text=True, timeout=30,
+                                    env={**os.environ, 'ANSIBLE_CONFIG': str(config),
+                                         'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Refuse linked or non-regular XRDP TLS', result.stdout)
+            self.assertEqual(target.read_text(), 'unrelated key material')
+            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
