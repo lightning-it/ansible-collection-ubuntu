@@ -62,6 +62,10 @@ class XrdpPreflightTests(unittest.TestCase):
             ('xrdp_gnome_private_dbus_session', 'true'),
             ('xrdp_release_upgrade_prompt', 'anything'),
             ('xrdp_tls_key_group', 'root'),
+            ('xrdp_tls_key_group', 'docker'),
+            ('xrdp_tls_key_group', 'lxd'),
+            ('xrdp_tls_key_group', 'disk'),
+            ('xrdp_tls_key_group', 'custom'),
             ('xrdp_tls_key_group', 'bad;group'),
             ('xrdp_tls_key_mode', '0600'),
             ('xrdp_tls_key_mode', '0644'),
@@ -134,7 +138,7 @@ class XrdpPreflightTests(unittest.TestCase):
         self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(), values), values))
         task = next(task for task in tasks if task['name'].startswith('Require a known package-owned'))
         gate.when = task['ansible.builtin.assert']['that']
-        for group, present, expected in [('missing-custom', False, False), ('custom', True, True),
+        for group, present, expected in [('missing-custom', False, False), ('custom', True, False),
                                          ('ssl-cert', False, True), ('xrdp', False, True)]:
             values['xrdp_tls_key_group'] = group
             values['ansible_facts']['getent_group'] = {group: []} if present else {}

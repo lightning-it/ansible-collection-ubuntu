@@ -14,7 +14,6 @@
   when:
     - luks_unlock_enabled | bool
     - luks_unlock_execution_mode == 'installed'
-  tags: always
 
 - name: Configure early-boot networking
   ansible.builtin.include_tasks: network.yml

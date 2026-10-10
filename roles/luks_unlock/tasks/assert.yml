@@ -223,7 +223,7 @@
       - item.address.split('.') | map('int') | max <= 255
       - item.prefix is integer
       - item.prefix >= 1
-      - item.prefix <= 32
+      - item.prefix <= 31
       - item.mtu is integer
       - item.mtu >= 576
       - item.mtu <= 9000

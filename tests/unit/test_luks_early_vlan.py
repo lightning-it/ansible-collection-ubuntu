@@ -34,7 +34,7 @@ class EarlyVlanTests(unittest.TestCase):
   self.assertNotIn('10.10.30.22',kernel)
  def test_invalid_vlan_or_injection_cannot_render_boot_commands(self):
   for change in ({'id':4095},{'id':0},{'name':'different'},{'address':'10.10.30.22;id'},
-                 {'address':'999.1.1.1'},{'parent':'eno2;id'},{'mtu':100},{'prefix':33}):
+                 {'address':'999.1.1.1'},{'parent':'eno2;id'},{'mtu':100},{'prefix':33},{'prefix':32}):
    values=self.values();values['luks_unlock_early_vlans'][0].update(change)
    self.assertFalse(self.accepts(values))
   values=self.values();values['luks_unlock_network_modules']=['igb'];self.assertFalse(self.accepts(values))
@@ -102,6 +102,7 @@ class EarlyVlanTests(unittest.TestCase):
  def test_disabled_network_management_still_removes_role_owned_vlan_artifacts(self):
   tasks=yaml.safe_load((ROOT/'tasks/main.yml').read_text())
   task=next(t for t in tasks if t.get('ansible.builtin.import_tasks') == 'early_vlan_cleanup.yml')
+  self.assertNotIn('always', task.get('tags', []))
   values=self.values();values.update(luks_unlock_execution_mode='installed',luks_unlock_manage_early_network=False,luks_unlock_early_vlans=[])
   gate=Conditional(loader=DataLoader());gate.when=task['when']
   self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(),values),values))

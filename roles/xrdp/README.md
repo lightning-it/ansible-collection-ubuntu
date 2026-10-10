@@ -14,7 +14,7 @@ newlines, leading-zero octets and out-of-range octets are rejected before change
 
 See `defaults/main.yml`.
 
-Custom TLS key groups must already exist and are checked before host changes, including when no GNOME users are declared. The package-owned `ssl-cert` and `xrdp` groups may be created by the normal XRDP package installation; their existence is verified again before key permissions and daemon membership change.
+Only the dedicated package-owned TLS groups `ssl-cert` and `xrdp` are allowed, including when no GNOME users are declared. The package-owned `ssl-cert` and `xrdp` groups may be created by the normal XRDP package installation; their existence is verified again before key permissions and daemon membership change.
 
 ## Dependencies
 
@@ -61,3 +61,5 @@ prompting (`never`, `normal`, `lts`); the default leaves it unchanged. This
 does not disable package or security updates.
 
 TLS defaults use the package-provided `ssl-cert` group with mode `0640`. The role requires the declared key group to exist and appends the installed `xrdp` daemon to it before setting key permissions. Root-group and owner-only key settings are rejected because the configured unprivileged daemon must read its key.
+
+TLS key groups are restricted to the dedicated package-owned `ssl-cert` and `xrdp` groups. Privileged and arbitrary custom groups are rejected before changes.
