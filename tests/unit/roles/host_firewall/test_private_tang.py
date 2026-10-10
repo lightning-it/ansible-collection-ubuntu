@@ -58,3 +58,13 @@ class PrivateTangTests(unittest.TestCase):
         self.assertNotIn('tang_network', base)
         self.assertNotIn('tang_network', effective)
         self.assertEqual(effective, base)
+
+    def test_inactive_management_tang_does_not_change_authorization_fingerprint(self):
+        values = variables(); values['host_firewall_tang_network'] = 'management'
+        values['host_firewall_tang_access']['sources_ipv4'] = []
+        engine = Templar(DataLoader(), values)
+        baseline = engine.template(values['host_firewall_policy_material_effective'])
+        self.assertNotIn('tang_network', baseline)
+        self.assertNotIn('ip saddr @tang_sources_v4', render(values))
+        values['host_firewall_tang_network'] = 'public'
+        self.assertEqual(Templar(DataLoader(), values).template(values['host_firewall_policy_material_effective']), baseline)

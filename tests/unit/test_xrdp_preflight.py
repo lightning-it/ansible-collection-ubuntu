@@ -69,11 +69,35 @@ class XrdpPreflightTests(unittest.TestCase):
             ('xrdp_tls_key_group', 'bad;group'),
             ('xrdp_tls_key_mode', '0600'),
             ('xrdp_tls_key_mode', '0644'),
+            ('xrdp_tls_days', 0),
+            ('xrdp_tls_days', -1),
+            ('xrdp_tls_days', '365'),
         ):
             with self.subTest(field=field):
                 values = copy.deepcopy(self.values())
                 values[field] = value
                 self.assertFalse(self.accepts(values))
+
+    def test_tls_output_paths_and_subject_remain_single_openssl_arguments(self):
+        task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                    if t['name'].startswith('Generate self-signed'))
+        values = self.values()
+        values.update(xrdp_tls_cert_path='/tmp/leaf certificate.pem', xrdp_tls_key_path='/tmp/leaf key.pem',
+                      xrdp_tls_subject='/CN=Fixture with spaces')
+        argv = Templar(DataLoader(), values).template(task['ansible.builtin.command']['argv'])
+        self.assertEqual(argv[argv.index('-out') + 1], values['xrdp_tls_cert_path'])
+        self.assertEqual(argv[argv.index('-keyout') + 1], values['xrdp_tls_key_path'])
+        self.assertEqual(argv[argv.index('-subj') + 1], values['xrdp_tls_subject'])
+        self.assertEqual(argv[argv.index('-days') + 1], str(values['xrdp_tls_days']))
+
+    def test_disabled_tls_renders_no_reference_to_missing_certificates(self):
+        values = self.values(); values.update(xrdp_tls_enable=False, xrdp_security_layer='tls')
+        rendered = Templar(DataLoader(), values).template((ROLE / 'templates/xrdp.ini.j2').read_text())
+        self.assertIn('security_layer=rdp', rendered)
+        self.assertIn('certificate=\n', rendered)
+        self.assertIn('key_file=\n', rendered)
+        self.assertNotIn(values['xrdp_tls_cert_path'], rendered)
+        self.assertNotIn(values['xrdp_tls_key_path'], rendered)
 
     def test_tls_paths_reject_control_characters_relative_and_identical_inputs(self):
         task = next(task for task in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())

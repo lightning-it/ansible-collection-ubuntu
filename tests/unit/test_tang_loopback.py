@@ -41,3 +41,16 @@ class LoopbackTests(unittest.TestCase):
                           'ansible_check_mode': check, '_tang_deploy_unit_load_state': {'stdout': load_state}}
                 gate = Conditional(loader=DataLoader()); gate.when = service['when']
                 self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)
+
+    def test_package_reconciliation_preserves_explicit_stopped_state(self):
+        tasks = yaml.safe_load((ROOT / 'tasks/main.yml').read_text())
+        packages = next(task for task in tasks if 'ansible.builtin.apt' in task)
+        self.assertIn('Tang deploy | Restart socket', packages['notify'])
+        handler = next(t for t in yaml.safe_load((ROOT / 'handlers/main.yml').read_text())
+                       if t['name'] == 'Tang deploy | Restart socket')
+        for state, enabled, check, accepted in [('started', True, False, True), ('stopped', True, False, False),
+                ('started', False, False, False), ('started', True, True, False)]:
+            values = {'tang_deploy_manage_service': True, 'tang_deploy_enabled': enabled,
+                      'tang_deploy_socket_state': state, 'ansible_check_mode': check}
+            gate = Conditional(loader=DataLoader()); gate.when = handler['when']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)

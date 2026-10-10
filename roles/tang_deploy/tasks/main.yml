@@ -9,6 +9,9 @@
     state: present
     update_cache: "{{ tang_deploy_update_apt_cache | bool }}"
     policy_rc_d: 101
+  notify:
+    - Tang deploy | Reload systemd
+    - Tang deploy | Restart socket
   when:
     - tang_deploy_enabled | bool
     - tang_deploy_manage_packages | bool

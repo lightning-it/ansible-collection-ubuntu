@@ -291,7 +291,8 @@ host_firewall_policy_material_effective: >-
     host_firewall_policy_material
     | combine(
         {'tang_network': host_firewall_tang_network}
-        if host_firewall_tang_network == 'management'
+        if (host_firewall_tang_network == 'management'
+            and host_firewall_tang_access.sources_ipv4 | length > 0)
         else {}
       )
     | combine(

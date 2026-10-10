@@ -10,5 +10,7 @@
     name: "{{ tang_deploy_socket_unit }}"
     state: restarted
   when:
+    - tang_deploy_enabled | bool
     - tang_deploy_manage_service | bool
+    - tang_deploy_socket_state == 'started'
     - not ansible_check_mode

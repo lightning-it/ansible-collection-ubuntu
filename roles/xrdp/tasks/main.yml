@@ -131,13 +131,22 @@
   when: xrdp_tls_enable | bool
 
 - name: Generate self-signed cert/key for XRDP (when missing)
-  ansible.builtin.command: >
-    openssl req -x509 -nodes -newkey rsa:2048
-    -keyout {{ xrdp_tls_key_path }}
-    -out {{ xrdp_tls_cert_path }}
-    -days {{ xrdp_tls_days | int }}
-    -subj "{{ xrdp_tls_subject }}"
-  args:
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - req
+      - -x509
+      - -nodes
+      - -newkey
+      - rsa:2048
+      - -keyout
+      - "{{ xrdp_tls_key_path }}"
+      - -out
+      - "{{ xrdp_tls_cert_path }}"
+      - -days
+      - "{{ xrdp_tls_days | int | string }}"
+      - -subj
+      - "{{ xrdp_tls_subject }}"
     creates: "{{ xrdp_tls_cert_path }}"
   when:
     - xrdp_tls_enable | bool
