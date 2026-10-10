@@ -56,6 +56,10 @@ class XrdpPreflightTests(unittest.TestCase):
             ('xrdp_gnome_session', 'gnome; id'),
             ('xrdp_gnome_private_dbus_session', 'true'),
             ('xrdp_release_upgrade_prompt', 'anything'),
+            ('xrdp_tls_key_group', 'root'),
+            ('xrdp_tls_key_group', 'bad;group'),
+            ('xrdp_tls_key_mode', '0600'),
+            ('xrdp_tls_key_mode', '0644'),
         ):
             with self.subTest(field=field):
                 values = copy.deepcopy(self.values())

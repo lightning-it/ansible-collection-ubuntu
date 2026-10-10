@@ -31,3 +31,13 @@ class LoopbackTests(unittest.TestCase):
         values['tang_deploy_listen_address'] = '127.0.0.1'
         values['tang_deploy_manage_socket_override'] = False
         self.assertFalse(self.accepts(values))
+
+    def test_existing_unit_check_mode_previews_service_drift(self):
+        tasks = yaml.safe_load((ROOT / 'tasks/main.yml').read_text())
+        service = next(task for task in tasks if 'ansible.builtin.systemd_service' in task)
+        for check, load_state, expected in [(False, '', True), (True, 'loaded', True), (True, 'not-found', False)]:
+            with self.subTest(check=check, load_state=load_state):
+                values = {'tang_deploy_enabled': True, 'tang_deploy_manage_service': True,
+                          'ansible_check_mode': check, '_tang_deploy_unit_load_state': {'stdout': load_state}}
+                gate = Conditional(loader=DataLoader()); gate.when = service['when']
+                self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)

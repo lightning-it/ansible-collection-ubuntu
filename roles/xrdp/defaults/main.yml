@@ -26,8 +26,8 @@ xrdp_tls_enable: true
 xrdp_tls_cert_path: "/etc/xrdp/cert.pem"
 xrdp_tls_key_path: "/etc/xrdp/key.pem"
 xrdp_tls_generate_self_signed: true
-xrdp_tls_key_group: root
-xrdp_tls_key_mode: "0600"
+xrdp_tls_key_group: ssl-cert
+xrdp_tls_key_mode: "0640"
 xrdp_tls_subject: "/CN={{ inventory_hostname }}"
 xrdp_tls_days: 825
 

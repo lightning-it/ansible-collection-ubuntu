@@ -8,7 +8,9 @@
       - xrdp_gnome_private_dbus_session is boolean
       - xrdp_gnome_session is string and xrdp_gnome_session is match('^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$')
       - xrdp_tls_key_group is string and xrdp_tls_key_group is match('^[a-z_][a-z0-9_-]{0,31}$')
-      - xrdp_tls_key_mode is string and xrdp_tls_key_mode is match('^0[0-7]00$|^0[0-7][0-4]0$')
+      - xrdp_tls_key_mode is string and xrdp_tls_key_mode in ['0440', '0640']
+      - xrdp_tls_key_group is string and xrdp_tls_key_group is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - xrdp_tls_key_group != 'root'
       - xrdp_release_upgrade_prompt in ['', 'never', 'normal', 'lts']
       - xrdp_gnome_provisioned_users is sequence and xrdp_gnome_provisioned_users is not string
       - xrdp_gnome_provisioned_users | unique | length == xrdp_gnome_provisioned_users | length

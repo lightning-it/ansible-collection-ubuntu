@@ -146,6 +146,24 @@
     - not _xrdp_cert.stat.exists
   notify: Restart xrdp
 
+- name: Require the TLS key group installed by packages or the operator
+  ansible.builtin.getent:
+    database: group
+    key: "{{ xrdp_tls_key_group }}"
+  when:
+    - xrdp_tls_enable | bool
+    - xrdp_tls_key_path | length > 0
+
+- name: Give the installed XRDP daemon access to its declared key group
+  ansible.builtin.user:
+    name: xrdp
+    groups: "{{ xrdp_tls_key_group }}"
+    append: true
+  when:
+    - xrdp_tls_enable | bool
+    - xrdp_tls_key_path | length > 0
+  notify: Restart xrdp
+
 - name: Ensure permissions on XRDP TLS key
   ansible.builtin.file:
     path: "{{ xrdp_tls_key_path }}"

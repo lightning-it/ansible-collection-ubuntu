@@ -198,9 +198,9 @@
       - luks_unlock_early_vlans | map(attribute='name') | unique | length == luks_unlock_early_vlans | length
       - >-
         luks_unlock_early_vlan_script_path
-        is match('^/etc/initramfs-tools/scripts/init-premount/[A-Za-z0-9_-][A-Za-z0-9_.-]*$')
+        == '/etc/initramfs-tools/scripts/init-premount/00-lit-early-vlans'
       - >-
-        luks_unlock_early_vlan_hook_path is match('^/etc/initramfs-tools/hooks/[A-Za-z0-9_-][A-Za-z0-9_.-]*$')
+        luks_unlock_early_vlan_hook_path == '/etc/initramfs-tools/hooks/lit-early-vlans'
       - luks_unlock_early_vlan_script_path != luks_unlock_early_vlan_hook_path
     quiet: true
   when: luks_unlock_enabled | bool

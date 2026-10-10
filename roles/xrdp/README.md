@@ -53,3 +53,5 @@ first-login wizard. The default empty list preserves normal onboarding.
 `xrdp_release_upgrade_prompt` optionally declares Ubuntu release-upgrade
 prompting (`never`, `normal`, `lts`); the default leaves it unchanged. This
 does not disable package or security updates.
+
+TLS defaults use the package-provided `ssl-cert` group with mode `0640`. The role requires the declared key group to exist and appends the installed `xrdp` daemon to it before setting key permissions. Root-group and owner-only key settings are rejected because the configured unprivileged daemon must read its key.
