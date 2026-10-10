@@ -74,6 +74,9 @@
       - item.stat.exists
       - not (item.stat.islnk | default(false))
       - item.stat.isdir | default(false)
+      - item.stat.uid == ansible_facts.getent_passwd[item.item][1] | int
+      - item.stat.gid == ansible_facts.getent_group[item.item][1] | int
+      - item.stat.mode[-3] | int in [3, 7]
     quiet: true
   loop: "{{ _xrdp_home_preflight.results }}"
 
@@ -89,5 +92,7 @@
     that:
       - not (item.stat.islnk | default(false))
       - not item.stat.exists or (item.stat.isdir | default(false))
+      - not item.stat.exists or item.stat.uid == ansible_facts.getent_passwd[item.item][1] | int
+      - not item.stat.exists or item.stat.gid == ansible_facts.getent_group[item.item][1] | int
     quiet: true
   loop: "{{ _xrdp_config_preflight.results }}"

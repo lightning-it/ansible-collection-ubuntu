@@ -99,7 +99,7 @@ class XrdpPreflightTests(unittest.TestCase):
         task = next(task for task in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
                     if task['name'] == 'Refuse linked or non-directory personal configuration paths')
         for linked, directory, accepted in ((True, True, False), (False, False, False), (False, True, True)):
-            values = {'item': {'stat': {'exists': True, 'islnk': linked, 'isdir': directory}}}
+            values = {'item': {'item': 'p1005a', 'stat': {'exists': True, 'islnk': linked, 'isdir': directory, 'uid': 1001, 'gid': 1001}}, 'ansible_facts': {'getent_passwd': {'p1005a': ['x','1001','1001']}, 'getent_group': {'p1005a': ['x','1001']}}}
             gate = Conditional(loader=DataLoader())
             gate.when = task['ansible.builtin.assert']['that']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
@@ -172,3 +172,18 @@ class XrdpPreflightTests(unittest.TestCase):
                 'getent_group': {'p1005a': ['x', '1001', members]}}}
             gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)
+
+class ExistingDirectoryOwnershipTests(unittest.TestCase):
+    def test_home_and_config_owned_by_other_account_fail_before_packages(self):
+        init_plugin_loader()
+        tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        for name in ('Refuse linked or missing personal home directories',
+                     'Refuse linked or non-directory personal configuration paths'):
+            task = next(task for task in tasks if task['name'] == name)
+            for uid, gid, accepted in ((1001, 1001, True), (0, 1001, False), (1002, 1001, False), (1001, 0, False)):
+                values = {'item': {'item': 'p1005a', 'stat': {'exists': True, 'isdir': True, 'islnk': False,
+                                                            'uid': uid, 'gid': gid, 'mode': '0700'}},
+                          'ansible_facts': {'getent_passwd': {'p1005a': ['x', '1001', '1001']},
+                                            'getent_group': {'p1005a': ['x', '1001']}}}
+                gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+                self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
