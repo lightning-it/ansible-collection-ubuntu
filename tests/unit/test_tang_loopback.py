@@ -54,3 +54,10 @@ class LoopbackTests(unittest.TestCase):
                       'tang_deploy_socket_state': state, 'ansible_check_mode': check}
             gate = Conditional(loader=DataLoader()); gate.when = handler['when']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+
+    def test_externally_managed_package_lifecycle_is_not_suppressed(self):
+        packages = next(t for t in yaml.safe_load((ROOT / 'tasks/main.yml').read_text()) if 'ansible.builtin.apt' in t)
+        expression = packages['ansible.builtin.apt']['policy_rc_d']
+        for managed, expected in [(True, '101'), (False, 'OMIT_FIXTURE')]:
+            values = {'tang_deploy_manage_service': managed, 'omit': 'OMIT_FIXTURE'}
+            self.assertEqual(Templar(DataLoader(), values).template(expression), expected)

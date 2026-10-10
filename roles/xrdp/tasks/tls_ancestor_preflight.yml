@@ -15,5 +15,10 @@
         and item.stat.mode is match('^0[0-7][0145][0145]\\Z'))
         or (not item.stat.exists and xrdp_tls_generate_self_signed | bool
         and xrdp_tls_output_path.split('/')[:item.item] | join('/') == '/etc/xrdp')
+      - >-
+        not item.stat.exists or item.stat.mode[-1] in ['1', '5']
+        or (xrdp_tls_key_group in ansible_facts.getent_group | default({})
+        and item.stat.gid | default(-1) == ansible_facts.getent_group[xrdp_tls_key_group][1] | int
+        and item.stat.mode[-2] in ['1', '5'])
     quiet: true
   loop: "{{ _xrdp_tls_ancestor_preflight.results }}"

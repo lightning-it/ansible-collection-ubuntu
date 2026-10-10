@@ -8,7 +8,7 @@
     name: "{{ tang_deploy_packages }}"
     state: present
     update_cache: "{{ tang_deploy_update_apt_cache | bool }}"
-    policy_rc_d: 101
+    policy_rc_d: "{{ 101 if tang_deploy_manage_service | bool else omit }}"
   notify:
     - Tang deploy | Reload systemd
     - Tang deploy | Restart socket

@@ -467,6 +467,60 @@ class XrdpActivationBoundaryTests(unittest.TestCase):
         service = next(t for t in tasks if 'ansible.builtin.service' in t
                        and t['ansible.builtin.service'].get('name') == 'xrdp')
         self.assertLess(names.index('Configure xrdp.ini'), names.index(service['name']))
+        for name in ('Install XRDP packages', 'Install optional XRDP packages (best-effort)'):
+            self.assertEqual(next(t for t in tasks if t['name'] == name)['notify'], 'Restart xrdp')
+        handler = yaml.safe_load((ROLE / 'handlers/main.yml').read_text())[0]
+        self.assertEqual(handler['loop'], ['xrdp-sesman', 'xrdp'])
+        self.assertEqual(handler['ansible.builtin.service']['state'], 'restarted')
+        self.assertEqual(handler['when'], 'not ansible_check_mode')
+
+    def test_certificate_permissions_are_reconciled_after_validation_before_activation(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        names = [t['name'] for t in tasks]
+        task = next(t for t in tasks if t['name'] == 'Ensure the XRDP daemon can read its validated certificate')
+        self.assertLess(names.index('Validate materialized XRDP TLS identity before daemon access changes'), names.index(task['name']))
+        self.assertLess(names.index(task['name']), names.index('Enable and start xrdp service'))
+        self.assertEqual(task['ansible.builtin.file']['group'], '{{ xrdp_tls_key_group }}')
+        self.assertIs(task['ansible.builtin.file']['follow'], False)
+        self.assertEqual(task['ansible.builtin.file']['owner'], 'root')
+        self.assertEqual(task['notify'], 'Restart xrdp')
+        with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+            directory = Path(temporary); cert = directory / 'validated-public-cert'; cert.write_text('fixture public certificate')
+            cert.chmod(0o600)
+            selected = copy.deepcopy(task); selected.pop('notify')
+            selected['ansible.builtin.file']['owner'] = str(os.geteuid())
+            source = directory / 'play.yml'; source.write_text(yaml.safe_dump([{
+                'hosts': 'localhost', 'gather_facts': False,
+                'vars': {'xrdp_tls_enable': True, 'xrdp_tls_cert_path': str(cert), 'xrdp_tls_key_group': str(os.getegid()),
+                         '_xrdp_installed': True, '_xrdp_cert': {'stat': {'exists': True}}}, 'tasks': [selected]}]))
+            config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
+            result = subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)],
+                capture_output=True, text=True, check=False, timeout=30,
+                env={**os.environ, 'ANSIBLE_CONFIG': str(config), 'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(cert.stat().st_mode & 0o777, 0o640)
+            self.assertEqual(cert.stat().st_gid, os.getegid())
+            self.assertEqual(cert.read_text(), 'fixture public certificate')
+
+    def test_tls_ancestors_must_be_traversable_by_the_daemon_group(self):
+        init_plugin_loader()
+        task = yaml.safe_load((ROLE / 'tasks/tls_ancestor_preflight.yml').read_text())[1]
+        for mode, gid, accepted in [('0755', 0, True), ('0710', 42, True), ('0700', 42, False), ('0710', 0, False)]:
+            values = {'item': {'item': 2, 'stat': {'exists': True, 'islnk': False, 'isdir': True,
+                'uid': 0, 'gid': gid, 'mode': mode}}, 'xrdp_tls_output_path': '/etc/ssl/private/leaf.key',
+                'xrdp_tls_generate_self_signed': False, 'xrdp_tls_key_group': 'ssl-cert',
+                'ansible_facts': {'getent_group': {'ssl-cert': ['x', '42', '']}}}
+            gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+
+    def test_check_mode_defers_unmaterialized_certificate_permissions(self):
+        init_plugin_loader()
+        task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                    if t['name'] == 'Ensure the XRDP daemon can read its validated certificate')
+        values = {'xrdp_tls_enable': True, 'ansible_check_mode': True, '_xrdp_installed': True,
+                  '_xrdp_cert': {'stat': {'exists': False}}}
+        gate = Conditional(loader=DataLoader()); gate.when = task['when']
+        self.assertFalse(gate.evaluate_conditional(Templar(DataLoader(), values), values))
 
     def test_installed_check_mode_skips_permissions_on_unmaterialized_key(self):
         init_plugin_loader()
