@@ -24,7 +24,9 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `tang_deploy_validate`: validate the local advertisement and obtain public signing thumbprints.
 - `tang_deploy_public_thumbprints`: public thumbprints recorded after validation.
 
-The optional `tang_deploy_listen_address: 127.0.0.1` requires the socket override and restricts the backend to loopback. Package installation suppresses automatic service start; the role starts the configured socket. An empty address preserves the previous socket binding.
+The optional `tang_deploy_listen_address: 127.0.0.1` requires the socket override and restricts the backend to loopback. An empty address preserves the previous socket binding.
+
+With `tang_deploy_manage_service: true`, package installation suppresses automatic service activation; the role applies its socket configuration before enabling and starting `tangd.socket`. With `tang_deploy_manage_service: false`, the role omits that suppression and does not manage the socket service. Package installation and upgrades retain their normal service lifecycle; the external service owner is responsible for socket activation and configuration reconciliation.
 
 ## Dependencies
 
