@@ -10,6 +10,8 @@ None.
 
 See `defaults/main.yml`.
 
+Custom TLS key groups must already exist and are checked before host changes, including when no GNOME users are declared. The package-owned `ssl-cert` and `xrdp` groups may be created by the normal XRDP package installation; their existence is verified again before key permissions and daemon membership change.
+
 ## Dependencies
 
 None.

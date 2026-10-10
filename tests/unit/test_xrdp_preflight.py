@@ -121,6 +121,20 @@ class XrdpPreflightTests(unittest.TestCase):
         self.assertEqual(spec['argument_specs']['main']['options']['host_firewall_tang_network'],
                          {'type': 'str', 'choices': ['public', 'management']})
 
+    def test_missing_custom_tls_group_is_rejected_with_no_gnome_users(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        read = next(task for task in tasks if task['name'] == 'Discover existing personal GNOME groups before changes')
+        gate = Conditional(loader=DataLoader()); gate.when = [read['when']]
+        values = {**self.values(), 'ansible_facts': {'getent_group': {}}}
+        self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(), values), values))
+        task = next(task for task in tasks if task['name'].startswith('Require a known package-owned'))
+        gate.when = task['ansible.builtin.assert']['that']
+        for group, present, expected in [('missing-custom', False, False), ('custom', True, True),
+                                         ('ssl-cert', False, True), ('xrdp', False, True)]:
+            values['xrdp_tls_key_group'] = group
+            values['ansible_facts']['getent_group'] = {group: []} if present else {}
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)
+
     def test_real_getent_discovery_keeps_two_accounts(self):
         tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
         reads = [task for task in tasks if 'ansible.builtin.getent' in task]

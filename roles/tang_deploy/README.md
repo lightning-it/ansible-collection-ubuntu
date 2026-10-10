@@ -24,6 +24,8 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
 - `tang_deploy_validate`: validate the local advertisement and obtain public signing thumbprints.
 - `tang_deploy_public_thumbprints`: public thumbprints recorded after validation.
 
+The optional `tang_deploy_listen_address: 127.0.0.1` requires the socket override and restricts the backend to loopback. Package installation suppresses automatic service start; the role starts the configured socket. An empty address preserves the previous socket binding.
+
 ## Dependencies
 
 None.
@@ -50,5 +52,3 @@ MIT
 ## Author
 
 Lightning IT
-
-The optional `tang_deploy_listen_address: 127.0.0.1` requires the socket override and restricts the backend to loopback. Package installation suppresses automatic service start; the role starts the configured socket. An empty address preserves the previous socket binding.

@@ -31,8 +31,15 @@
 - name: Discover existing personal GNOME groups before changes
   ansible.builtin.getent:
     database: group
-  when: xrdp_gnome_provisioned_users | length > 0
+  when: xrdp_gnome_provisioned_users | length > 0 or xrdp_tls_enable | bool
   no_log: true
+
+- name: Require a known package-owned or existing custom TLS key group before changes
+  ansible.builtin.assert:
+    that:
+      - xrdp_tls_key_group in ['ssl-cert', 'xrdp'] or xrdp_tls_key_group in ansible_facts.getent_group
+    quiet: true
+  when: xrdp_tls_enable | bool
 
 - name: Require every declared existing account and matching group
   ansible.builtin.assert:
