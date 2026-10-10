@@ -89,6 +89,37 @@ class XrdpPreflightTests(unittest.TestCase):
         values = self.values()
         self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(), values), values))
 
+    def test_home_traversal_probe_runs_as_the_user_before_package_mutations(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        probes = [task for task in tasks if task['name'].startswith(('Verify personal home traversal', 'Verify personal home write'))]
+        self.assertEqual(len(probes), 2)
+        for task in probes:
+            self.assertIs(task['become'], True)
+            self.assertEqual(task['become_user'], '{{ item }}')
+            self.assertIs(task['changed_when'], False)
+            self.assertIs(task['check_mode'], False)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); ancestor = root / 'ancestor'; ancestor.mkdir()
+            home = ancestor / 'home'; home.mkdir(); home.chmod(0o700)
+            argv = probes[0]['ansible.builtin.command']['argv'][:2] + [str(home)]
+            self.assertEqual(subprocess.run(argv, capture_output=True).returncode, 0)
+            try:
+                ancestor.chmod(0o700 & ~0o111)
+                self.assertNotEqual(subprocess.run(argv, capture_output=True).returncode, 0)
+            finally:
+                ancestor.chmod(0o700)
+
+    def test_optional_release_upgrade_config_must_exist_and_not_be_a_link(self):
+        task = next(task for task in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+                    if task['name'] == 'Require an existing regular release upgrade configuration')
+        for stat, accepted in [({'exists': False}, False),
+                ({'exists': True, 'isreg': True, 'islnk': True}, False),
+                ({'exists': True, 'isreg': False, 'islnk': False}, False),
+                ({'exists': True, 'isreg': True, 'islnk': False}, True)]:
+            values = {'_xrdp_release_upgrade_preflight': {'stat': stat}}
+            gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+
     def test_auto_and_explicit_gnome_use_private_dbus_but_xfce_does_not(self):
         for desktop in ('auto', 'gnome', 'xfce'):
             values = self.values()

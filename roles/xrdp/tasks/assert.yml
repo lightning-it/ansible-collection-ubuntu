@@ -80,6 +80,30 @@
     quiet: true
   loop: "{{ _xrdp_home_preflight.results }}"
 
+- name: Verify personal home traversal as the declared account before changes
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/test
+      - -x
+      - "{{ ansible_facts.getent_passwd[item][4] }}"
+  become: true
+  become_user: "{{ item }}"
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+  check_mode: false
+  changed_when: false
+
+- name: Verify personal home write access as the declared account before changes
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/test
+      - -w
+      - "{{ ansible_facts.getent_passwd[item][4] }}"
+  become: true
+  become_user: "{{ item }}"
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+  check_mode: false
+  changed_when: false
+
 - name: Inspect personal configuration directories without following links
   ansible.builtin.stat:
     path: "{{ ansible_facts.getent_passwd[item][4] }}/.config"
@@ -123,3 +147,19 @@
     quiet: true
   loop: "{{ _xrdp_tls_path_preflight.results | default([]) }}"
   when: xrdp_tls_enable | bool
+
+- name: Inspect the optional release upgrade configuration before changes
+  ansible.builtin.stat:
+    path: /etc/update-manager/release-upgrades
+    follow: false
+  register: _xrdp_release_upgrade_preflight
+  when: xrdp_release_upgrade_prompt | length > 0
+
+- name: Require an existing regular release upgrade configuration
+  ansible.builtin.assert:
+    that:
+      - _xrdp_release_upgrade_preflight.stat.exists
+      - _xrdp_release_upgrade_preflight.stat.isreg | default(false)
+      - not (_xrdp_release_upgrade_preflight.stat.islnk | default(false))
+    quiet: true
+  when: xrdp_release_upgrade_prompt | length > 0
