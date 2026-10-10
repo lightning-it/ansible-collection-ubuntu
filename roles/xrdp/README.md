@@ -66,8 +66,22 @@ TLS key groups are restricted to the dedicated package-owned `ssl-cert` and `xrd
 
 The default listener is loopback (`127.0.0.1`). Remote use requires an explicit
 private interface address and a firewall policy limited to the intended gateway.
-The WBN01 inventory declares that private bind separately. Existing certificate
+The consumer inventory declares that private bind separately. Existing certificate
 and key paths must be regular files, never symlinks; this is checked before host
 changes. Provision regular TLS files at explicit paths instead of using a package
 snakeoil symlink. The materialized key is checked again before daemon group access
 and permissions are changed, and permission changes do not follow links.
+
+The role-managed defaults are `/etc/xrdp/lit-cert.pem` and
+`/etc/xrdp/lit-key.pem`, separate from Ubuntu's package-owned snakeoil symlinks.
+On first install, packages create the XRDP directory and the optional self-signed
+flow creates regular files at these paths. Existing installations use the same
+role-managed paths without changing package-owned targets. Explicit linked paths
+remain rejected.
+
+When self-signed generation is disabled, both external TLS files must already
+exist at preflight. Check mode on a first installation defers account/group and
+key-permission tasks that depend on package-created resources; installed hosts
+still evaluate those tasks. Only the canonical `xrdp_tls_cert_path` and
+`xrdp_tls_key_path` values are rendered; undeclared legacy aliases do not select
+other daemon files.

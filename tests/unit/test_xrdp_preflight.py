@@ -84,6 +84,10 @@ class XrdpPreflightTests(unittest.TestCase):
             self.assertIn(f'case "{desktop}" in', content)
             if desktop in ('auto', 'gnome'):
                 self.assertIn('exec dbus-run-session -- gnome-session', content)
+            else:
+                xfce_branch = content.split('  xfce)', 1)[1].split('  auto|*)', 1)[0]
+                self.assertIn('exec startxfce4', xfce_branch)
+                self.assertNotIn('dbus-run-session', xfce_branch)
 
     def test_marker_changes_run_as_the_account_not_root(self):
         tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
@@ -195,6 +199,17 @@ class TlsPathSafetyTests(unittest.TestCase):
         self.assertEqual(defaults['xrdp_listen_address'], '127.0.0.1')
         self.assertEqual(spec['argument_specs']['main']['options']['xrdp_listen_address']['default'], '127.0.0.1')
 
+    def test_default_tls_files_are_separate_from_package_symlinks(self):
+        defaults = yaml.safe_load((ROLE / 'defaults/main.yml').read_text())
+        spec = yaml.safe_load((ROLE / 'meta/argument_specs.yml').read_text())
+        for field, value in (('xrdp_tls_cert_path', '/etc/xrdp/lit-cert.pem'),
+                             ('xrdp_tls_key_path', '/etc/xrdp/lit-key.pem')):
+            self.assertEqual(defaults[field], value)
+            self.assertEqual(spec['argument_specs']['main']['options'][field]['default'], value)
+        content = Templar(DataLoader(), defaults).template((ROLE / 'templates/xrdp.ini.j2').read_text())
+        self.assertIn('certificate=/etc/xrdp/lit-cert.pem', content)
+        self.assertIn('key_file=/etc/xrdp/lit-key.pem', content)
+
     def test_tls_paths_fail_closed_before_generation_and_permission_changes(self):
         init_plugin_loader()
         preflight = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
@@ -203,7 +218,7 @@ class TlsPathSafetyTests(unittest.TestCase):
                                ({'exists': True, 'islnk': False, 'isreg': True}, True),
                                ({'exists': True, 'islnk': True, 'isreg': True}, False),
                                ({'exists': True, 'islnk': False, 'isreg': False}, False)):
-            values = {'item': {'stat': stat}}
+            values = {'item': {'stat': stat}, 'xrdp_tls_generate_self_signed': True}
             gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
         main = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
@@ -238,3 +253,63 @@ class TlsPathSafetyTests(unittest.TestCase):
             self.assertIn('Refuse linked or non-regular XRDP TLS', result.stdout)
             self.assertEqual(target.read_text(), 'unrelated key material')
             self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+
+    def test_role_managed_defaults_generate_regular_files_beside_package_symlinks(self):
+        with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+            directory = Path(temporary)
+            target = directory / 'snakeoil'; target.write_text('package-owned'); target.chmod(0o600)
+            for name in ('cert.pem', 'key.pem'):
+                (directory / name).symlink_to(target)
+            values = yaml.safe_load((ROLE / 'defaults/main.yml').read_text())
+            for field in ('xrdp_tls_cert_path', 'xrdp_tls_key_path'):
+                values[field] = str(directory / Path(values[field]).name)
+            values['xrdp_tls_subject'] = '/CN=localhost'
+            values['xrdp_tls_days'] = 1
+            preflight = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+            main = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+            selected = [task for task in preflight if task['name'].startswith(('Inspect existing XRDP TLS', 'Refuse linked or non-regular XRDP'))]
+            selected += [task for task in main if task['name'].startswith(('Check TLS certificate', 'Generate self-signed', 'Inspect materialized', 'Require a regular materialized'))]
+            for task in selected:
+                task.pop('notify', None)
+            config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
+            source = directory / 'play.yml'; source.write_text(yaml.safe_dump([{
+                'hosts': 'localhost', 'gather_facts': False, 'vars': values, 'tasks': selected}]))
+            result = subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)],
+                                    check=False, capture_output=True, text=True, timeout=30,
+                                    env={**os.environ, 'ANSIBLE_CONFIG': str(config),
+                                         'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for field in ('xrdp_tls_cert_path', 'xrdp_tls_key_path'):
+                path = Path(values[field]); self.assertTrue(path.is_file()); self.assertFalse(path.is_symlink())
+            self.assertEqual(target.read_text(), 'package-owned')
+            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+
+    def test_external_tls_missing_paths_fail_in_preflight(self):
+        init_plugin_loader()
+        task = next(task for task in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+                    if task['name'].startswith('Refuse linked or non-regular XRDP'))
+        for exists, generate, expected in ((False, False, False), (True, False, True), (False, True, True)):
+            values = {'item': {'stat': {'exists': exists, 'islnk': False, 'isreg': exists}},
+                      'xrdp_tls_generate_self_signed': generate}
+            gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)
+
+    def test_package_created_tls_tasks_defer_only_on_first_install_check_mode(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        names = ('Require the TLS key group installed by packages or the operator',
+                 'Give the installed XRDP daemon access to its declared key group',
+                 'Ensure permissions on XRDP TLS key')
+        for task in [task for task in tasks if task['name'] in names]:
+            for check, installed, expected in ((True, False, False), (True, True, True), (False, False, True)):
+                values = {'xrdp_tls_enable': True, 'xrdp_tls_key_path': '/etc/xrdp/lit-key.pem',
+                          'ansible_check_mode': check, '_xrdp_installed': installed}
+                gate = Conditional(loader=DataLoader()); gate.when = task['when']
+                self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)
+
+    def test_daemon_ignores_unvalidated_tls_aliases(self):
+        values = yaml.safe_load((ROLE / 'defaults/main.yml').read_text())
+        values.update(xrdp_tls_cert='/unvalidated-cert', xrdp_tls_key='/unvalidated-key')
+        content = Templar(DataLoader(), values).template((ROLE / 'templates/xrdp.ini.j2').read_text())
+        self.assertNotIn('/unvalidated', content)
+        self.assertIn('certificate=' + values['xrdp_tls_cert_path'], content)
+        self.assertIn('key_file=' + values['xrdp_tls_key_path'], content)

@@ -110,6 +110,7 @@
     that:
       - not (item.stat.islnk | default(false))
       - not item.stat.exists or (item.stat.isreg | default(false))
+      - xrdp_tls_generate_self_signed | bool or item.stat.exists
     quiet: true
   loop: "{{ _xrdp_tls_path_preflight.results | default([]) }}"
   when: xrdp_tls_enable | bool

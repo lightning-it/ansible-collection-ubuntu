@@ -23,8 +23,8 @@ xrdp_gnome_provisioned_users: []
 xrdp_release_upgrade_prompt: ""
 
 xrdp_tls_enable: true
-xrdp_tls_cert_path: "/etc/xrdp/cert.pem"
-xrdp_tls_key_path: "/etc/xrdp/key.pem"
+xrdp_tls_cert_path: "/etc/xrdp/lit-cert.pem"
+xrdp_tls_key_path: "/etc/xrdp/lit-key.pem"
 xrdp_tls_generate_self_signed: true
 xrdp_tls_key_group: ssl-cert
 xrdp_tls_key_mode: "0640"

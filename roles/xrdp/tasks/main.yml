@@ -171,6 +171,7 @@
   when:
     - xrdp_tls_enable | bool
     - xrdp_tls_key_path | length > 0
+    - not ansible_check_mode or _xrdp_installed | bool
 
 - name: Give the installed XRDP daemon access to its declared key group
   ansible.builtin.user:
@@ -180,6 +181,7 @@
   when:
     - xrdp_tls_enable | bool
     - xrdp_tls_key_path | length > 0
+    - not ansible_check_mode or _xrdp_installed | bool
   notify: Restart xrdp
 
 - name: Ensure permissions on XRDP TLS key
@@ -192,6 +194,7 @@
   when:
     - xrdp_tls_enable | bool
     - xrdp_tls_key_path | length > 0
+    - not ansible_check_mode or _xrdp_installed | bool
   notify: Restart xrdp
 
 - name: Configure xrdp.ini
