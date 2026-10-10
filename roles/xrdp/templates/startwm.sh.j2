@@ -10,7 +10,7 @@ fi
 exit $?
 {% endif %}
 
-case "{{ xrdp_desktop }}" in
+case "{{ _xrdp_desktop_effective }}" in
   gnome)
     if command -v gnome-session >/dev/null 2>&1; then
 {% if xrdp_gnome_private_dbus_session | bool %}

@@ -12,6 +12,10 @@ argument_specs:
       xrdp_firewalld_state: {type: str, default: "enabled"}
       xrdp_desktop: {type: str, default: "auto"}
       xrdp_install_desktop: {type: bool, default: false}
+      xrdp_gnome_session: {type: str, default: gnome}
+      xrdp_gnome_private_dbus_session: {type: bool, default: false}
+      xrdp_tls_key_group: {type: str, default: root}
+      xrdp_tls_key_mode: {type: str, default: "0600"}
       xrdp_gnome_provisioned_users: {type: list, elements: str, default: []}
       xrdp_release_upgrade_prompt: {type: str, default: "", choices: ["", never, normal, lts]}
       xrdp_custom_startwm: {type: str, default: ""}

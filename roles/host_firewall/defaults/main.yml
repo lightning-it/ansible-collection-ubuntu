@@ -279,7 +279,6 @@ host_firewall_policy_material:
   container_interfaces: "{{ host_firewall_container_interfaces }}"
   management_access: "{{ host_firewall_management_access }}"
   tang_access: "{{ host_firewall_tang_access }}"
-  tang_network: "{{ host_firewall_tang_network }}"
   public_service_access: "{{ host_firewall_public_service_access }}"
   container_service_access: "{{ host_firewall_container_service_access }}"
   input_policy: drop
@@ -290,6 +289,11 @@ host_firewall_policy_material:
 host_firewall_policy_material_effective: >-
   {{
     host_firewall_policy_material
+    | combine(
+        {'tang_network': host_firewall_tang_network}
+        if host_firewall_tang_network == 'management'
+        else {}
+      )
     | combine(
         {'published_https_access': host_firewall_published_https_access}
         if host_firewall_published_https_access.enabled

@@ -49,3 +49,12 @@ class PrivateTangTests(unittest.TestCase):
         rule = next(line for line in render(values).splitlines() if 'ip saddr @tang_sources_v4' in line)
         self.assertIn('"' + values['host_firewall_public_interface'] + '"', rule)
         self.assertIn('ip daddr ' + values['host_firewall_expected_public_ipv4'], rule)
+
+    def test_public_default_preserves_original_policy_material_and_fingerprint(self):
+        values = variables()
+        engine = Templar(DataLoader(), values)
+        base = engine.template(values['host_firewall_policy_material'])
+        effective = engine.template(values['host_firewall_policy_material_effective'])
+        self.assertNotIn('tang_network', base)
+        self.assertNotIn('tang_network', effective)
+        self.assertEqual(effective, base)

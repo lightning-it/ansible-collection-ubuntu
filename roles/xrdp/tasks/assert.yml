@@ -1,0 +1,72 @@
+---
+- name: Validate XRDP desktop and listener inputs
+  ansible.builtin.assert:
+    that:
+      - xrdp_desktop in ['auto', 'gnome', 'xfce', 'custom']
+      - xrdp_listen_address is string and xrdp_listen_address | length > 0
+      - xrdp_listen_port is integer and xrdp_listen_port >= 1 and xrdp_listen_port <= 65535
+      - xrdp_gnome_private_dbus_session is boolean
+      - xrdp_gnome_session is string and xrdp_gnome_session is match('^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$')
+      - xrdp_tls_key_group is string and xrdp_tls_key_group is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - xrdp_tls_key_mode is string and xrdp_tls_key_mode is match('^0[0-7]00$|^0[0-7][0-4]0$')
+      - xrdp_release_upgrade_prompt in ['', 'never', 'normal', 'lts']
+      - xrdp_gnome_provisioned_users is sequence and xrdp_gnome_provisioned_users is not string
+      - xrdp_gnome_provisioned_users | unique | length == xrdp_gnome_provisioned_users | length
+    quiet: true
+
+- name: Require explicit existing personal GNOME user names
+  ansible.builtin.assert:
+    that:
+      - item is string and item is match('^[a-z][a-z0-9_-]{0,31}$')
+    quiet: true
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+
+- name: Discover existing personal GNOME accounts before changes
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ item }}"
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+
+- name: Discover existing personal GNOME groups before changes
+  ansible.builtin.getent:
+    database: group
+    key: "{{ item }}"
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+
+- name: Validate discovered home directories
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.getent_passwd[item][4] is match('^/(home|srv/home)/[a-z][a-z0-9_-]{0,31}$')
+    quiet: true
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+
+- name: Inspect personal home directories without following links
+  ansible.builtin.stat:
+    path: "{{ ansible_facts.getent_passwd[item][4] }}"
+    follow: false
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+  register: _xrdp_home_preflight
+
+- name: Refuse linked or missing personal home directories
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - not (item.stat.islnk | default(false))
+      - item.stat.isdir | default(false)
+    quiet: true
+  loop: "{{ _xrdp_home_preflight.results }}"
+
+- name: Inspect personal configuration directories without following links
+  ansible.builtin.stat:
+    path: "{{ ansible_facts.getent_passwd[item][4] }}/.config"
+    follow: false
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+  register: _xrdp_config_preflight
+
+- name: Refuse linked or non-directory personal configuration paths
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+      - not item.stat.exists or (item.stat.isdir | default(false))
+    quiet: true
+  loop: "{{ _xrdp_config_preflight.results }}"

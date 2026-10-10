@@ -72,3 +72,23 @@ class EarlyVlanTests(unittest.TestCase):
     checked=subprocess.run(['/bin/sh','-n',script.name],capture_output=True,text=True)
     self.assertEqual(checked.returncode,0,checked.stderr)
     self.assertEqual(checked.stderr,'')
+
+ def test_post_install_archive_check_uses_custom_vlan_script_path(self):
+  values=self.values()
+  values.update(luks_unlock_early_vlan_script_path='/etc/initramfs-tools/scripts/init-premount/01-private-vlan',
+                luks_unlock_dropbear_options_effective='-p 2222 -s -j -k -I 300',
+                luks_unlock_kernel_ip_argument_effective='ip=dhcp',
+                luks_unlock_dropbear_authorized_keys=['ssh-ed25519 AAAATEST'])
+  template_engine=Templar(DataLoader(),values)
+  environment=template_engine.environment
+  environment.loader=FileSystemLoader(str(ROOT/'templates'))
+  content=environment.get_template('installimage-post-install.sh.j2').render(**values)
+  self.assertIn('scripts/init-premount/01-private-vlan',content)
+  self.assertNotIn("grep -Fxq 'scripts/init-premount/00-lit-early-vlans'",content)
+
+ def test_vlan_artifact_paths_must_be_in_supported_initramfs_directories(self):
+  for field,path in (('luks_unlock_early_vlan_script_path','/etc/01-private-vlan'),
+                     ('luks_unlock_early_vlan_script_path','/etc/initramfs-tools/scripts/init-premount/../escape'),
+                     ('luks_unlock_early_vlan_hook_path','/tmp/hook'),
+                     ('luks_unlock_early_vlan_hook_path','/etc/initramfs-tools/hooks/../../escape')):
+   values=self.values();values[field]=path;self.assertFalse(self.accepts(values))

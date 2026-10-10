@@ -3,6 +3,9 @@
   ansible.builtin.meta: end_host
   when: not (xrdp_enabled | bool)
 
+- name: Validate XRDP inputs before host changes
+  ansible.builtin.import_tasks: assert.yml
+
 - name: Gather installed packages (XRDP precheck)
   ansible.builtin.package_facts:
     manager: auto
@@ -89,17 +92,11 @@
     - xrdp_install_desktop | bool
     - _xrdp_desktop_effective == 'xfce'
 
-- name: Require explicit existing personal GNOME user names
-  ansible.builtin.assert:
-    that:
-      - item is match('^[a-z][a-z0-9_-]{0,31}$')
-    quiet: true
-  loop: "{{ xrdp_gnome_provisioned_users }}"
-  when: _xrdp_desktop_effective == 'gnome'
-
 - name: Ensure provisioned GNOME user configuration directories
+  become: true
+  become_user: "{{ item }}"
   ansible.builtin.file:
-    path: "/home/{{ item }}/.config"
+    path: "{{ ansible_facts.getent_passwd[item][4] }}/.config"
     state: directory
     owner: "{{ item }}"
     group: "{{ item }}"
@@ -108,8 +105,10 @@
   when: _xrdp_desktop_effective == 'gnome'
 
 - name: Mark declared GNOME users as configured by automation
+  become: true
+  become_user: "{{ item }}"
   ansible.builtin.copy:
-    dest: "/home/{{ item }}/.config/gnome-initial-setup-done"
+    dest: "{{ ansible_facts.getent_passwd[item][4] }}/.config/gnome-initial-setup-done"
     content: "yes\n"
     owner: "{{ item }}"
     group: "{{ item }}"
@@ -156,12 +155,6 @@
     - xrdp_tls_enable | bool
     - xrdp_tls_key_path | length > 0
   notify: Restart xrdp
-
-- name: Assert XRDP listen address is set
-  ansible.builtin.assert:
-    that:
-      - xrdp_listen_address | default('') | length > 0
-    fail_msg: "xrdp_listen_address is empty; set net_ifaces.mgmt.ipv4 or override xrdp_listen_address."
 
 - name: Configure xrdp.ini
   ansible.builtin.template:
