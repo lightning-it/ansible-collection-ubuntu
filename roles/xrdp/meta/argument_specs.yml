@@ -12,6 +12,8 @@ argument_specs:
       xrdp_firewalld_state: {type: str, default: "enabled"}
       xrdp_desktop: {type: str, default: "auto"}
       xrdp_install_desktop: {type: bool, default: false}
+      xrdp_gnome_provisioned_users: {type: list, elements: str, default: []}
+      xrdp_release_upgrade_prompt: {type: str, default: "", choices: ["", never, normal, lts]}
       xrdp_custom_startwm: {type: str, default: ""}
       xrdp_tls_enable: {type: bool, default: true}
       xrdp_tls_cert_path: {type: str, default: "/etc/xrdp/cert.pem"}

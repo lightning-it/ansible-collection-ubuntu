@@ -113,3 +113,5 @@ MIT
 ## Author
 
 Lightning IT
+
+Optional `luks_unlock_early_vlans` creates directly connected private VLAN interfaces in init-premount while retaining the primary kernel `ip=` network for independent Dropbear recovery. Each item declares parent, name (`parent.id`), VLAN id, IPv4 address, prefix and MTU. Include `8021q` in network modules. The role installs a hook to copy iproute2 into initramfs; it adds no private default route. This path requires real pre-root LAN and reboot acceptance on each target; rendered artifacts alone do not prove automatic unlock.

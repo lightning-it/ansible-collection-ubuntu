@@ -1,5 +1,15 @@
 # lit.ubuntu.host_firewall
 
+## Container SSH access
+
+`host_firewall_container_ssh_access` defaults to `{}`. An entry binds
+`interface`, one RFC1918 `source_ipv4` with `/32`, the bridge's independently
+observed `destination_ipv4`, the existing hardened OpenSSH `port`, and
+`modes: [hardened]`. Public/management destinations, broad sources, other
+ports and unmanaged interfaces are rejected. The grant is included in the
+policy fingerprint and the existing rollback/confirmation transaction.
+It authorizes only host input; it grants neither forwarding nor sudo.
+
 Build and inspect a fail-closed nftables host policy for Ubuntu 24.04. The role owns exactly one `inet` table and one
 dedicated persistence include. It never captures, flushes, restores, or persists the complete host ruleset, and it
 never overwrites the administrator-owned root nftables configuration. Foreign tables and Podman/Netavark tables stay
@@ -344,3 +354,5 @@ MIT
 ## Author
 
 Lightning IT
+
+`host_firewall_tang_network` defaults to `public`. Selecting `management` binds Tang ingress to the declared management interface and destination IPv4, retaining exact /32 consumers and TCP 80. IPv6 Tang grants are refused in this mode. This selector is included in the policy fingerprint.

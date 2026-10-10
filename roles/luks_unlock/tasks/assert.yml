@@ -189,3 +189,38 @@
   when:
     - luks_unlock_enabled | bool
     - luks_unlock_method == 'clevis_tang'
+
+- name: Validate the optional early VLAN sequence
+  ansible.builtin.assert:
+    that:
+      - luks_unlock_early_vlans is sequence
+      - luks_unlock_early_vlans is not string
+      - luks_unlock_early_vlans | map(attribute='name') | unique | length == luks_unlock_early_vlans | length
+      - luks_unlock_early_vlan_script_path is match('^/[A-Za-z0-9/_.-]+$')
+      - luks_unlock_early_vlan_hook_path is match('^/[A-Za-z0-9/_.-]+$')
+      - luks_unlock_early_vlan_script_path != luks_unlock_early_vlan_hook_path
+    quiet: true
+  when: luks_unlock_enabled | bool
+
+- name: Validate every early VLAN before boot artifact rendering
+  ansible.builtin.assert:
+    that:
+      - item.keys() | list | sort == ['address', 'id', 'mtu', 'name', 'parent', 'prefix']
+      - item.parent is match('^[A-Za-z][A-Za-z0-9_-]{0,14}$')
+      - item.id is integer
+      - item.id >= 1
+      - item.id <= 4094
+      - item.name == item.parent ~ '.' ~ item.id | string
+      - item.name | length <= 15
+      - item.address is match('^[0-9]{1,3}(\.[0-9]{1,3}){3}$')
+      - item.address.split('.') | map('int') | max <= 255
+      - item.prefix is integer
+      - item.prefix >= 1
+      - item.prefix <= 32
+      - item.mtu is integer
+      - item.mtu >= 576
+      - item.mtu <= 9000
+      - "'8021q' in luks_unlock_network_modules"
+    quiet: true
+  loop: "{{ luks_unlock_early_vlans }}"
+  when: luks_unlock_enabled | bool

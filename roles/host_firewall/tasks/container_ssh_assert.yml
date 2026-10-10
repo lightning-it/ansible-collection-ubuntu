@@ -1,0 +1,38 @@
+---
+- name: Require a mapping of exact container SSH grants
+  ansible.builtin.assert:
+    that:
+      - host_firewall_container_ssh_access is mapping
+    fail_msg: Container SSH access must be an explicit mapping, empty by default.
+
+- name: Bind each SSH client to its observed bridge and hardened management port
+  ansible.builtin.assert:
+    that:
+      - item.key is match('^[a-z][a-z0-9_]{1,31}\Z')
+      - item.value is mapping
+      - >-
+        item.value.keys() | list | sort
+        == ['destination_ipv4', 'interface', 'modes', 'port', 'source_ipv4']
+      - item.value.interface is string
+      - item.value.interface in host_firewall_container_interfaces
+      - item.value.interface in host_firewall_observed_container_bridge_gateways_ipv4
+      - item.value.source_ipv4 is match(host_firewall_ipv4_host_cidr_pattern)
+      - >-
+        item.value.source_ipv4.startswith('10.')
+        or item.value.source_ipv4.startswith('192.168.')
+        or item.value.source_ipv4 is match('^172[.](1[6-9]|2[0-9]|3[01])[.]')
+      - item.value.destination_ipv4 is match(host_firewall_ipv4_pattern)
+      - >-
+        item.value.destination_ipv4
+        == host_firewall_observed_container_bridge_gateways_ipv4[item.value.interface]
+      - item.value.destination_ipv4 in host_firewall_observed_ipv4_addresses
+      - item.value.destination_ipv4 not in host_firewall_host_ipv4_addresses_effective
+      - item.value.port is integer
+      - item.value.port == host_firewall_management_access_contract.openssh.port
+      - item.value.modes == ['hardened']
+    fail_msg: >-
+      Container SSH requires one private /32 identity on a managed bridge,
+      that bridge's observed host gateway, and the hardened OpenSSH port.
+  loop: "{{ host_firewall_container_ssh_access | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"

@@ -17,6 +17,10 @@
   ansible.builtin.meta: end_role
   when: not host_firewall_enabled | bool
 
+- name: Validate exact container SSH capabilities
+  ansible.builtin.import_tasks: container_ssh_assert.yml
+  tags: always
+
 - name: Verify actual protected control connection
   ansible.builtin.include_tasks: control_connection.yml
   when:

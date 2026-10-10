@@ -8,6 +8,7 @@
     name: "{{ tang_deploy_packages }}"
     state: present
     update_cache: "{{ tang_deploy_update_apt_cache | bool }}"
+    policy_rc_d: 101
   when:
     - tang_deploy_enabled | bool
     - tang_deploy_manage_packages | bool
@@ -46,6 +47,7 @@
   when:
     - tang_deploy_enabled | bool
     - tang_deploy_manage_service | bool
+    - not ansible_check_mode
 
 - name: Apply pending Tang socket handlers before validation
   ansible.builtin.meta: flush_handlers

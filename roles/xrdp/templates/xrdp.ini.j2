@@ -34,8 +34,8 @@ security_layer={{ xrdp_security_layer | default('negotiate') }}
 crypt_level=high
 
 ; TLS certificate and key (role should ensure these exist)
-certificate={{ xrdp_tls_cert | default('/etc/xrdp/cert.pem') }}
-key_file={{ xrdp_tls_key | default('/etc/xrdp/key.pem') }}
+certificate={{ xrdp_tls_cert | default(xrdp_tls_cert_path) }}
+key_file={{ xrdp_tls_key | default(xrdp_tls_key_path) }}
 
 ; TLS protocols
 ssl_protocols={{ xrdp_ssl_protocols | default('TLSv1.2, TLSv1.3') }}
@@ -77,6 +77,8 @@ name=Xorg
 lib=libxup.so
 username=ask
 password=ask
+; sesman runs locally; xrdp requires an explicit session-manager address.
+ip=127.0.0.1
 port=-1
 code=20
 

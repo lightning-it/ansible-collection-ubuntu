@@ -34,3 +34,40 @@
     mode: "0644"
   loop: "{{ luks_unlock_network_modules }}"
   notify: LUKS unlock | Rebuild initramfs
+
+- name: Create role-owned early VLAN boot artifact directories
+  ansible.builtin.file:
+    path: "{{ item | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ luks_unlock_early_vlan_script_path }}"
+    - "{{ luks_unlock_early_vlan_hook_path }}"
+  when: luks_unlock_early_vlans | length > 0
+
+- name: Render the optional private early VLAN boot artifacts
+  ansible.builtin.template:
+    src: "{{ item.template }}"
+    dest: "{{ item.path }}"
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - template: initramfs-early-vlans.sh.j2
+      path: "{{ luks_unlock_early_vlan_script_path }}"
+    - template: initramfs-vlan-hook.sh.j2
+      path: "{{ luks_unlock_early_vlan_hook_path }}"
+  when: luks_unlock_early_vlans | length > 0
+  notify: LUKS unlock | Rebuild initramfs
+
+- name: Remove disabled role-owned early VLAN boot artifacts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ luks_unlock_early_vlan_script_path }}"
+    - "{{ luks_unlock_early_vlan_hook_path }}"
+  when: luks_unlock_early_vlans | length == 0
+  notify: LUKS unlock | Rebuild initramfs

@@ -1,0 +1,3 @@
+---
+minor_changes:
+  - luks_unlock supports private early-boot VLAN interfaces without replacing the primary Dropbear recovery network.

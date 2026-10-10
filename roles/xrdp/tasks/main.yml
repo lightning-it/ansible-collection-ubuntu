@@ -52,6 +52,14 @@
   no_log: "{{ xrdp_no_log }}"
   when: (xrdp_optional_packages | default([]) | length) > 0
 
+- name: Ensure desktop users can traverse the public XRDP configuration directory
+  ansible.builtin.file:
+    path: /etc/xrdp
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Determine effective desktop mode
   ansible.builtin.set_fact:
     _xrdp_desktop_effective: >-
@@ -81,6 +89,41 @@
     - xrdp_install_desktop | bool
     - _xrdp_desktop_effective == 'xfce'
 
+- name: Require explicit existing personal GNOME user names
+  ansible.builtin.assert:
+    that:
+      - item is match('^[a-z][a-z0-9_-]{0,31}$')
+    quiet: true
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+  when: _xrdp_desktop_effective == 'gnome'
+
+- name: Ensure provisioned GNOME user configuration directories
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.config"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+  when: _xrdp_desktop_effective == 'gnome'
+
+- name: Mark declared GNOME users as configured by automation
+  ansible.builtin.copy:
+    dest: "/home/{{ item }}/.config/gnome-initial-setup-done"
+    content: "yes\n"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+  loop: "{{ xrdp_gnome_provisioned_users }}"
+  when: _xrdp_desktop_effective == 'gnome'
+
+- name: Declare OS release upgrade prompting without altering package updates
+  ansible.builtin.lineinfile:
+    path: /etc/update-manager/release-upgrades
+    regexp: '^Prompt='
+    line: "Prompt={{ xrdp_release_upgrade_prompt }}"
+  when: xrdp_release_upgrade_prompt | length > 0
+
 - name: Check TLS certificate exists
   ansible.builtin.stat:
     path: "{{ xrdp_tls_cert_path }}"
@@ -107,8 +150,8 @@
   ansible.builtin.file:
     path: "{{ xrdp_tls_key_path }}"
     owner: root
-    group: root
-    mode: "0600"
+    group: "{{ xrdp_tls_key_group }}"
+    mode: "{{ xrdp_tls_key_mode }}"
   when:
     - xrdp_tls_enable | bool
     - xrdp_tls_key_path | length > 0
@@ -171,4 +214,3 @@
     name: xrdp-sesman
     state: started
     enabled: true
-  failed_when: false

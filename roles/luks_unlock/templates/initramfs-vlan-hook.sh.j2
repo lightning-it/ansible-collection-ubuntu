@@ -1,0 +1,10 @@
+#!/bin/sh
+# Managed by lit.ubuntu.luks_unlock.
+PREREQ=""
+case "${1:-}" in
+  prereqs) echo "$PREREQ"; exit 0 ;;
+esac
+set -eu
+. /usr/share/initramfs-tools/hook-functions
+manual_add_modules 8021q
+copy_exec /usr/sbin/ip /sbin/ip

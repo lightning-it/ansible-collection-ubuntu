@@ -46,3 +46,10 @@ Enable repositories via `lit.ubuntu.repos` (or your internal mirror policy).
 - Installs XRDP packages
 - Configures `/etc/xrdp/xrdp.ini` and `/etc/xrdp/startwm.sh`
 - Optional TLS, firewalld port open
+
+`xrdp_gnome_provisioned_users` optionally marks explicitly declared existing
+personal users under `/home` as configured by automation, avoiding GNOME's
+first-login wizard. The default empty list preserves normal onboarding.
+`xrdp_release_upgrade_prompt` optionally declares Ubuntu release-upgrade
+prompting (`never`, `normal`, `lts`); the default leaves it unchanged. This
+does not disable package or security updates.

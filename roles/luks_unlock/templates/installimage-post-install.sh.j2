@@ -50,6 +50,19 @@ if [ ! -s /etc/ssh/ssh_host_ed25519_key.pub ]; then
 fi
 test -s /etc/ssh/ssh_host_ed25519_key.pub
 
+{% if luks_unlock_early_vlans | length > 0 %}
+install -d -m 0755 {{ luks_unlock_early_vlan_script_path | dirname | quote }} {{ luks_unlock_early_vlan_hook_path | dirname | quote }}
+cat >{{ luks_unlock_early_vlan_script_path | quote }} <<'LIT_EARLY_VLANS'
+{% include 'initramfs-early-vlans.sh.j2' %}
+
+LIT_EARLY_VLANS
+cat >{{ luks_unlock_early_vlan_hook_path | quote }} <<'LIT_VLAN_HOOK'
+{% include 'initramfs-vlan-hook.sh.j2' %}
+
+LIT_VLAN_HOOK
+chmod 0755 {{ luks_unlock_early_vlan_script_path | quote }} {{ luks_unlock_early_vlan_hook_path | quote }}
+{% endif %}
+
 update-grub >/dev/null
 update-initramfs -u -k all >/dev/null
 
@@ -64,6 +77,9 @@ test -n "$initrd"
 initramfs_listing="$(lsinitramfs "$initrd")"
 grep -q 'cryptroot-unlock' <<<"$initramfs_listing"
 grep -q 'authorized_keys' <<<"$initramfs_listing"
+{% if luks_unlock_early_vlans | length > 0 %}
+grep -Fxq 'scripts/init-premount/00-lit-early-vlans' <<<"$initramfs_listing"
+{% endif %}
 {% for luks_unlock_module in luks_unlock_network_modules %}
 grep -Eq '/{{ luks_unlock_module | regex_escape }}\.ko(\..*)?$' <<<"$initramfs_listing"
 {% endfor %}

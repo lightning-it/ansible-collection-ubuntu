@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - Support explicit TLS key group and permissions for externally managed certificates.
+  - Support a separate D-Bus GNOME session with a declared desktop session name.
+bugfixes:
+  - Use the declared certificate and key paths when rendering XRDP configuration.
+  - Fail when the required XRDP session manager cannot start.

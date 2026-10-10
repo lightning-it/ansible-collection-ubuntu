@@ -17,11 +17,17 @@ xrdp_firewalld_state: "enabled"
 xrdp_desktop: "auto"      # auto | gnome | xfce | custom
 xrdp_install_desktop: false
 xrdp_custom_startwm: ""
+xrdp_gnome_session: gnome
+xrdp_gnome_private_dbus_session: false
+xrdp_gnome_provisioned_users: []
+xrdp_release_upgrade_prompt: ""
 
 xrdp_tls_enable: true
 xrdp_tls_cert_path: "/etc/xrdp/cert.pem"
 xrdp_tls_key_path: "/etc/xrdp/key.pem"
 xrdp_tls_generate_self_signed: true
+xrdp_tls_key_group: root
+xrdp_tls_key_mode: "0600"
 xrdp_tls_subject: "/CN={{ inventory_hostname }}"
 xrdp_tls_days: 825
 

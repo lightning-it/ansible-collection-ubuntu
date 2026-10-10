@@ -50,3 +50,5 @@ MIT
 ## Author
 
 Lightning IT
+
+The optional `tang_deploy_listen_address: 127.0.0.1` requires the socket override and restricts the backend to loopback. Package installation suppresses automatic service start; the role starts the configured socket. An empty address preserves the previous socket binding.

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Managed by lit.ubuntu.luks_unlock; contains no recovery credentials.
+PREREQ="udev"
+case "${1:-}" in
+  prereqs) echo "$PREREQ"; exit 0 ;;
+esac
+set -eu
+modprobe 8021q
+{% for vlan in luks_unlock_early_vlans %}
+remaining=30
+while [ ! -e /sys/class/net/{{ vlan.parent }} ]; do
+  [ "$remaining" -gt 0 ] || exit 1
+  remaining=$((remaining - 1))
+  sleep 1
+done
+ip link set dev {{ vlan.parent }} up
+if ! ip link show dev {{ vlan.name }} >/dev/null 2>&1; then
+  ip link add link {{ vlan.parent }} name {{ vlan.name }} type vlan id {{ vlan.id }}
+fi
+ip link set dev {{ vlan.name }} mtu {{ vlan.mtu }} up
+ip address replace {{ vlan.address }}/{{ vlan.prefix }} dev {{ vlan.name }}
+{% endfor %}
+# No default route is added: the private LAN is directly connected. Primary
+# public early networking remains available for source-restricted recovery.
