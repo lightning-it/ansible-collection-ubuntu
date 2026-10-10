@@ -83,7 +83,8 @@ Ubuntu-native package and repository management.
   installed VLAN declarations require `luks_unlock_manage_early_network: true`. See the disabled example in
   `playbooks/example.yml`.
 - `lit.ubuntu.tang_deploy`
-  Install and validate a minimal systemd socket-activated Tang binding service.
+  Install and validate a minimal systemd socket-activated Tang binding service. `tang_deploy_listen_address`
+  and `tang_deploy_listen_port` can select a loopback-only backend for a separate private gateway.
 - `lit.ubuntu.host_firewall`
   Apply a fail-closed, Podman-aware nftables policy through rollback-protected plan, check, apply, confirm, readback,
   and rollback phases. Its optional forward-proxy egress boundary requires the unique host-local, non-login
@@ -94,6 +95,9 @@ Ubuntu-native package and repository management.
   interface/source/destination cross product. Container service forwarding remains restricted to the management
   interface. Reverse-proxy-to-backend traffic inside one dedicated Podman bridge stays layer 2 and is therefore not
   represented as host-routed forwarding by this role.
+  `host_firewall_tang_network` selects public or management ingress; exact optional
+  `host_firewall_container_ssh_access` grants bind one observed bridge, private source `/32`, host gateway and
+  hardened SSH port. Both are shown without activation in `playbooks/example.yml`.
   `host_firewall_container_dns_clients` defaults to an empty mapping. Its separate per-client mode permits only
   INPUT UDP/53 from each exact private `/32` client to its observed bridge gateway; it grants no TCP or FORWARD
   access and cannot coexist with aggregate container DNS access.
@@ -102,7 +106,10 @@ Ubuntu-native package and repository management.
   separately deployed portable forward proxy.
 - `lit.ubuntu.podman`, `lit.ubuntu.gui`, `lit.ubuntu.xrdp`,
   `lit.ubuntu.firefox`, and `lit.ubuntu.vscode`
-  Provide optional workstation and remote desktop building blocks.
+  Provide optional workstation and remote desktop building blocks. XRDP accepts only a literal IPv4 listener,
+  validates declared existing GNOME accounts/group membership, supports a private D-Bus session, and grants its
+  unprivileged daemon read access to the declared TLS group with `0440` or `0640` key permissions.
+  See the disabled XRDP example in `playbooks/example.yml`.
   Podman's `podman_dns_authoritative_only` defaults to false. Opting in requires the actual Netavark resolver
   path in `podman_dns_resolver_executable` and its independently approved SHA256 in `podman_dns_resolver_sha256`.
   The role validates the effective helper and trusted ancestors before persisting `AARDVARK_NO_PROXY` for future

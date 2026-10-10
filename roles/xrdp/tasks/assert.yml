@@ -3,7 +3,9 @@
   ansible.builtin.assert:
     that:
       - xrdp_desktop in ['auto', 'gnome', 'xfce', 'custom']
-      - xrdp_listen_address is string and xrdp_listen_address | length > 0
+      - xrdp_listen_address is string
+      - xrdp_listen_address is match('^(0|[1-9][0-9]{0,2})([.](0|[1-9][0-9]{0,2})){3}\\Z')
+      - xrdp_listen_address.split('.') | map('int') | max <= 255
       - xrdp_listen_port is integer and xrdp_listen_port >= 1 and xrdp_listen_port <= 65535
       - xrdp_gnome_private_dbus_session is boolean
       - xrdp_gnome_session is string and xrdp_gnome_session is match('^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$')
