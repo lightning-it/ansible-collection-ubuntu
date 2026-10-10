@@ -1,0 +1,19 @@
+---
+- name: Inspect every TLS ancestor without following links
+  ansible.builtin.stat:
+    path: "{{ xrdp_tls_output_path.split('/')[:item] | join('/') or '/' }}"
+    follow: false
+  loop: "{{ range(1, xrdp_tls_output_path.split('/') | length) | list }}"
+  register: _xrdp_tls_ancestor_preflight
+
+- name: Require trusted TLS ancestors before any host mutation
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+      - >-
+        (item.stat.exists and item.stat.isdir | default(false) and item.stat.uid == 0
+        and item.stat.mode is match('^0[0-7][0145][0145]\\Z'))
+        or (not item.stat.exists and xrdp_tls_generate_self_signed | bool
+        and xrdp_tls_output_path.split('/')[:item.item] | join('/') == '/etc/xrdp')
+    quiet: true
+  loop: "{{ _xrdp_tls_ancestor_preflight.results }}"

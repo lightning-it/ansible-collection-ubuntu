@@ -79,7 +79,7 @@ class XrdpPreflightTests(unittest.TestCase):
         task = next(task for task in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
                     if task['name'].startswith('Require distinct absolute TLS paths'))
         for field in ('xrdp_tls_cert_path', 'xrdp_tls_key_path'):
-            for value in ('relative.pem', '/tmp/leaf\nsecurity_layer=rdp', '/tmp/leaf\r', '/tmp/leaf\t', '/tmp/leaf\x00', '/tmp/leaf\x7f'):
+            for value in ('relative.pem', '/tmp/leaf\nsecurity_layer=rdp', '/tmp/leaf\r', '/tmp/leaf\t', '/tmp/leaf\x00', '/tmp/leaf\x7f', '/etc/xrdp/../xrdp/leaf.pem', '/etc//xrdp/leaf.pem'):
                 values = self.values(); values[field] = value
                 gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
                 self.assertFalse(gate.evaluate_conditional(Templar(DataLoader(), values), values))
@@ -148,7 +148,7 @@ class XrdpPreflightTests(unittest.TestCase):
         task = next(task for task in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
                     if task['name'] == 'Refuse linked or non-directory personal configuration paths')
         for linked, directory, accepted in ((True, True, False), (False, False, False), (False, True, True)):
-            values = {'item': {'item': 'p1005a', 'stat': {'exists': True, 'islnk': linked, 'isdir': directory, 'uid': 1001, 'gid': 1001}}, 'ansible_facts': {'getent_passwd': {'p1005a': ['x','1001','1001']}, 'getent_group': {'p1005a': ['x','1001']}}}
+            values = {'item': {'item': 'p1005a', 'stat': {'exists': True, 'islnk': linked, 'isdir': directory, 'uid': 1001, 'gid': 1001, 'mode': '0700'}}, 'ansible_facts': {'getent_passwd': {'p1005a': ['x','1001','1001']}, 'getent_group': {'p1005a': ['x','1001']}}}
             gate = Conditional(loader=DataLoader())
             gate.when = task['ansible.builtin.assert']['that']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
@@ -358,3 +358,32 @@ class TlsPathSafetyTests(unittest.TestCase):
         self.assertNotIn('/unvalidated', content)
         self.assertIn('certificate=' + values['xrdp_tls_cert_path'], content)
         self.assertIn('key_file=' + values['xrdp_tls_key_path'], content)
+
+    def test_half_existing_self_signed_tls_pair_is_rejected(self):
+        task = next(t for t in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+                    if t['name'].startswith('Require both TLS outputs present'))
+        for cert, key, expected in [(False, False, True), (True, True, True), (True, False, False), (False, True, False)]:
+            values = {'_xrdp_tls_path_preflight': {'results': [{'stat': {'exists': cert}}, {'stat': {'exists': key}}]}}
+            gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)
+
+    def test_tls_ancestor_guard_rejects_links_writable_or_non_directory_components(self):
+        task = yaml.safe_load((ROLE / 'tasks/tls_ancestor_preflight.yml').read_text())[1]
+        for delta, accepted in [({}, True), ({'islnk': True}, False), ({'mode': '0777'}, False),
+                ({'uid': 1000}, False), ({'isdir': False}, False)]:
+            values = {'item': {'item': 2, 'stat': {'exists': True, 'islnk': False, 'isdir': True,
+                'uid': 0, 'mode': '0755', **delta}}, 'xrdp_tls_output_path': '/etc/xrdp/lit-key.pem',
+                'xrdp_tls_generate_self_signed': True}
+            gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+
+    def test_home_and_config_cannot_be_writable_by_other_accounts(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        for name in ('Refuse linked or missing personal home directories', 'Refuse linked or non-directory personal configuration paths'):
+            task = next(t for t in tasks if t['name'] == name)
+            for mode, accepted in [('0700', True), ('0750', True), ('0770', False), ('0777', False), ('0702', False)]:
+                values = {'item': {'item': 'p1005a', 'stat': {'exists': True, 'islnk': False, 'isdir': True,
+                    'uid': 1001, 'gid': 1001, 'mode': mode}}, 'ansible_facts': {
+                    'getent_passwd': {'p1005a': ['x', '1001', '1001']}, 'getent_group': {'p1005a': ['x', '1001']}}}
+                gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+                self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)

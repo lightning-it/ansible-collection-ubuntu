@@ -106,7 +106,7 @@ class EarlyVlanTests(unittest.TestCase):
   values=self.values();values.update(luks_unlock_execution_mode='installed',luks_unlock_manage_early_network=False,luks_unlock_early_vlans=[])
   gate=Conditional(loader=DataLoader());gate.when=task['when']
   self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(),values),values))
-  cleanup=yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text())[0]
+  cleanup=yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text())[1]
   self.assertEqual(cleanup['ansible.builtin.file']['state'],'absent')
   self.assertEqual(cleanup['notify'],'LUKS unlock | Rebuild initramfs')
   self.assertEqual(Templar(DataLoader(),values).template(cleanup['loop']),[values['luks_unlock_early_vlan_script_path'],values['luks_unlock_early_vlan_hook_path']])
@@ -132,7 +132,7 @@ class EarlyVlanTests(unittest.TestCase):
     self.assertFalse((directory/'artifact').exists())
 
  def test_installed_directory_guard_rejects_links_and_unsafe_ownership_before_changes(self):
-  tasks=yaml.safe_load((ROOT/'tasks/network.yml').read_text())
+  tasks=yaml.safe_load((ROOT/'tasks/early_vlan_preflight.yml').read_text())
   guard=next(t for t in tasks if t['name'].startswith('Reject unsafe early VLAN artifact directories'))
   for changes,accepted in [({},True),({'islnk':True},False),({'uid':1000},False),({'gid':1000},False),({'mode':'0777'},False),({'isdir':False},False)]:
    stat={'exists':True,'islnk':False,'isdir':True,'uid':0,'gid':0,'mode':'0755',**changes}
@@ -146,3 +146,29 @@ class EarlyVlanTests(unittest.TestCase):
    result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(path)],capture_output=True,text=True,
        env={**os.environ,'ANSIBLE_CONFIG':str(config)},timeout=30)
    self.assertNotEqual(result.returncode,0);self.assertTrue(link.is_symlink());self.assertEqual(target.stat().st_mode & 0o777,0o750)
+
+ def test_cleanup_reuses_guard_for_linked_parents_and_directory_leaves(self):
+  tasks=yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text())
+  self.assertEqual(tasks[0]['ansible.builtin.import_tasks'],'early_vlan_preflight.yml')
+  self.assertIs(tasks[1]['ansible.builtin.file']['follow'],False)
+  preflight=yaml.safe_load((ROOT/'tasks/early_vlan_preflight.yml').read_text())
+  guard=next(t for t in preflight if t['name'].startswith('Reject unsafe early VLAN output files'))
+  for changes in ({'isreg':False,'isdir':True},{'islnk':True},{'uid':1000}):
+   values={'item':{'stat':{'exists':True,'isreg':True,'islnk':False,'uid':0,'gid':0,'mode':'0755',**changes}}}
+   gate=Conditional(loader=DataLoader());gate.when=guard['ansible.builtin.assert']['that']
+   self.assertFalse(gate.evaluate_conditional(Templar(DataLoader(),values),values))
+
+ def test_actual_cleanup_cannot_delete_linked_parent_targets_or_directory_leaves(self):
+  for linked in (True,False):
+   with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+    root=Path(temporary);target=root/'target';target.mkdir();leaf=target/'artifact';leaf.mkdir();canary=leaf/'canary';canary.write_text('UNCHANGED')
+    parent=root/'parent'
+    if linked: parent.symlink_to(target,target_is_directory=True)
+    else: parent=target
+    values={'luks_unlock_early_vlans':[],'luks_unlock_early_vlan_script_path':str(parent/'artifact'),
+       'luks_unlock_early_vlan_hook_path':str(root/'unused-hook')}
+    play=[{'hosts':'localhost','gather_facts':False,'vars':values,'tasks':[{'ansible.builtin.import_tasks':str(ROOT/'tasks/early_vlan_cleanup.yml')}]}]
+    path=root/'play.yml';path.write_text(yaml.safe_dump(play));config=root/'ansible.cfg';config.write_text('[defaults]\n')
+    result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(path)],capture_output=True,text=True,
+        env={**os.environ,'ANSIBLE_CONFIG':str(config)},timeout=30)
+    self.assertNotEqual(result.returncode,0);self.assertEqual(canary.read_text(),'UNCHANGED')

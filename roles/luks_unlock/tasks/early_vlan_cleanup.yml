@@ -1,8 +1,13 @@
 ---
+- name: Validate early VLAN paths before removal even without network management
+  ansible.builtin.import_tasks: early_vlan_preflight.yml
+  when: luks_unlock_early_vlans | length == 0
+
 - name: Remove disabled role-owned early VLAN boot artifacts
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
+    follow: false
   loop:
     - "{{ luks_unlock_early_vlan_script_path }}"
     - "{{ luks_unlock_early_vlan_hook_path }}"

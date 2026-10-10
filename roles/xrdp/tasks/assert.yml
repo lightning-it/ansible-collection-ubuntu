@@ -77,6 +77,8 @@
       - item.stat.uid == ansible_facts.getent_passwd[item.item][1] | int
       - item.stat.gid == ansible_facts.getent_group[item.item][1] | int
       - item.stat.mode[-3] | int in [3, 7]
+      - item.stat.mode[-2] | int in [0, 1, 4, 5]
+      - item.stat.mode[-1] | int in [0, 1, 4, 5]
     quiet: true
   loop: "{{ _xrdp_home_preflight.results }}"
 
@@ -118,6 +120,8 @@
       - not item.stat.exists or (item.stat.isdir | default(false))
       - not item.stat.exists or item.stat.uid == ansible_facts.getent_passwd[item.item][1] | int
       - not item.stat.exists or item.stat.gid == ansible_facts.getent_group[item.item][1] | int
+      - not item.stat.exists or item.stat.mode[-2] | int in [0, 1, 4, 5]
+      - not item.stat.exists or item.stat.mode[-1] | int in [0, 1, 4, 5]
     quiet: true
   loop: "{{ _xrdp_config_preflight.results }}"
 
@@ -127,7 +131,17 @@
       - xrdp_tls_cert_path is string and xrdp_tls_cert_path is match('^/[^\x00-\x1f\x7f]+\\Z')
       - xrdp_tls_key_path is string and xrdp_tls_key_path is match('^/[^\x00-\x1f\x7f]+\\Z')
       - xrdp_tls_cert_path != xrdp_tls_key_path
+      - "'.' not in xrdp_tls_cert_path.split('/') and '..' not in xrdp_tls_cert_path.split('/')"
+      - "'.' not in xrdp_tls_key_path.split('/') and '..' not in xrdp_tls_key_path.split('/')"
+      - "'//' not in xrdp_tls_cert_path and '//' not in xrdp_tls_key_path"
     quiet: true
+  when: xrdp_tls_enable | bool
+
+- name: Validate every TLS ancestor before package or file mutations
+  ansible.builtin.include_tasks: tls_ancestor_preflight.yml
+  loop: "{{ [xrdp_tls_cert_path, xrdp_tls_key_path] | unique }}"
+  loop_control:
+    loop_var: xrdp_tls_output_path
   when: xrdp_tls_enable | bool
 
 - name: Inspect existing XRDP TLS output paths before any changes
@@ -163,3 +177,12 @@
       - not (_xrdp_release_upgrade_preflight.stat.islnk | default(false))
     quiet: true
   when: xrdp_release_upgrade_prompt | length > 0
+
+- name: Require both TLS outputs present or both absent before self-signed generation
+  ansible.builtin.assert:
+    that:
+      - _xrdp_tls_path_preflight.results[0].stat.exists == _xrdp_tls_path_preflight.results[1].stat.exists
+    quiet: true
+  when:
+    - xrdp_tls_enable | bool
+    - xrdp_tls_generate_self_signed | bool
