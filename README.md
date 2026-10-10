@@ -79,7 +79,9 @@ Ubuntu-native package and repository management.
   activation reconciliation.
 - `lit.ubuntu.luks_unlock`
   Stage secret-free Dropbear first-boot unlock hooks and safely add pinned Clevis Tang bindings to existing LUKS2
-  devices.
+  devices. Optional `luks_unlock_early_vlans` creates private pre-root VLANs without replacing recovery routing;
+  installed VLAN declarations require `luks_unlock_manage_early_network: true`. See the disabled example in
+  `playbooks/example.yml`.
 - `lit.ubuntu.tang_deploy`
   Install and validate a minimal systemd socket-activated Tang binding service.
 - `lit.ubuntu.host_firewall`

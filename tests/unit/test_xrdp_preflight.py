@@ -152,3 +152,14 @@ class XrdpPreflightTests(unittest.TestCase):
                                     env={**os.environ, 'ANSIBLE_CONFIG': str(config),
                                          'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_same_named_group_requires_actual_membership(self):
+        task = next(task for task in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+                    if task['name'].startswith('Require every declared'))
+        for primary, members, expected in [('1001', '', True), ('1002', 'p1005a', True),
+                                            ('1002', 'someoneelse', False)]:
+            values = {'item': 'p1005a', 'ansible_facts': {
+                'getent_passwd': {'p1005a': ['x', '1001', primary, '', '/home/p1005a', '/bin/bash']},
+                'getent_group': {'p1005a': ['x', '1001', members]}}}
+            gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)

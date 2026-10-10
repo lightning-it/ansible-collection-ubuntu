@@ -46,6 +46,9 @@
     that:
       - item in ansible_facts.getent_passwd
       - item in ansible_facts.getent_group
+      - >-
+        ansible_facts.getent_passwd[item][2] == ansible_facts.getent_group[item][1]
+        or item in ansible_facts.getent_group[item][2].split(',')
     quiet: true
   loop: "{{ xrdp_gnome_provisioned_users }}"
 

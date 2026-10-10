@@ -62,3 +62,19 @@
           - name: ops-admin
             groups: ["sudo"]
             shell: /bin/bash
+
+    # Disabled: replace example interface/address only after hardware review.
+    # The public recovery route remains separate from this private Tang VLAN.
+    - role: lit.ubuntu.luks_unlock
+      when: false
+      vars:
+        luks_unlock_enabled: false
+        luks_unlock_manage_early_network: true
+        luks_unlock_network_modules: [8021q]
+        luks_unlock_early_vlans:
+          - parent: eno1
+            name: eno1.4091
+            id: 4091
+            address: 10.20.30.22
+            prefix: 24
+            mtu: 1400
