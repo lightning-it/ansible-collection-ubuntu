@@ -4,3 +4,7 @@ bugfixes:
   - >-
     host_firewall - validate the Tang network role parameter and exclude
     host-spoofed container SSH sources/public gateways.
+  - >-
+    luks_unlock - reject stale VLAN sources when initramfs rebuilding is
+    disabled. XRDP configuration directory guards also run without TLS;
+    Tang plans defer only genuinely absent socket units.

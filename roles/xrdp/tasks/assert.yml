@@ -27,6 +27,26 @@
     quiet: true
   loop: "{{ xrdp_gnome_provisioned_users }}"
 
+- name: Inspect XRDP configuration directories regardless of TLS mode
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - /etc
+    - /etc/xrdp
+  register: _xrdp_config_directory_preflight
+
+- name: Refuse linked or unsafe XRDP configuration directories before host changes
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+      - >-
+        not item.stat.exists or (
+        item.stat.isdir | default(false) and item.stat.uid == 0 and item.stat.gid == 0
+        and item.stat.mode is match('^0[0-7][0145][0145]\\Z'))
+    quiet: true
+  loop: "{{ _xrdp_config_directory_preflight.results }}"
+
 - name: Discover existing personal GNOME accounts before changes
   ansible.builtin.getent:
     database: passwd

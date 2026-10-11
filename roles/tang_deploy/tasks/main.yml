@@ -62,7 +62,7 @@
   when:
     - tang_deploy_enabled | bool
     - tang_deploy_manage_service | bool
-    - not ansible_check_mode or (_tang_deploy_unit_load_state.stdout | default('') | trim) == 'loaded'
+    - not ansible_check_mode or (_tang_deploy_unit_load_state.stdout | default('') | trim) != 'not-found'
 
 - name: Apply pending Tang socket handlers before validation
   ansible.builtin.meta: flush_handlers

@@ -64,6 +64,7 @@
   ansible.builtin.file:
     path: /etc/xrdp
     state: directory
+    follow: false
     owner: root
     group: root
     mode: "0755"

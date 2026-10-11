@@ -35,7 +35,9 @@ class LoopbackTests(unittest.TestCase):
     def test_existing_unit_check_mode_previews_service_drift(self):
         tasks = yaml.safe_load((ROOT / 'tasks/main.yml').read_text())
         service = next(task for task in tasks if 'ansible.builtin.systemd_service' in task)
-        for check, load_state, expected in [(False, '', True), (True, 'loaded', True), (True, 'not-found', False)]:
+        for check, load_state, expected in [(False, '', True), (True, 'loaded', True), (True, 'not-found', False),
+                                             (True, 'masked', True), (True, 'error', True),
+                                             (True, 'bad-setting', True), (True, '', True)]:
             with self.subTest(check=check, load_state=load_state):
                 values = {'tang_deploy_enabled': True, 'tang_deploy_manage_service': True,
                           'ansible_check_mode': check, '_tang_deploy_unit_load_state': {'stdout': load_state}}

@@ -3,6 +3,16 @@
   ansible.builtin.import_tasks: early_vlan_preflight.yml
   when: luks_unlock_early_vlans | length == 0
 
+- name: Require a boot image rebuild before removing installed VLAN artifacts
+  ansible.builtin.assert:
+    that:
+      - >-
+        luks_unlock_rebuild_initramfs | bool or
+        (luks_unlock_early_vlan_outputs.results | selectattr('stat.exists') | list | length == 0)
+    fail_msg: Disable early VLANs with initramfs rebuilding enabled before removing their boot sources.
+    quiet: true
+  when: luks_unlock_early_vlans | length == 0
+
 - name: Remove disabled role-owned early VLAN boot artifacts
   ansible.builtin.file:
     path: "{{ item }}"

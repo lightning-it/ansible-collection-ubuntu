@@ -543,3 +543,45 @@ class XrdpActivationBoundaryTests(unittest.TestCase):
                       '_xrdp_key': {'stat': {'exists': exists}}}
             gate = Conditional(loader=DataLoader()); gate.when = task['when']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+
+    def test_config_directory_preflight_is_unconditional_and_precedes_mutation(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        read = next(t for t in tasks if t['name'].startswith('Inspect XRDP configuration directories'))
+        guard = next(t for t in tasks if t['name'].startswith('Refuse linked or unsafe XRDP configuration directories'))
+        self.assertNotIn('when', read)
+        self.assertNotIn('when', guard)
+        self.assertIs(read['ansible.builtin.stat']['follow'], False)
+        self.assertEqual(read['loop'], ['/etc', '/etc/xrdp'])
+        for overrides, accepted in [({}, True), ({'islnk': True}, False), ({'isdir': False}, False),
+                                     ({'uid': 1001}, False), ({'mode': '0777'}, False)]:
+            values = {'xrdp_tls_enable': False, 'item': {'stat': {
+                'exists': True, 'isdir': True, 'islnk': False, 'uid': 0, 'gid': 0,
+                'mode': '0755', **overrides}}}
+            gate = Conditional(loader=DataLoader()); gate.when = guard['ansible.builtin.assert']['that']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+        main = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        directory = next(t for t in main if t['name'].startswith('Ensure desktop users can traverse'))
+        self.assertIs(directory['ansible.builtin.file']['follow'], False)
+
+    def test_actual_tls_disabled_config_preflight_preserves_unrelated_link_target(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+        read = copy.deepcopy(next(t for t in tasks if t['name'].startswith('Inspect XRDP configuration directories')))
+        guard = next(t for t in tasks if t['name'].startswith('Refuse linked or unsafe XRDP configuration directories'))
+        with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+            directory = Path(temporary); target = directory / 'protected'; target.mkdir(); target.chmod(0o700)
+            canary = target / 'canary'; canary.write_text('UNCHANGED')
+            link = directory / 'xrdp'; link.symlink_to(target, target_is_directory=True)
+            read['loop'] = [str(link)]
+            marker = directory / 'mutation'
+            source = directory / 'play.yml'; source.write_text(yaml.safe_dump([{
+                'hosts': 'localhost', 'gather_facts': False, 'vars': {'xrdp_tls_enable': False},
+                'tasks': [read, guard, {'ansible.builtin.file': {'path': str(marker), 'state': 'touch', 'mode': '0600'}}]}]))
+            config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
+            result = subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)],
+                capture_output=True, text=True, timeout=30,
+                env={**os.environ, 'ANSIBLE_CONFIG': str(config), 'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(marker.exists())
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(canary.read_text(), 'UNCHANGED')
