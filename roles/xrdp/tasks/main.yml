@@ -36,12 +36,16 @@
       - >-
         (_xrdp_tls_path_preflight.results[0].stat.exists
         and _xrdp_tls_path_preflight.results[1].stat.exists)
+        or (xrdp_tls_generate_self_signed | bool
+        and not _xrdp_tls_path_preflight.results[0].stat.exists
+        and _xrdp_tls_path_preflight.results[1].stat.exists)
         or (_xrdp_legacy_tls_identity.results | selectattr('stat.exists') | list | length == 0)
     fail_msg: >-
       Existing XRDP TLS identity uses the previous package paths. Before upgrading,
       preserve the existing certificate/key as secure regular files at the new paths,
       or explicitly select existing regular files with xrdp_tls_cert_path/xrdp_tls_key_path.
       This role will not silently generate a replacement identity for the legacy installation.
+      A secure, parsed retained key at the role-owned path may complete its missing certificate.
     quiet: true
   when:
     - _xrdp_installed | bool

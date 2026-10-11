@@ -431,6 +431,14 @@ class RealTlsPairPreflightTests(unittest.TestCase):
                 'Inspect existing XRDP TLS', 'Refuse linked or non-regular XRDP',
                 'Require a retained private key', 'Require secure custody',
                 'Validate a retained self-signed key'))]
+            migration = copy.deepcopy(next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                                          if t['name'].startswith('Preserve legacy XRDP server identity')))
+            # This isolated fixture replaces only the fixed-path selection. The
+            # actual guard executes after custody/parsing with package aliases present.
+            migration['when'] = 'xrdp_tls_enable | bool'
+            values['_xrdp_legacy_tls_identity'] = {'results': [{'stat': {'exists': False}},
+                                                              {'stat': {'exists': False}}]}
+            selected.append(migration)
             selected += [copy.deepcopy(t) for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
                          if t['name'].startswith(('Check TLS certificate', 'Generate self-signed'))]
             for task in selected:
@@ -451,6 +459,8 @@ class RealTlsPairPreflightTests(unittest.TestCase):
             retained = key.read_bytes()
             self.assertEqual(list(directory.glob('*.XXXXXX')), [])
             values['xrdp_tls_subject'] = '/CN=corrected fixture'
+            values['_xrdp_legacy_tls_identity'] = {'results': [{'stat': {'exists': True}},
+                                                              {'stat': {'exists': True}}]}
             recovered = run()
             self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
             self.assertEqual(key.read_bytes(), retained)
