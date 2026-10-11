@@ -48,6 +48,7 @@ class XrdpPreflightTests(unittest.TestCase):
 
     def test_invalid_accounts_desktop_and_session_cannot_reach_mutations(self):
         for field, value in (
+            ('xrdp_gnome_provisioned_users', {'alice': 'ignored'}),
             ('xrdp_gnome_provisioned_users', ['../../root']),
             ('xrdp_gnome_provisioned_users', ['p1005a', 'p1005a']),
             ('xrdp_desktop', 'unknown'),

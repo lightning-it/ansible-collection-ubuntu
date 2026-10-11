@@ -259,6 +259,7 @@ class EarlyVlanTests(unittest.TestCase):
     for item in task['loop']:item['template']=str(ROOT/'templates'/item['template'])
   with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
    root=Path(temporary);script=root/'script';hook=root/'hook';pending=Path(str(script)+'.lit-install-pending');image=root/'image'
+   cleanup_pending=Path(str(script)+'.lit-cleanup-pending');cleanup_pending.write_text('FAILED CLEANUP')
    values=self.values();values.update(luks_unlock_early_vlan_script_path=str(script),
       luks_unlock_early_vlan_hook_path=str(hook),luks_unlock_rebuild_initramfs=True)
    config=root/'ansible.cfg';config.write_text('[defaults]\n')
@@ -273,5 +274,15 @@ class EarlyVlanTests(unittest.TestCase):
     if previous is not None:self.assertEqual(current,previous)
     previous=current
     self.assertEqual(pending.exists(),not success);self.assertEqual(image.exists(),success)
+    self.assertEqual(cleanup_pending.exists(),not success)
     if not success:self.assertEqual(pending.stat().st_mode & 0o777,0o600)
+   self.assertIn('changed=0',result.stdout)
+   # Even an otherwise unchanged enabled state must reconcile a retained
+   # cleanup transaction, then return to a zero-change repeat.
+   cleanup_pending.write_text('RETAINED CLEANUP')
+   result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(source)],capture_output=True,text=True,timeout=40,env={**os.environ,'ANSIBLE_CONFIG':str(config)})
+   self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+   self.assertFalse(cleanup_pending.exists())
+   result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(source)],capture_output=True,text=True,timeout=40,env={**os.environ,'ANSIBLE_CONFIG':str(config)})
+   self.assertEqual(result.returncode,0,result.stdout+result.stderr)
    self.assertIn('changed=0',result.stdout)

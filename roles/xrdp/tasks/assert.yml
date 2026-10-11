@@ -18,6 +18,7 @@
       - not (xrdp_tls_enable and xrdp_tls_generate_self_signed) or (xrdp_tls_days is integer and xrdp_tls_days > 0)
       - xrdp_release_upgrade_prompt in ['', 'never', 'normal', 'lts']
       - xrdp_gnome_provisioned_users is sequence and xrdp_gnome_provisioned_users is not string
+      - xrdp_gnome_provisioned_users is not mapping
       - xrdp_gnome_provisioned_users | unique | length == xrdp_gnome_provisioned_users | length
     quiet: true
 
