@@ -111,7 +111,7 @@ class EarlyVlanTests(unittest.TestCase):
   self.assertEqual(cleanup['ansible.builtin.file']['state'],'absent')
   self.assertNotIn('notify',cleanup)
   self.assertTrue(any('ansible.builtin.command' in task for task in transaction['block']))
-  self.assertEqual(Templar(DataLoader(),values).template(cleanup['loop']),[values['luks_unlock_early_vlan_script_path'],values['luks_unlock_early_vlan_hook_path']])
+  self.assertEqual(Templar(DataLoader(),values).template(cleanup['loop']),[values['luks_unlock_early_vlan_script_path'],values['luks_unlock_early_vlan_hook_path'],values['luks_unlock_early_vlan_script_path']+'.lit-install-pending'])
 
  def test_rescue_guard_rejects_linked_output_and_ancestor_without_mutation(self):
   values=self.values();values.update(luks_unlock_dropbear_options_effective='-p 2222',
@@ -222,6 +222,34 @@ class EarlyVlanTests(unittest.TestCase):
     result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(source)],capture_output=True,text=True,timeout=30,env={**os.environ,'ANSIBLE_CONFIG':str(config)})
     self.assertEqual(result.returncode==0,success,result.stdout+result.stderr)
     self.assertFalse(script.exists());self.assertFalse(hook.exists())
+    self.assertEqual(pending.exists(),not success);self.assertEqual(image.exists(),success)
+    if not success:self.assertEqual(pending.stat().st_mode & 0o777,0o600)
+   self.assertIn('changed=0',result.stdout)
+
+ def test_install_retries_failed_image_build_with_unchanged_sources_then_is_idempotent(self):
+  import copy,sys
+  tasks=copy.deepcopy(yaml.safe_load((ROOT/'tasks/early_vlan_install.yml').read_text()))
+  for task in [tasks[0]]+tasks[-1]['block']:
+   module=task.get('ansible.builtin.template') or task.get('ansible.builtin.copy')
+   if module:
+    module['owner']=os.getuid();module['group']=os.getgid()
+   if 'ansible.builtin.template' in task:
+    for item in task['loop']:item['template']=str(ROOT/'templates'/item['template'])
+  with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+   root=Path(temporary);script=root/'script';hook=root/'hook';pending=Path(str(script)+'.lit-install-pending');image=root/'image'
+   values=self.values();values.update(luks_unlock_early_vlan_script_path=str(script),
+      luks_unlock_early_vlan_hook_path=str(hook),luks_unlock_rebuild_initramfs=True)
+   config=root/'ansible.cfg';config.write_text('[defaults]\n')
+   previous=None
+   for success in (False,True,True):
+    code='from pathlib import Path; Path('+repr(str(image))+').write_text("REBUILT")' if success else 'raise SystemExit(1)'
+    values['luks_unlock_update_initramfs_command']=[sys.executable,'-c',code]
+    source=root/'play.yml';source.write_text(yaml.safe_dump([{'hosts':'localhost','gather_facts':False,'vars':values,'tasks':tasks}]))
+    result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(source)],capture_output=True,text=True,timeout=40,env={**os.environ,'ANSIBLE_CONFIG':str(config)})
+    self.assertEqual(result.returncode==0,success,result.stdout+result.stderr)
+    current=(script.read_bytes(),hook.read_bytes())
+    if previous is not None:self.assertEqual(current,previous)
+    previous=current
     self.assertEqual(pending.exists(),not success);self.assertEqual(image.exists(),success)
     if not success:self.assertEqual(pending.stat().st_mode & 0o777,0o600)
    self.assertIn('changed=0',result.stdout)

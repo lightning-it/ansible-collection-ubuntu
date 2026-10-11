@@ -52,18 +52,6 @@
     - "{{ luks_unlock_early_vlan_hook_path }}"
   when: luks_unlock_early_vlans | length > 0
 
-- name: Render the optional private early VLAN boot artifacts
-  ansible.builtin.template:
-    src: "{{ item.template }}"
-    dest: "{{ item.path }}"
-    follow: false
-    owner: root
-    group: root
-    mode: '0755'
-  loop:
-    - template: initramfs-early-vlans.sh.j2
-      path: "{{ luks_unlock_early_vlan_script_path }}"
-    - template: initramfs-vlan-hook.sh.j2
-      path: "{{ luks_unlock_early_vlan_hook_path }}"
+- name: Install private early VLAN artifacts with retryable boot image reconciliation
+  ansible.builtin.import_tasks: early_vlan_install.yml
   when: luks_unlock_early_vlans | length > 0
-  notify: LUKS unlock | Rebuild initramfs

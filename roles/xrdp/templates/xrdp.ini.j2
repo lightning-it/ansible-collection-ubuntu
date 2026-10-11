@@ -28,7 +28,7 @@ tcp_keepalive=true
 
 ; security layer can be 'tls', 'rdp' or 'negotiate'
 ; 'negotiate' is usually the most compatible
-security_layer={{ (xrdp_security_layer | default('negotiate')) if xrdp_tls_enable else 'rdp' }}
+security_layer={{ xrdp_security_layer if xrdp_tls_enable else 'rdp' }}
 
 ; encryption level for classic RDP encryption (TLS is configured below)
 crypt_level=high

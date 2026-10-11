@@ -37,6 +37,7 @@
       loop:
         - "{{ luks_unlock_early_vlan_script_path }}"
         - "{{ luks_unlock_early_vlan_hook_path }}"
+        - "{{ luks_unlock_early_vlan_script_path }}.lit-install-pending"
 
     - name: Rebuild the boot image before clearing pending early VLAN cleanup
       ansible.builtin.command:

@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    luks_unlock - persist pending early VLAN installation before writing boot artifacts
+    and retry failed initramfs builds.
+  - xrdp - validate security_layer as tls, rdp or negotiate before rendering INI configuration.

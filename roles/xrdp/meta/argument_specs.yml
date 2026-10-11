@@ -20,6 +20,7 @@ argument_specs:
       xrdp_release_upgrade_prompt: {type: str, default: "", choices: ["", never, normal, lts]}
       xrdp_custom_startwm: {type: str, default: ""}
       xrdp_tls_enable: {type: bool, default: true}
+      xrdp_security_layer: {type: str, default: negotiate, choices: [tls, rdp, negotiate]}
       xrdp_tls_cert_path: {type: str, default: "/etc/xrdp/lit-cert.pem"}
       xrdp_tls_key_path: {type: str, default: "/etc/xrdp/lit-key.pem"}
       xrdp_tls_generate_self_signed: {type: bool, default: true}
