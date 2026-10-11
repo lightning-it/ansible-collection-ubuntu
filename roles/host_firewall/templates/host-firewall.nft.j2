@@ -111,7 +111,7 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
 {% endfor %}
 {% if host_firewall_tang_access.sources_ipv4 | length > 0 %}
 
-        iifname "{{ host_firewall_public_interface }}" ip saddr @tang_sources_v4 ip daddr {{ host_firewall_expected_public_ipv4 }} tcp dport {{ host_firewall_tang_access.port }} ct state new accept
+        iifname "{{ host_firewall_management_interface if host_firewall_tang_network == 'management' else host_firewall_public_interface }}" ip saddr @tang_sources_v4 ip daddr {{ host_firewall_expected_management_ipv4 if host_firewall_tang_network == 'management' else host_firewall_expected_public_ipv4 }} tcp dport {{ host_firewall_tang_access.port }} ct state new accept
 {% endif %}
 {% if host_firewall_forward_proxy_access.enabled %}
 
@@ -131,6 +131,11 @@ table {{ host_firewall_table_family }} {{ host_firewall_table_name }} {
 {% for client in host_firewall_container_dns_clients | dict2items %}
 
         iifname {{ client.value.interface | to_json }} ip saddr {{ client.value.source_ipv4 }} ip daddr {{ client.value.destination_ipv4 }} udp dport 53 ct state new accept
+{% endfor %}
+{% for client in host_firewall_container_ssh_access | dict2items %}
+{% if host_firewall_mode in client.value.modes %}
+        iifname "{{ client.value.interface }}" ip saddr {{ client.value.source_ipv4 }} ip daddr {{ client.value.destination_ipv4 }} tcp dport {{ client.value.port }} ct state new accept
+{% endif %}
 {% endfor %}
 
         counter drop

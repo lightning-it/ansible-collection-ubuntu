@@ -17,7 +17,7 @@ fork=true
 
 ; Listen socket
 ; IMPORTANT: bind to a specific IP via tcp://IP:port (not via "address=").
-port=tcp://{{ xrdp_listen_address | default('0.0.0.0') }}:{{ xrdp_listen_port | default(3389) }}
+port=tcp://{{ xrdp_listen_address }}:{{ xrdp_listen_port | default(3389) }}
 
 ; Run daemon unprivileged
 runtime_user=xrdp
@@ -28,14 +28,14 @@ tcp_keepalive=true
 
 ; security layer can be 'tls', 'rdp' or 'negotiate'
 ; 'negotiate' is usually the most compatible
-security_layer={{ xrdp_security_layer | default('negotiate') }}
+security_layer={{ (xrdp_security_layer | default('negotiate')) if xrdp_tls_enable else 'rdp' }}
 
 ; encryption level for classic RDP encryption (TLS is configured below)
 crypt_level=high
 
 ; TLS certificate and key (role should ensure these exist)
-certificate={{ xrdp_tls_cert | default('/etc/xrdp/cert.pem') }}
-key_file={{ xrdp_tls_key | default('/etc/xrdp/key.pem') }}
+certificate={{ xrdp_tls_cert_path if xrdp_tls_enable else '' }}
+key_file={{ xrdp_tls_key_path if xrdp_tls_enable else '' }}
 
 ; TLS protocols
 ssl_protocols={{ xrdp_ssl_protocols | default('TLSv1.2, TLSv1.3') }}
@@ -77,6 +77,8 @@ name=Xorg
 lib=libxup.so
 username=ask
 password=ask
+; sesman runs locally; xrdp requires an explicit session-manager address.
+ip=127.0.0.1
 port=-1
 code=20
 

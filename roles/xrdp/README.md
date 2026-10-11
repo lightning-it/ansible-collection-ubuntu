@@ -8,11 +8,19 @@ None.
 
 ## Variables
 
+`xrdp_listen_address` is a canonical literal IPv4 address; URLs, hostnames,
+newlines, leading-zero octets and out-of-range octets are rejected before changes.
+
+
 See `defaults/main.yml`.
+
+Only the dedicated package-owned TLS groups `ssl-cert` and `xrdp` are allowed, including when no GNOME users are declared. The package-owned `ssl-cert` and `xrdp` groups may be created by the normal XRDP package installation; their existence is verified again before key permissions and daemon membership change.
 
 ## Dependencies
 
-None.
+No role dependencies. TLS issuance and read-only certificate/key preflight use
+`/usr/bin/openssl`; OpenSSL must already be available when adopting existing TLS
+files. These checks do not require target Python cryptography packages.
 
 ## Example Playbook
 
@@ -46,3 +54,43 @@ Enable repositories via `lit.ubuntu.repos` (or your internal mirror policy).
 - Installs XRDP packages
 - Configures `/etc/xrdp/xrdp.ini` and `/etc/xrdp/startwm.sh`
 - Optional TLS, firewalld port open
+
+`xrdp_gnome_provisioned_users` optionally marks explicitly declared existing
+personal users under `/home` as configured by automation, avoiding GNOME's
+first-login wizard. The default empty list preserves normal onboarding.
+`xrdp_release_upgrade_prompt` optionally declares Ubuntu release-upgrade
+prompting (`never`, `normal`, `lts`); the default leaves it unchanged. This
+does not disable package or security updates.
+
+TLS defaults use the package-provided `ssl-cert` group with mode `0640`. The role requires the declared key group to exist and appends the installed `xrdp` daemon to it before setting key permissions. An unreadable validated certificate is reconciled to that group with mode `0640`; an already readable, root-owned public certificate keeps its permissions, including a Vault-managed `0644` file. A non-root owner is reconciled even when the certificate is readable. Every existing ancestor must allow traversal by that group or by other users. Root-group and owner-only key settings are rejected because the configured unprivileged daemon must read its key.
+
+TLS key groups are restricted to the dedicated package-owned `ssl-cert` and `xrdp` groups. Privileged and arbitrary custom groups are rejected before changes.
+
+The default listener is loopback (`127.0.0.1`). Remote use requires an explicit
+private interface address and a firewall policy limited to the intended gateway.
+The consumer inventory declares that private bind separately. Existing certificate
+and key paths must be regular files, never symlinks; this is checked before host
+changes. Provision regular TLS files at explicit paths instead of using a package
+snakeoil symlink. The materialized key is checked again before daemon group access
+and permissions are changed, and permission changes do not follow links.
+
+The role-managed defaults are `/etc/xrdp/lit-cert.pem` and
+`/etc/xrdp/lit-key.pem`, separate from Ubuntu's package-owned snakeoil symlinks.
+On first install, packages create the XRDP directory and the optional self-signed
+flow creates regular files at these paths. **Upgrade/porting:** previous versions
+used `/etc/xrdp/cert.pem` and `/etc/xrdp/key.pem`. An installed XRDP host with
+legacy files and missing new default outputs fails before package changes,
+generation or restart, including in check mode. Back up the original identity,
+resolve any snakeoil symlink under operator control, and preserve its existing
+certificate/key bytes as secure regular files at the new declared paths. Or
+explicitly configure the existing regular paths; linked paths remain rejected.
+Keep self-signed generation disabled when another role owns issuance. The normal
+cryptographic pair and daemon-access checks still apply to migrated material.
+An installation already using the new paths retains its identity.
+
+When self-signed generation is disabled, both external TLS files must already
+exist at preflight. Check mode on a first installation defers account/group and
+key-permission tasks that depend on package-created resources; installed hosts
+still evaluate those tasks. Only the canonical `xrdp_tls_cert_path` and
+`xrdp_tls_key_path` values are rendered; undeclared legacy aliases do not select
+other daemon files.

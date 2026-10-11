@@ -5,17 +5,23 @@ argument_specs:
     options:
       xrdp_enabled: {type: bool, default: true}
       xrdp_fail_if_unavailable: {type: bool, default: true}
-      xrdp_listen_address: {type: str, default: "0.0.0.0"}
+      xrdp_listen_address: {type: str, default: "127.0.0.1"}
       xrdp_listen_port: {type: int, default: 3389}
       xrdp_firewalld_manage: {type: bool, default: true}
       xrdp_firewalld_zone: {type: str, default: "public"}
       xrdp_firewalld_state: {type: str, default: "enabled"}
       xrdp_desktop: {type: str, default: "auto"}
       xrdp_install_desktop: {type: bool, default: false}
+      xrdp_gnome_session: {type: str, default: gnome}
+      xrdp_gnome_private_dbus_session: {type: bool, default: false}
+      xrdp_tls_key_group: {type: str, default: ssl-cert}
+      xrdp_tls_key_mode: {type: str, default: "0640"}
+      xrdp_gnome_provisioned_users: {type: list, elements: str, default: []}
+      xrdp_release_upgrade_prompt: {type: str, default: "", choices: ["", never, normal, lts]}
       xrdp_custom_startwm: {type: str, default: ""}
       xrdp_tls_enable: {type: bool, default: true}
-      xrdp_tls_cert_path: {type: str, default: "/etc/xrdp/cert.pem"}
-      xrdp_tls_key_path: {type: str, default: "/etc/xrdp/key.pem"}
+      xrdp_tls_cert_path: {type: str, default: "/etc/xrdp/lit-cert.pem"}
+      xrdp_tls_key_path: {type: str, default: "/etc/xrdp/lit-key.pem"}
       xrdp_tls_generate_self_signed: {type: bool, default: true}
       xrdp_tls_subject: {type: str, default: "/CN={{ inventory_hostname }}"}
       xrdp_tls_days: {type: int, default: 825}

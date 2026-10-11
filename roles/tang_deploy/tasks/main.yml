@@ -8,6 +8,10 @@
     name: "{{ tang_deploy_packages }}"
     state: present
     update_cache: "{{ tang_deploy_update_apt_cache | bool }}"
+    policy_rc_d: "{{ 101 if tang_deploy_manage_service | bool else omit }}"
+  notify:
+    - Tang deploy | Reload systemd
+    - Tang deploy | Restart socket
   when:
     - tang_deploy_enabled | bool
     - tang_deploy_manage_packages | bool
@@ -37,6 +41,18 @@
     - tang_deploy_enabled | bool
     - tang_deploy_manage_socket_override | bool
 
+- name: Observe whether the Tang socket exists during a read-only plan
+  ansible.builtin.command:
+    argv: [systemctl, show, --property=LoadState, --value, "{{ tang_deploy_socket_unit }}"]
+  register: _tang_deploy_unit_load_state
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when:
+    - tang_deploy_enabled | bool
+    - tang_deploy_manage_service | bool
+    - ansible_check_mode
+
 - name: Enable and start Tang socket
   ansible.builtin.systemd_service:
     name: "{{ tang_deploy_socket_unit }}"
@@ -46,6 +62,7 @@
   when:
     - tang_deploy_enabled | bool
     - tang_deploy_manage_service | bool
+    - not ansible_check_mode or (_tang_deploy_unit_load_state.stdout | default('') | trim) != 'not-found'
 
 - name: Apply pending Tang socket handlers before validation
   ansible.builtin.meta: flush_handlers

@@ -1,0 +1,52 @@
+---
+- name: Validate early VLAN paths before removal even without network management
+  ansible.builtin.import_tasks: early_vlan_preflight.yml
+  when: luks_unlock_early_vlans | length == 0
+
+- name: Require a boot image rebuild before removing installed VLAN artifacts
+  ansible.builtin.assert:
+    that:
+      - >-
+        luks_unlock_rebuild_initramfs | bool or
+        (luks_unlock_early_vlan_outputs.results | selectattr('stat.exists') | list | length == 0)
+    fail_msg: Disable early VLANs with initramfs rebuilding enabled before removing their boot sources.
+    quiet: true
+  when: luks_unlock_early_vlans | length == 0
+
+# The non-executable marker survives command failure or controller interruption.
+# It is inspected with the same ownership/link guards as the boot sources.
+- name: Complete disabled early VLAN cleanup as a retryable boot transaction
+  when:
+    - luks_unlock_early_vlans | length == 0
+    - luks_unlock_early_vlan_outputs.results | selectattr('stat.exists') | list | length > 0
+  block:
+    - name: Persist the pending early VLAN boot image rebuild
+      ansible.builtin.copy:
+        dest: "{{ luks_unlock_early_vlan_script_path }}.lit-cleanup-pending"
+        content: "Early VLAN removal requires a successful initramfs rebuild.\n"
+        owner: root
+        group: root
+        mode: "0600"
+        follow: false
+
+    - name: Remove disabled role-owned early VLAN boot artifacts
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+        follow: false
+      loop:
+        - "{{ luks_unlock_early_vlan_script_path }}"
+        - "{{ luks_unlock_early_vlan_hook_path }}"
+
+    - name: Rebuild the boot image before clearing pending early VLAN cleanup
+      ansible.builtin.command:
+        argv: "{{ luks_unlock_update_initramfs_command }}"
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Clear only successfully rebuilt early VLAN cleanup
+      ansible.builtin.file:
+        path: "{{ luks_unlock_early_vlan_script_path }}.lit-cleanup-pending"
+        state: absent
+        follow: false
+      when: not ansible_check_mode

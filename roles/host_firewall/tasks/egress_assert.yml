@@ -379,6 +379,7 @@
     host_firewall_container_dns_access.enabled | bool
     or host_firewall_forward_proxy_client_access | length > 0
     or host_firewall_container_dns_clients | length > 0
+    or host_firewall_container_ssh_access | length > 0
 
 - name: Bind exact container proxy clients to observed bridge gateways
   ansible.builtin.assert:

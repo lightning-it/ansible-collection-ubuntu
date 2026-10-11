@@ -1,0 +1,44 @@
+---
+- name: Inspect early VLAN directory components without following links
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - /etc
+    - /etc/initramfs-tools
+    - /etc/initramfs-tools/scripts
+    - "{{ luks_unlock_early_vlan_script_path | dirname }}"
+    - "{{ luks_unlock_early_vlan_hook_path | dirname }}"
+  register: luks_unlock_early_vlan_directories
+
+- name: Reject unsafe early VLAN artifact directories before mutation
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+      - >-
+        not item.stat.exists or (
+        item.stat.isdir | default(false) and item.stat.uid == 0 and item.stat.gid == 0
+        and item.stat.mode is match('^0[0-7][0145][0145]\\Z'))
+    quiet: true
+  loop: "{{ luks_unlock_early_vlan_directories.results | default([]) }}"
+
+- name: Inspect early VLAN output files without following links
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ luks_unlock_early_vlan_script_path }}"
+    - "{{ luks_unlock_early_vlan_hook_path }}"
+    - "{{ luks_unlock_early_vlan_script_path }}.lit-cleanup-pending"
+  register: luks_unlock_early_vlan_outputs
+
+- name: Reject unsafe early VLAN output files before rendering
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+      - >-
+        not item.stat.exists or (
+        item.stat.isreg | default(false) and item.stat.uid == 0 and item.stat.gid == 0
+        and item.stat.mode is match('^0[0-7][0145][0145]\\Z'))
+    quiet: true
+  loop: "{{ luks_unlock_early_vlan_outputs.results | default([]) }}"

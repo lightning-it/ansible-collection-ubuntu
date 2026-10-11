@@ -175,6 +175,24 @@ Deprecated aggregate variables (`host_firewall_controller_source_cidrs`, `host_f
 `host_firewall_tang_consumer_cidrs`) are accepted by the interface only to return a fail-closed migration error; they
 never affect the rendered policy.
 
+**Container SSH access**
+
+`host_firewall_container_ssh_access` defaults to `{}`. An entry binds
+`interface`, one RFC1918 `source_ipv4` with `/32`, the bridge's independently
+observed `destination_ipv4`, the existing hardened OpenSSH `port`, and
+`modes: [hardened]`. Public/management destinations, broad sources, other
+ports and unmanaged interfaces are rejected. The grant is included in the
+policy fingerprint and the existing rollback/confirmation transaction.
+It authorizes only host input; it grants neither forwarding nor sudo.
+This is an IP/interface network allowlist, not container authentication or a
+same-bridge anti-spoofing boundary. Deploy it only on a bridge whose peers share
+the same trust boundary; SSH must still authenticate each account with its own
+managed key. Do not use this grant to isolate mutually untrusted containers.
+Such isolation requires separately enforced bridge/namespace membership or an
+independently verified ingress-port policy owned by the container platform.
+
+`host_firewall_tang_network` defaults to `public`. Selecting `management` binds Tang ingress to the declared management interface and destination IPv4, retaining exact /32 consumers and TCP 80. IPv6 Tang grants are refused in this mode. Only an active management Tang grant adds this selector to the policy fingerprint; the public default and an inactive management selection leave the fingerprint unchanged.
+
 ## Dependencies
 
 None.

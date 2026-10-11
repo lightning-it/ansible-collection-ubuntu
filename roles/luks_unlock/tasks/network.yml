@@ -1,4 +1,8 @@
 ---
+- name: Validate early VLAN paths before creation
+  ansible.builtin.import_tasks: early_vlan_preflight.yml
+  when: luks_unlock_early_vlans | length > 0
+
 - name: Ensure GRUB drop-in directory exists
   ansible.builtin.file:
     path: "{{ luks_unlock_grub_dropin_path | dirname }}"
@@ -33,4 +37,33 @@
     group: root
     mode: "0644"
   loop: "{{ luks_unlock_network_modules }}"
+  notify: LUKS unlock | Rebuild initramfs
+
+- name: Create role-owned early VLAN boot artifact directories
+  ansible.builtin.file:
+    path: "{{ item | dirname }}"
+    state: directory
+    follow: false
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ luks_unlock_early_vlan_script_path }}"
+    - "{{ luks_unlock_early_vlan_hook_path }}"
+  when: luks_unlock_early_vlans | length > 0
+
+- name: Render the optional private early VLAN boot artifacts
+  ansible.builtin.template:
+    src: "{{ item.template }}"
+    dest: "{{ item.path }}"
+    follow: false
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - template: initramfs-early-vlans.sh.j2
+      path: "{{ luks_unlock_early_vlan_script_path }}"
+    - template: initramfs-vlan-hook.sh.j2
+      path: "{{ luks_unlock_early_vlan_hook_path }}"
+  when: luks_unlock_early_vlans | length > 0
   notify: LUKS unlock | Rebuild initramfs
