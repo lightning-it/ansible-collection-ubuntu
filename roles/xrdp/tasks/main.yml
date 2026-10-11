@@ -16,6 +16,39 @@
     _xrdp_installed: "{{ 'xrdp' in ansible_facts.packages }}"
   changed_when: false
 
+- name: Inspect legacy XRDP default identity before migration
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - /etc/xrdp/cert.pem
+    - /etc/xrdp/key.pem
+  register: _xrdp_legacy_tls_identity
+  when:
+    - _xrdp_installed | bool
+    - xrdp_tls_enable | bool
+    - xrdp_tls_cert_path == '/etc/xrdp/lit-cert.pem'
+    - xrdp_tls_key_path == '/etc/xrdp/lit-key.pem'
+
+- name: Preserve legacy XRDP server identity before adopting new defaults
+  ansible.builtin.assert:
+    that:
+      - >-
+        (_xrdp_tls_path_preflight.results[0].stat.exists
+        and _xrdp_tls_path_preflight.results[1].stat.exists)
+        or (_xrdp_legacy_tls_identity.results | selectattr('stat.exists') | list | length == 0)
+    fail_msg: >-
+      Existing XRDP TLS identity uses the previous package paths. Before upgrading,
+      preserve the existing certificate/key as secure regular files at the new paths,
+      or explicitly select existing regular files with xrdp_tls_cert_path/xrdp_tls_key_path.
+      This role will not silently generate a replacement identity for the legacy installation.
+    quiet: true
+  when:
+    - _xrdp_installed | bool
+    - xrdp_tls_enable | bool
+    - xrdp_tls_cert_path == '/etc/xrdp/lit-cert.pem'
+    - xrdp_tls_key_path == '/etc/xrdp/lit-key.pem'
+
 - name: Precheck - verify XRDP packages are available in enabled repos
   ansible.builtin.command: "apt-cache policy {{ xrdp_packages | join(' ') }}"
   register: _xrdp_repo_check
@@ -246,7 +279,8 @@
     - xrdp_tls_enable | bool
     - not ansible_check_mode or (_xrdp_installed | bool and (_xrdp_cert.stat.exists | default(false)))
     - >-
-      (_xrdp_cert.stat.mode | default('0000'))[-1] in ['2', '3', '6', '7']
+      _xrdp_cert.stat.uid | default(-1) != 0
+      or (_xrdp_cert.stat.mode | default('0000'))[-1] in ['2', '3', '6', '7']
       or (_xrdp_cert.stat.mode | default('0000'))[-2] in ['2', '3', '6', '7']
       or (
         (_xrdp_cert.stat.mode | default('0000'))[-1] not in ['4', '5', '6', '7']

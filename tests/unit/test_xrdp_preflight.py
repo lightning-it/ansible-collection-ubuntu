@@ -530,9 +530,56 @@ class XrdpActivationBoundaryTests(unittest.TestCase):
                 ('0660', 42, True), ('0666', 42, True), ('0646', 42, True), ('0664', 0, True)]:
             values = {'xrdp_tls_enable': True, 'ansible_check_mode': False, '_xrdp_installed': True,
                 'xrdp_tls_key_group': 'ssl-cert', 'ansible_facts': {'getent_group': {'ssl-cert': ['x', '42', '']}},
-                '_xrdp_cert': {'stat': {'exists': True, 'mode': mode, 'gid': gid}}}
+                '_xrdp_cert': {'stat': {'exists': True, 'mode': mode, 'gid': gid, 'uid': 0}}}
             gate = Conditional(loader=DataLoader()); gate.when = task['when']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), changed)
+
+    def test_unprivileged_owner_triggers_certificate_reconciliation_even_when_public(self):
+        task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                    if t['name'] == 'Ensure the XRDP daemon can read its validated certificate')
+        for uid, accepted in [(0, False), (1001, True)]:
+            values = {'xrdp_tls_enable': True, 'ansible_check_mode': False, '_xrdp_installed': True,
+                'xrdp_tls_key_group': 'ssl-cert', 'ansible_facts': {'getent_group': {'ssl-cert': ['x', '42', '']}},
+                '_xrdp_cert': {'stat': {'exists': True, 'mode': '0644', 'gid': 0, 'uid': uid}}}
+            gate = Conditional(loader=DataLoader()); gate.when = task['when']
+            self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), accepted)
+        self.assertEqual(task['ansible.builtin.file']['owner'], 'root')
+
+    def test_actual_legacy_identity_upgrade_guard_preserves_files_in_apply_and_check(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        legacy = next(t for t in tasks if t['name'].startswith('Inspect legacy XRDP'))
+        guard = next(t for t in tasks if t['name'].startswith('Preserve legacy XRDP'))
+        names = [t['name'] for t in tasks]
+        self.assertLess(names.index(guard['name']), names.index('Install XRDP packages'))
+        self.assertEqual(legacy['loop'], ['/etc/xrdp/cert.pem', '/etc/xrdp/key.pem'])
+        self.assertIs(legacy['ansible.builtin.stat']['follow'], False)
+        for installed, legacy_exists, outputs_exist, accepted in [
+                (True, True, False, False), (True, True, True, True),
+                (True, False, False, True), (False, True, False, True)]:
+            for check in (False, True):
+                with self.subTest(installed=installed, legacy=legacy_exists, outputs=outputs_exist, check=check):
+                    with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+                        directory = Path(temporary)
+                        old = [directory / 'cert.pem', directory / 'key.pem']
+                        if legacy_exists:
+                            for f in old: f.write_text('previous identity bytes')
+                        read = copy.deepcopy(legacy); read['loop'] = [str(f) for f in old]
+                        variables = yaml.safe_load((ROLE / 'defaults/main.yml').read_text()); variables.update(_xrdp_installed=installed,
+                            _xrdp_tls_path_preflight={'results': [{'stat': {'exists': outputs_exist}}] * 2})
+                        source = directory / 'play.yml'; source.write_text(yaml.safe_dump([{
+                            'hosts': 'localhost', 'gather_facts': False, 'vars': variables,
+                            'tasks': [read, guard]}]))
+                        config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
+                        command = ['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)]
+                        if check: command.append('--check')
+                        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=30,
+                            env={**os.environ, 'ANSIBLE_CONFIG': str(config),
+                                 'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
+                        self.assertEqual(result.returncode == 0, accepted, result.stdout + result.stderr)
+                        if not accepted: self.assertIn('will not silently generate', result.stdout)
+                        for f in old:
+                            self.assertEqual(f.exists(), legacy_exists)
+                            if legacy_exists: self.assertEqual(f.read_text(), 'previous identity bytes')
 
     def test_installed_check_mode_skips_permissions_on_unmaterialized_key(self):
         init_plugin_loader()

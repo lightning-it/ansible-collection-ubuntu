@@ -62,7 +62,7 @@ first-login wizard. The default empty list preserves normal onboarding.
 prompting (`never`, `normal`, `lts`); the default leaves it unchanged. This
 does not disable package or security updates.
 
-TLS defaults use the package-provided `ssl-cert` group with mode `0640`. The role requires the declared key group to exist and appends the installed `xrdp` daemon to it before setting key permissions. An unreadable validated certificate is reconciled to that group with mode `0640`; an already readable public certificate keeps its permissions, including a Vault-managed `0644` file. Every existing ancestor must allow traversal by that group or by other users. Root-group and owner-only key settings are rejected because the configured unprivileged daemon must read its key.
+TLS defaults use the package-provided `ssl-cert` group with mode `0640`. The role requires the declared key group to exist and appends the installed `xrdp` daemon to it before setting key permissions. An unreadable validated certificate is reconciled to that group with mode `0640`; an already readable, root-owned public certificate keeps its permissions, including a Vault-managed `0644` file. A non-root owner is reconciled even when the certificate is readable. Every existing ancestor must allow traversal by that group or by other users. Root-group and owner-only key settings are rejected because the configured unprivileged daemon must read its key.
 
 TLS key groups are restricted to the dedicated package-owned `ssl-cert` and `xrdp` groups. Privileged and arbitrary custom groups are rejected before changes.
 
@@ -77,9 +77,16 @@ and permissions are changed, and permission changes do not follow links.
 The role-managed defaults are `/etc/xrdp/lit-cert.pem` and
 `/etc/xrdp/lit-key.pem`, separate from Ubuntu's package-owned snakeoil symlinks.
 On first install, packages create the XRDP directory and the optional self-signed
-flow creates regular files at these paths. Existing installations use the same
-role-managed paths without changing package-owned targets. Explicit linked paths
-remain rejected.
+flow creates regular files at these paths. **Upgrade/porting:** previous versions
+used `/etc/xrdp/cert.pem` and `/etc/xrdp/key.pem`. An installed XRDP host with
+legacy files and missing new default outputs fails before package changes,
+generation or restart, including in check mode. Back up the original identity,
+resolve any snakeoil symlink under operator control, and preserve its existing
+certificate/key bytes as secure regular files at the new declared paths. Or
+explicitly configure the existing regular paths; linked paths remain rejected.
+Keep self-signed generation disabled when another role owns issuance. The normal
+cryptographic pair and daemon-access checks still apply to migrated material.
+An installation already using the new paths retains its identity.
 
 When self-signed generation is disabled, both external TLS files must already
 exist at preflight. Check mode on a first installation defers account/group and

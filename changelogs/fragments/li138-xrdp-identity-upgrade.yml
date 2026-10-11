@@ -1,0 +1,8 @@
+---
+breaking_changes:
+  - >-
+    xrdp - The new regular-file TLS defaults require explicit porting of installed legacy identities;
+    existing certificate/key bytes must be preserved before the upgrade can proceed.
+minor_changes:
+  - xrdp - Fail before host changes when an installed legacy TLS identity would otherwise be replaced at new defaults.
+  - xrdp - Reconcile non-root certificate ownership even for already-readable public certificates.
