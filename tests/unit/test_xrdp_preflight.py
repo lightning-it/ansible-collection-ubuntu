@@ -486,13 +486,14 @@ class XrdpActivationBoundaryTests(unittest.TestCase):
         self.assertEqual(task['notify'], 'Restart xrdp')
         with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
             directory = Path(temporary); cert = directory / 'validated-public-cert'; cert.write_text('fixture public certificate')
-            cert.chmod(0o600)
+            cert.chmod(0o660)
             selected = copy.deepcopy(task); selected.pop('notify')
             selected['ansible.builtin.file']['owner'] = str(os.geteuid())
             source = directory / 'play.yml'; source.write_text(yaml.safe_dump([{
                 'hosts': 'localhost', 'gather_facts': False,
                 'vars': {'xrdp_tls_enable': True, 'xrdp_tls_cert_path': str(cert), 'xrdp_tls_key_group': str(os.getegid()),
-                         '_xrdp_installed': True, '_xrdp_cert': {'stat': {'exists': True}}}, 'tasks': [selected]}]))
+                         '_xrdp_installed': True, '_xrdp_cert': {'stat': {'exists': True, 'mode': '0660', 'gid': os.getegid()}},
+                         'ansible_facts': {'getent_group': {str(os.getegid()): ['x', str(os.getegid()), '']}}}, 'tasks': [selected]}]))
             config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
             result = subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)],
                 capture_output=True, text=True, check=False, timeout=30,
@@ -525,7 +526,8 @@ class XrdpActivationBoundaryTests(unittest.TestCase):
     def test_readable_vault_certificate_does_not_toggle_permissions_between_roles(self):
         task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
                     if t['name'] == 'Ensure the XRDP daemon can read its validated certificate')
-        for mode, gid, changed in [('0644', 0, False), ('0640', 42, False), ('0600', 0, True), ('0640', 0, True)]:
+        for mode, gid, changed in [('0644', 0, False), ('0640', 42, False), ('0600', 0, True), ('0640', 0, True),
+                ('0660', 42, True), ('0666', 42, True), ('0646', 42, True), ('0664', 0, True)]:
             values = {'xrdp_tls_enable': True, 'ansible_check_mode': False, '_xrdp_installed': True,
                 'xrdp_tls_key_group': 'ssl-cert', 'ansible_facts': {'getent_group': {'ssl-cert': ['x', '42', '']}},
                 '_xrdp_cert': {'stat': {'exists': True, 'mode': mode, 'gid': gid}}}

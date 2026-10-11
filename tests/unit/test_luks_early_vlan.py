@@ -106,9 +106,11 @@ class EarlyVlanTests(unittest.TestCase):
   values=self.values();values.update(luks_unlock_execution_mode='installed',luks_unlock_manage_early_network=False,luks_unlock_early_vlans=[])
   gate=Conditional(loader=DataLoader());gate.when=task['when']
   self.assertTrue(gate.evaluate_conditional(Templar(DataLoader(),values),values))
-  cleanup=next(t for t in yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text()) if 'ansible.builtin.file' in t)
+  transaction=next(t for t in yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text()) if 'block' in t)
+  cleanup=next(t for t in transaction['block'] if t['name'].startswith('Remove disabled'))
   self.assertEqual(cleanup['ansible.builtin.file']['state'],'absent')
-  self.assertEqual(cleanup['notify'],'LUKS unlock | Rebuild initramfs')
+  self.assertNotIn('notify',cleanup)
+  self.assertTrue(any('ansible.builtin.command' in task for task in transaction['block']))
   self.assertEqual(Templar(DataLoader(),values).template(cleanup['loop']),[values['luks_unlock_early_vlan_script_path'],values['luks_unlock_early_vlan_hook_path']])
 
  def test_rescue_guard_rejects_linked_output_and_ancestor_without_mutation(self):
@@ -150,7 +152,8 @@ class EarlyVlanTests(unittest.TestCase):
  def test_cleanup_reuses_guard_for_linked_parents_and_directory_leaves(self):
   tasks=yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text())
   self.assertEqual(tasks[0]['ansible.builtin.import_tasks'],'early_vlan_preflight.yml')
-  self.assertIs(next(t for t in tasks if 'ansible.builtin.file' in t)['ansible.builtin.file']['follow'],False)
+  transaction=next(t for t in tasks if 'block' in t)
+  self.assertIs(next(t for t in transaction['block'] if 'ansible.builtin.file' in t)['ansible.builtin.file']['follow'],False)
   preflight=yaml.safe_load((ROOT/'tasks/early_vlan_preflight.yml').read_text())
   guard=next(t for t in preflight if t['name'].startswith('Reject unsafe early VLAN output files'))
   for changes in ({'isreg':False,'isdir':True},{'islnk':True},{'uid':1000}):
@@ -176,8 +179,10 @@ class EarlyVlanTests(unittest.TestCase):
  def test_actual_disabled_vlan_cleanup_requires_rebuild_before_deletion(self):
   tasks=yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text())
   guard=next(t for t in tasks if 'ansible.builtin.assert' in t)
-  cleanup=next(t for t in tasks if 'ansible.builtin.file' in t)
-  handler=next(t for t in yaml.safe_load((ROOT/'handlers/main.yml').read_text()) if t['name']=='LUKS unlock | Rebuild initramfs')
+  cleanup=next(t for t in tasks if 'block' in t)
+  pending=cleanup['block'][0]['ansible.builtin.copy']
+  self.assertEqual((pending['owner'],pending['group'],pending['mode']),('root','root','0600'))
+  pending['owner']=os.getuid();pending['group']=os.getgid()
   for rebuild, present in ((False,True),(True,True),(False,False)):
    with self.subTest(rebuild=rebuild,present=present), tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
     root=Path(temporary); script=root/'script'; hook=root/'hook'; marker=root/'rebuilt-image'
@@ -187,8 +192,8 @@ class EarlyVlanTests(unittest.TestCase):
     values={'luks_unlock_early_vlans':[], 'luks_unlock_early_vlan_script_path':str(script),
       'luks_unlock_early_vlan_hook_path':str(hook), 'luks_unlock_rebuild_initramfs':rebuild,
       'luks_unlock_update_initramfs_command':[sys.executable,'-c','from pathlib import Path; Path("'+str(marker)+'").write_text("REBUILT")']}
-    inspect={'ansible.builtin.stat':{'path':'{{ item }}','follow':False},'loop':[str(script),str(hook)],'register':'luks_unlock_early_vlan_outputs'}
-    play=[{'hosts':'localhost','gather_facts':False,'vars':values,'tasks':[inspect,guard,cleanup],'handlers':[handler]}]
+    inspect={'ansible.builtin.stat':{'path':'{{ item }}','follow':False},'loop':[str(script),str(hook),str(script)+'.lit-cleanup-pending'],'register':'luks_unlock_early_vlan_outputs'}
+    play=[{'hosts':'localhost','gather_facts':False,'vars':values,'tasks':[inspect,guard,cleanup]}]
     source=root/'play.yml';source.write_text(yaml.safe_dump(play));config=root/'ansible.cfg';config.write_text('[defaults]\n')
     result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(source)],
       capture_output=True,text=True,timeout=30,env={**os.environ,'ANSIBLE_CONFIG':str(config)})
@@ -196,3 +201,27 @@ class EarlyVlanTests(unittest.TestCase):
      self.assertNotEqual(result.returncode,0);self.assertEqual(script.read_text(),'BOOT-SOURCE');self.assertEqual(hook.read_text(),'BOOT-HOOK');self.assertFalse(marker.exists())
     else:
      self.assertEqual(result.returncode,0,result.stdout+result.stderr);self.assertFalse(script.exists());self.assertFalse(hook.exists());self.assertEqual(marker.exists(),present)
+
+ def test_failed_rebuild_is_retried_after_sources_are_already_absent(self):
+  import sys
+  tasks=yaml.safe_load((ROOT/'tasks/early_vlan_cleanup.yml').read_text())
+  guard=next(t for t in tasks if 'ansible.builtin.assert' in t)
+  cleanup=next(t for t in tasks if 'block' in t)
+  pending_copy=cleanup['block'][0]['ansible.builtin.copy']
+  pending_copy['owner']=os.getuid();pending_copy['group']=os.getgid()
+  with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+   root=Path(temporary);script=root/'script';hook=root/'hook';pending=Path(str(script)+'.lit-cleanup-pending');image=root/'rebuilt'
+   script.write_text('BOOT-SOURCE');hook.write_text('BOOT-HOOK')
+   inspect={'ansible.builtin.stat':{'path':'{{ item }}','follow':False},'loop':[str(script),str(hook),str(pending)],'register':'luks_unlock_early_vlan_outputs'}
+   values={'luks_unlock_early_vlans':[],'luks_unlock_early_vlan_script_path':str(script),'luks_unlock_early_vlan_hook_path':str(hook),'luks_unlock_rebuild_initramfs':True}
+   config=root/'ansible.cfg';config.write_text('[defaults]\n')
+   for success in (False,True,True):
+    code='from pathlib import Path; Path('+repr(str(image))+').write_text("REBUILT")' if success else 'raise SystemExit(1)'
+    values['luks_unlock_update_initramfs_command']=[sys.executable,'-c',code]
+    source=root/'play.yml';source.write_text(yaml.safe_dump([{'hosts':'localhost','gather_facts':False,'vars':values,'tasks':[inspect,guard,cleanup]}]))
+    result=subprocess.run([shutil.which('ansible-playbook'),'-i','localhost,','-c','local',str(source)],capture_output=True,text=True,timeout=30,env={**os.environ,'ANSIBLE_CONFIG':str(config)})
+    self.assertEqual(result.returncode==0,success,result.stdout+result.stderr)
+    self.assertFalse(script.exists());self.assertFalse(hook.exists())
+    self.assertEqual(pending.exists(),not success);self.assertEqual(image.exists(),success)
+    if not success:self.assertEqual(pending.stat().st_mode & 0o777,0o600)
+   self.assertIn('changed=0',result.stdout)

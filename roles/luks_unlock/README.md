@@ -62,7 +62,11 @@ Optional `luks_unlock_early_vlans` creates directly connected private VLAN inter
 
 Early VLAN script and hook paths are fixed role-owned names. Overrides are rejected before changes, ensuring enable/disable reruns cannot leave former executable artifacts in initramfs-tools.
 
-Disabling early VLANs while their source artifacts exist requires `luks_unlock_rebuild_initramfs: true`. With rebuilding disabled, the role refuses removal before changing either source file, so an old boot image cannot silently retain the removed configuration.
+Disabling early VLANs while their sources or a pending rebuild exist requires
+`luks_unlock_rebuild_initramfs: true`. With rebuilding disabled, the role refuses removal before changing either
+source file. A root-owned, non-executable `.lit-cleanup-pending` marker beside the script is persisted before
+removal and cleared only after a successful immediate rebuild. Command failure or interruption leaves it for the
+next apply, even when both boot sources are already absent. An unchanged successful repeat performs no rebuild.
 
 ## Dependencies
 

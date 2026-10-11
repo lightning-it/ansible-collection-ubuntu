@@ -246,10 +246,14 @@
     - xrdp_tls_enable | bool
     - not ansible_check_mode or (_xrdp_installed | bool and (_xrdp_cert.stat.exists | default(false)))
     - >-
-      (_xrdp_cert.stat.mode | default('0000'))[-1] not in ['4', '5', '6', '7']
-      and not (
-        (_xrdp_cert.stat.mode | default('0000'))[-2] in ['4', '5', '6', '7']
-        and _xrdp_cert.stat.gid | default(-1) == ansible_facts.getent_group[xrdp_tls_key_group][1] | int
+      (_xrdp_cert.stat.mode | default('0000'))[-1] in ['2', '3', '6', '7']
+      or (_xrdp_cert.stat.mode | default('0000'))[-2] in ['2', '3', '6', '7']
+      or (
+        (_xrdp_cert.stat.mode | default('0000'))[-1] not in ['4', '5', '6', '7']
+        and not (
+          (_xrdp_cert.stat.mode | default('0000'))[-2] in ['4', '5', '6', '7']
+          and _xrdp_cert.stat.gid | default(-1) == ansible_facts.getent_group[xrdp_tls_key_group][1] | int
+        )
       )
   notify: Restart xrdp
 

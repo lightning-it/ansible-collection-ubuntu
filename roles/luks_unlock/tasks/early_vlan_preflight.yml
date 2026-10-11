@@ -29,6 +29,7 @@
   loop:
     - "{{ luks_unlock_early_vlan_script_path }}"
     - "{{ luks_unlock_early_vlan_hook_path }}"
+    - "{{ luks_unlock_early_vlan_script_path }}.lit-cleanup-pending"
   register: luks_unlock_early_vlan_outputs
 
 - name: Reject unsafe early VLAN output files before rendering
