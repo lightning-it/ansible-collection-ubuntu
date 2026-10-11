@@ -1,5 +1,5 @@
 # Ansible managed
 [Socket]
 ListenStream=
-ListenStream={{ tang_deploy_listen_port }}
+ListenStream={{ (tang_deploy_listen_address ~ ':') if tang_deploy_listen_address | length > 0 else '' }}{{ tang_deploy_listen_port }}
 

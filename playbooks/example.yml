@@ -55,6 +55,15 @@
       when: false
       vars:
         host_firewall_container_dns_clients: {}
+        host_firewall_tang_network: management
+        host_firewall_container_ssh_access: {}
+        # Example grant, only with verified bridge/gateway observations:
+        #   console:
+        #     interface: appbridge
+        #     source_ipv4: 10.20.1.3/32
+        #     destination_ipv4: 10.20.1.1
+        #     port: 1905
+        #     modes: [hardened]
 
     - role: lit.ubuntu.users
       vars:
@@ -62,3 +71,37 @@
           - name: ops-admin
             groups: ["sudo"]
             shell: /bin/bash
+
+    # Disabled: replace example interface/address only after hardware review.
+    # The public recovery route remains separate from this private Tang VLAN.
+    - role: lit.ubuntu.luks_unlock
+      when: false
+      vars:
+        luks_unlock_enabled: false
+        luks_unlock_manage_early_network: true
+        luks_unlock_network_modules: [8021q]
+        luks_unlock_early_vlans:
+          - parent: eno1
+            name: eno1.4091
+            id: 4091
+            address: 10.20.30.22
+            prefix: 24
+            mtu: 1400
+
+    - role: lit.ubuntu.tang_deploy
+      when: false
+      vars:
+        tang_deploy_enabled: false
+        tang_deploy_manage_socket_override: true
+        tang_deploy_listen_address: 127.0.0.1
+        tang_deploy_listen_port: 7500
+
+    - role: lit.ubuntu.xrdp
+      when: false
+      vars:
+        xrdp_enabled: false
+        xrdp_listen_address: 127.0.0.1
+        xrdp_gnome_provisioned_users: []
+        xrdp_gnome_private_dbus_session: true
+        xrdp_tls_key_group: ssl-cert
+        xrdp_tls_key_mode: '0640'

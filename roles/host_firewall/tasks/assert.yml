@@ -204,6 +204,8 @@
 - name: Validate Tang function contract
   ansible.builtin.assert:
     that:
+      - host_firewall_tang_network in ['public', 'management']
+      - host_firewall_tang_network != 'management' or host_firewall_tang_access.sources_ipv6 | length == 0
       - host_firewall_tang_access is mapping
       - host_firewall_tang_access.keys() | list | sort == ['port', 'sources_ipv4', 'sources_ipv6']
       - host_firewall_tang_access.port is integer

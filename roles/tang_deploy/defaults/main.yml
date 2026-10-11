@@ -12,6 +12,7 @@ tang_deploy_socket_enabled: true
 
 tang_deploy_manage_socket_override: false
 tang_deploy_listen_port: 80
+tang_deploy_listen_address: ""
 tang_deploy_socket_override_path: /etc/systemd/system/tangd.socket.d/80-lit-listen.conf
 
 tang_deploy_validate: true

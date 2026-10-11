@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - tang_deploy supports a loopback-only backend and suppresses package auto-start before socket configuration.
+  - host_firewall supports an explicitly selected management-only Tang ingress boundary.
+  - Add fingerprint-bound container SSH ingress with exact bridge, source and host destination authorization.

@@ -1,0 +1,36 @@
+---
+- name: Validate XRDP certificate and key correspondence without changing files
+  no_log: true
+  block:
+    - name: Read declared XRDP certificate public key
+      ansible.builtin.command:
+        argv: [/usr/bin/openssl, x509, -in, "{{ xrdp_tls_cert_path }}", -pubkey, -noout]
+      register: _xrdp_tls_certificate_metadata
+      check_mode: false
+      changed_when: false
+
+    - name: Read declared XRDP private key public metadata
+      ansible.builtin.command:
+        argv: [/usr/bin/openssl, pkey, -in, "{{ xrdp_tls_key_path }}", -passin, 'pass:', -pubout]
+      register: _xrdp_tls_key_metadata
+      check_mode: false
+      changed_when: false
+
+    - name: Verify private key internal consistency without changing it
+      ansible.builtin.command:
+        argv: [/usr/bin/openssl, pkey, -in, "{{ xrdp_tls_key_path }}", -passin, 'pass:', -check, -noout]
+      check_mode: false
+      changed_when: false
+
+    - name: Require a matching XRDP certificate and private key before daemon access
+      ansible.builtin.assert:
+        that:
+          - _xrdp_tls_certificate_metadata.stdout is match('^-----BEGIN PUBLIC KEY-----')
+          - _xrdp_tls_certificate_metadata.stdout | trim == _xrdp_tls_key_metadata.stdout | trim
+        quiet: true
+  always:
+    - name: Clear temporary XRDP TLS metadata after validation
+      ansible.builtin.set_fact:
+        _xrdp_tls_certificate_metadata: {}
+        _xrdp_tls_key_metadata: {}
+      changed_when: false

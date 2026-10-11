@@ -25,6 +25,11 @@ luks_unlock_early_network:
   hostname: ""
   dns: []
 luks_unlock_network_modules: []
+# Optional private LAN interfaces, configured before cryptroot while preserving
+# the primary kernel ip= network for independent Dropbear recovery.
+luks_unlock_early_vlans: []
+luks_unlock_early_vlan_script_path: /etc/initramfs-tools/scripts/init-premount/00-lit-early-vlans
+luks_unlock_early_vlan_hook_path: /etc/initramfs-tools/hooks/lit-early-vlans
 luks_unlock_kernel_ip_argument_effective: >-
   {{
     'ip=dhcp'

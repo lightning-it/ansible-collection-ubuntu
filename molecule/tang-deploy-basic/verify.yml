@@ -20,4 +20,4 @@
         that:
           - "'[Socket]' in (tang_deploy_socket_override.content | b64decode)"
           - "'ListenStream=' in (tang_deploy_socket_override.content | b64decode)"
-          - "'ListenStream=18080' in (tang_deploy_socket_override.content | b64decode)"
+          - "'ListenStream=127.0.0.1:18080' in (tang_deploy_socket_override.content | b64decode)"

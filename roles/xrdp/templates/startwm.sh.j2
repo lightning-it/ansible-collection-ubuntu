@@ -13,7 +13,15 @@ exit $?
 case "{{ xrdp_desktop }}" in
   gnome)
     if command -v gnome-session >/dev/null 2>&1; then
+{% if xrdp_gnome_private_dbus_session | bool %}
+      unset DBUS_SESSION_BUS_ADDRESS
+      export XDG_SESSION_TYPE=x11
+      export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+      export DESKTOP_SESSION={{ xrdp_gnome_session | quote }}
+      exec dbus-run-session -- gnome-session --session={{ xrdp_gnome_session | quote }}
+{% else %}
       exec gnome-session
+{% endif %}
     fi
     ;;
   xfce)
@@ -23,7 +31,15 @@ case "{{ xrdp_desktop }}" in
     ;;
   auto|*)
     if command -v gnome-session >/dev/null 2>&1; then
+{% if xrdp_gnome_private_dbus_session | bool %}
+      unset DBUS_SESSION_BUS_ADDRESS
+      export XDG_SESSION_TYPE=x11
+      export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+      export DESKTOP_SESSION={{ xrdp_gnome_session | quote }}
+      exec dbus-run-session -- gnome-session --session={{ xrdp_gnome_session | quote }}
+{% else %}
       exec gnome-session
+{% endif %}
     fi
     if command -v startxfce4 >/dev/null 2>&1; then
       exec startxfce4

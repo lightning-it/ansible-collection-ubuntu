@@ -9,6 +9,12 @@
     - luks_unlock_enabled | bool
     - luks_unlock_execution_mode == 'rescue_stage'
 
+- name: Remove disabled early VLAN artifacts independently of network management
+  ansible.builtin.import_tasks: early_vlan_cleanup.yml
+  when:
+    - luks_unlock_enabled | bool
+    - luks_unlock_execution_mode == 'installed'
+
 - name: Configure early-boot networking
   ansible.builtin.include_tasks: network.yml
   when:

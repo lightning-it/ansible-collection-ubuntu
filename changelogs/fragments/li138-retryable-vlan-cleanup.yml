@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    luks_unlock - retain a guarded pending marker across failed early-VLAN boot image rebuilds
+    and retry it before clearing cleanup.
+  - xrdp - remove group or other write permissions from an otherwise readable validated daemon certificate.

@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - luks_unlock fixes early VLAN artifact names so path overrides cannot leave executable stale boot files.
+  - xrdp grants its unprivileged daemon group-read access to the declared TLS key group before key permissions change.
+  - tang_deploy previews existing socket state drift in check mode while avoiding first-install missing units.
