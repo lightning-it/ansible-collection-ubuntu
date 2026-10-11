@@ -53,6 +53,28 @@ class EarlyVlanTests(unittest.TestCase):
    self.assertIn('mtu 1400 up',script)
  def test_disabled_default_has_no_vlan_items(self):
   values=self.values();values['luks_unlock_early_vlans']=[];self.assertTrue(self.accepts(values))
+ def test_existing_interface_collision_never_receives_boot_address(self):
+  environment=Environment(loader=FileSystemLoader(str(ROOT/'templates')))
+  for kind,parent,accepted in [('vlan protocol 802.1Q id 4091',7,True),
+                                ('vlan protocol 802.1Q id 4092',7,False),
+                                ('vlan protocol 802.1Q id 4091',8,False),
+                                ('link/ether physical',7,False)]:
+   with self.subTest(kind=kind,parent=parent),tempfile.TemporaryDirectory() as temporary:
+    directory=Path(temporary); net=directory/'net'; (net/'eno2').mkdir(parents=True)
+    (net/'eno2.4091').mkdir(); (net/'eno2/ifindex').write_text('7\n')
+    (net/'eno2.4091/iflink').write_text(str(parent)+'\n')
+    log=directory/'changes'; binary=directory/'bin';binary.mkdir()
+    for name,body in [('modprobe','exit 0'),('ip',
+      'if [ "$1" = "-d" ]; then printf "%s\\n" "$DETAIL"; exit 0; fi\n'
+      'if [ "$1 $2" = "link show" ]; then exit 0; fi\n'
+      'printf "%s\\n" "$*" >> "$CHANGES"')]:
+     executable=binary/name;executable.write_text('#!/bin/sh\n'+body+'\n');executable.chmod(0o700)
+    script=directory/'boot.sh';script.write_text(environment.get_template('initramfs-early-vlans.sh.j2').render(**self.values()).replace('/sys/class/net',str(net)))
+    result=subprocess.run(['/bin/sh',str(script)],capture_output=True,text=True,
+      env={**os.environ,'PATH':str(binary)+':'+os.environ['PATH'],'DETAIL':kind,'CHANGES':str(log)})
+    self.assertEqual(result.returncode==0,accepted,result.stderr)
+    if accepted:self.assertIn('address replace 10.10.30.22/24',log.read_text())
+    else:self.assertFalse(log.exists())
  def test_post_install_includes_close_both_heredocs_under_ansible_trimming(self):
   values=self.values()
   values.update(luks_unlock_dropbear_options_effective='-p 2222 -s -j -k -I 300',

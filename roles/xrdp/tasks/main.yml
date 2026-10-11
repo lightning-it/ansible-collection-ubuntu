@@ -168,24 +168,49 @@
   register: _xrdp_cert
   when: xrdp_tls_enable | bool
 
-- name: Generate self-signed cert/key for XRDP (when missing)
+- name: Generate self-signed private key for XRDP (when missing)
   ansible.builtin.command:
     argv:
-      - openssl
+      - /bin/sh
+      - -c
+      - >-
+        umask 077; tmp=$(mktemp "${1}.XXXXXX") || exit;
+        trap 'rm -f -- "$tmp"' EXIT HUP INT TERM;
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$tmp" &&
+        mv -- "$tmp" "$1"
+      - xrdp-key-generation
+      - "{{ xrdp_tls_key_path }}"
+    creates: "{{ xrdp_tls_key_path }}"
+  no_log: true
+  when:
+    - xrdp_tls_enable | bool
+    - xrdp_tls_generate_self_signed | bool
+    - not _xrdp_tls_path_preflight.results[1].stat.exists
+  notify: Restart xrdp
+
+- name: Generate self-signed certificate for XRDP from its retained key (when missing)
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - >-
+        umask 077; output=$1; shift; tmp=$(mktemp "${output}.XXXXXX") || exit;
+        trap 'rm -f -- "$tmp"' EXIT HUP INT TERM;
+        openssl "$@" -out "$tmp" && mv -- "$tmp" "$output"
+      - xrdp-certificate-generation
+      - "{{ xrdp_tls_cert_path }}"
       - req
       - -x509
-      - -nodes
-      - -newkey
-      - rsa:2048
-      - -keyout
+      - -key
       - "{{ xrdp_tls_key_path }}"
-      - -out
-      - "{{ xrdp_tls_cert_path }}"
+      - -passin
+      - 'pass:'
       - -days
       - "{{ xrdp_tls_days | int | string }}"
       - -subj
       - "{{ xrdp_tls_subject }}"
     creates: "{{ xrdp_tls_cert_path }}"
+  no_log: true
   when:
     - xrdp_tls_enable | bool
     - xrdp_tls_generate_self_signed | bool

@@ -8,3 +8,5 @@ set -eu
 . /usr/share/initramfs-tools/hook-functions
 manual_add_modules 8021q
 copy_exec /usr/sbin/ip /sbin/ip
+copy_exec /usr/bin/cat /bin/cat
+copy_exec /usr/bin/grep /bin/grep

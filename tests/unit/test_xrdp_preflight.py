@@ -85,13 +85,13 @@ class XrdpPreflightTests(unittest.TestCase):
 
     def test_tls_output_paths_and_subject_remain_single_openssl_arguments(self):
         task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
-                    if t['name'].startswith('Generate self-signed'))
+                    if t['name'].startswith('Generate self-signed certificate'))
         values = self.values()
         values.update(xrdp_tls_cert_path='/tmp/leaf certificate.pem', xrdp_tls_key_path='/tmp/leaf key.pem',
                       xrdp_tls_subject='/CN=Fixture with spaces')
         argv = Templar(DataLoader(), values).template(task['ansible.builtin.command']['argv'])
-        self.assertEqual(argv[argv.index('-out') + 1], values['xrdp_tls_cert_path'])
-        self.assertEqual(argv[argv.index('-keyout') + 1], values['xrdp_tls_key_path'])
+        self.assertEqual(argv[4], values['xrdp_tls_cert_path'])
+        self.assertEqual(argv[argv.index('-key') + 1], values['xrdp_tls_key_path'])
         self.assertEqual(argv[argv.index('-subj') + 1], values['xrdp_tls_subject'])
         self.assertEqual(argv[argv.index('-days') + 1], str(values['xrdp_tls_days']))
 
@@ -388,10 +388,10 @@ class TlsPathSafetyTests(unittest.TestCase):
         self.assertIn('certificate=' + values['xrdp_tls_cert_path'], content)
         self.assertIn('key_file=' + values['xrdp_tls_key_path'], content)
 
-    def test_half_existing_self_signed_tls_pair_is_rejected(self):
+    def test_existing_certificate_without_its_key_is_rejected(self):
         task = next(t for t in yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
-                    if t['name'].startswith('Require both TLS outputs present'))
-        for cert, key, expected in [(False, False, True), (True, True, True), (True, False, False), (False, True, False)]:
+                    if t['name'].startswith('Require a retained private key'))
+        for cert, key, expected in [(False, False, True), (True, True, True), (True, False, False), (False, True, True)]:
             values = {'_xrdp_tls_path_preflight': {'results': [{'stat': {'exists': cert}}, {'stat': {'exists': key}}]}}
             gate = Conditional(loader=DataLoader()); gate.when = task['ansible.builtin.assert']['that']
             self.assertEqual(gate.evaluate_conditional(Templar(DataLoader(), values), values), expected)
@@ -419,6 +419,51 @@ class TlsPathSafetyTests(unittest.TestCase):
 
 
 class RealTlsPairPreflightTests(unittest.TestCase):
+    def test_failed_certificate_generation_retries_without_rotating_its_key(self):
+        with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
+            directory = Path(temporary)
+            key = directory / 'retained key.pem'; cert = directory / 'leaf cert.pem'
+            values = yaml.safe_load((ROLE / 'defaults/main.yml').read_text())
+            values.update(xrdp_tls_cert_path=str(cert), xrdp_tls_key_path=str(key),
+                          xrdp_tls_subject='invalid subject', xrdp_tls_days=1)
+            preflight = yaml.safe_load((ROLE / 'tasks/assert.yml').read_text())
+            selected = [copy.deepcopy(t) for t in preflight if t['name'].startswith((
+                'Inspect existing XRDP TLS', 'Refuse linked or non-regular XRDP',
+                'Require a retained private key', 'Require secure custody',
+                'Validate a retained self-signed key'))]
+            selected += [copy.deepcopy(t) for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                         if t['name'].startswith(('Check TLS certificate', 'Generate self-signed'))]
+            for task in selected:
+                task.pop('notify', None)
+            config = directory / 'ansible.cfg'; config.write_text('[defaults]\n')
+            source = directory / 'play.yml'
+            def run():
+                source.write_text(yaml.safe_dump([{'hosts': 'localhost', 'gather_facts': False,
+                                                  'vars': values, 'tasks': selected}]))
+                return subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(source)],
+                                      capture_output=True, text=True, timeout=30,
+                                      env={**os.environ, 'ANSIBLE_CONFIG': str(config),
+                                           'ANSIBLE_LOCAL_TEMP': str(directory / 'ansible')})
+            failed = run()
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertTrue(key.is_file()); self.assertFalse(cert.exists())
+            self.assertEqual(key.stat().st_mode & 0o777, 0o600)
+            retained = key.read_bytes()
+            self.assertEqual(list(directory.glob('*.XXXXXX')), [])
+            values['xrdp_tls_subject'] = '/CN=corrected fixture'
+            recovered = run()
+            self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
+            self.assertEqual(key.read_bytes(), retained)
+            self.assertTrue(cert.is_file())
+            repeated = run()
+            self.assertEqual(repeated.returncode, 0, repeated.stdout + repeated.stderr)
+            self.assertIn('changed=0', repeated.stdout)
+            self.assertEqual(key.read_bytes(), retained)
+            cert.unlink(); key.write_text('invalid key'); key.chmod(0o600)
+            rejected = run()
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertEqual(key.read_text(), 'invalid key'); self.assertFalse(cert.exists())
+
     def test_existing_pair_is_parsed_and_matched_before_permission_changes(self):
         with tempfile.TemporaryDirectory(dir=os.environ['HOME']) as temporary:
             directory = Path(temporary)

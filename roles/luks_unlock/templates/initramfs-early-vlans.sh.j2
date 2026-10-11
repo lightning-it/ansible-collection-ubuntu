@@ -13,10 +13,14 @@ while [ ! -e /sys/class/net/{{ vlan.parent }} ]; do
   remaining=$((remaining - 1))
   sleep 1
 done
-ip link set dev {{ vlan.parent }} up
 if ! ip link show dev {{ vlan.name }} >/dev/null 2>&1; then
   ip link add link {{ vlan.parent }} name {{ vlan.name }} type vlan id {{ vlan.id }}
 fi
+# An existing name must belong to this exact 802.1Q VLAN and parent. Never
+# repurpose a physical interface or another VLAN during pre-root recovery.
+[ "$(cat /sys/class/net/{{ vlan.name }}/iflink)" = "$(cat /sys/class/net/{{ vlan.parent }}/ifindex)" ] || exit 1
+ip -d -o link show dev {{ vlan.name }} | grep -Eq '(^|[[:space:]])vlan[[:space:]]+protocol[[:space:]]+802.1Q[[:space:]]+id[[:space:]]+{{ vlan.id }}([[:space:]]|$)' || exit 1
+ip link set dev {{ vlan.parent }} up
 ip link set dev {{ vlan.name }} mtu {{ vlan.mtu }} up
 ip address replace {{ vlan.address }}/{{ vlan.prefix }} dev {{ vlan.name }}
 {% endfor %}

@@ -4,3 +4,7 @@ bugfixes:
     luks_unlock - persist pending early VLAN installation before writing boot artifacts
     and retry failed initramfs builds.
   - xrdp - validate security_layer as tls, rdp or negotiate before rendering INI configuration.
+  - >-
+    xrdp - generate TLS outputs through private temporary files and recover a missing
+    self-signed certificate using its validated retained key without rotating identity.
+  - luks_unlock - refuse a pre-root VLAN name collision unless its parent and 802.1Q ID match the declaration.
