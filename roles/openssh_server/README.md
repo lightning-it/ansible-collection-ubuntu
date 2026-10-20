@@ -43,6 +43,61 @@ See `defaults/main.yml` for the complete interface. Important inputs are:
   `openssh_server_permit_empty_passwords`, `openssh_server_x11_forwarding`, and `openssh_server_use_pam`: explicit
   OpenSSH security controls.
 
+### Guarded port retirement
+
+Use `tasks_from: finalize` explicitly for Ubuntu 24 socket-activated port retirement.
+Normal role execution and bootstrap transitions retain their existing behavior.
+This entrypoint supports `openssh_server_finalize_action: plan | apply | confirm | rollback`.
+It uses the existing role to render a protected candidate before touching live SSH.
+The live managed path is deliberately fixed to `/etc/ssh/sshd_config.d/60-lit-hardening.conf`.
+Packages, accounts, keys, sudo, firewall policy and initramfs recovery are outside this transaction.
+
+Required inputs from approved inventory and the current execution receipt:
+
+| Variable | Contract |
+| --- | --- |
+| `openssh_server_ports` | Retained ports, also used by the ordinary role |
+| `openssh_server_finalize_retired_ports` | Explicit ports that must be absent; default `[22]` |
+| `openssh_server_finalize_machine_id` | Independently verified `/etc/machine-id`, 32 hex characters |
+| `openssh_server_finalize_approved_sources` | Nonempty management-source CIDRs, checked against actual SSH transport |
+| `openssh_server_finalize_source_revision` | Approved immutable 40-character source commit |
+| `openssh_server_finalize_ee_digest` | Actual controller EE `sha256:` digest |
+| `openssh_server_finalize_recovery` | Independent receipt with `reference`, `machine_id`, Unix `verified_at`; at most 24 hours old |
+| `openssh_server_finalize_expected_fingerprint` | Exact configuration fingerprint returned by the reviewed plan; apply only |
+| `openssh_server_finalize_transaction_id` | Unique 8–64 character alphanumeric/underscore/hyphen identifier; apply and confirm |
+
+Obtain the recovery receipt through an independently tested administration or recovery
+path. A saved SSH session, a configured recovery port or an invented receipt is insufficient.
+The role validates the receipt binding and age; the operator remains responsible for
+the referenced evidence and protected publication approval. No secrets belong in this input.
+
+`plan` authenticates a new retained-port transport and reports the observed fingerprint
+without creating transaction files. Wrong identity, source, stale recovery evidence or
+configuration drift fails before a live configuration write. Check mode is rejected;
+use `plan` instead.
+
+`apply` stages a candidate through `openssh_server`, then rechecks the fingerprint under
+a host-local lock. Before its atomic live write, it records the configuration and unit
+state in root-only `/var/lib/lit-openssh-finalize`, enables a persistent host-side timer
+with a **300-second** deadline, and verifies that timer is active. The transaction validates
+the complete configuration, stops daemon then socket to release inherited descriptors,
+reloads the systemd generator and restores the prior enabled/active unit states.
+It never edits generated systemd files. A local apply error immediately restores the
+snapshot. Controller loss or missing confirmation triggers the timer independently.
+
+Run `confirm` separately within the deadline using the same transaction identity and
+immutable contract. It resets SSH transport, authenticates anew through a retained port,
+and checks syntax, effective ports, unchanged configuration and absent retired listeners
+across both address families before canceling rollback. Reusing the apply transport or
+confirming after the deadline is rejected. A confirmed transaction is never rolled back
+by a stale timer. Preserve timer failure evidence; its service retries failed rollback.
+
+An identical later `apply`, using a new reviewed plan fingerprint, checks effective
+configuration/listeners and reports `already_finalized` without arming another timer.
+Keep snapshot/state for audit; do not publish their contents. Reboot, external service
+access, permitted forwarding and negative-access acceptance remain separate mandatory
+operator checks. No production acceptance is implied by this interface or unit tests.
+
 ## Dependencies
 
 None.
@@ -60,6 +115,24 @@ None.
         openssh_server_ports:
           - 22
           - 2222
+```
+
+For port retirement, supply the mandatory verified evidence through inventory or a
+protected execution input file, then select the action explicitly:
+
+```yaml
+---
+- name: Inspect an approved single-host SSH finalization plan
+  hosts: exact_ubuntu_target
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Plan the bounded transaction
+      ansible.builtin.include_role:
+        name: lit.ubuntu.openssh_server
+        tasks_from: finalize
+      vars:
+        openssh_server_finalize_action: plan
 ```
 
 ## License
