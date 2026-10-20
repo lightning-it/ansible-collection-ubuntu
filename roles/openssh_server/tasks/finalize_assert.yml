@@ -1,0 +1,24 @@
+---
+- name: Require an explicit supported finalization action
+  ansible.builtin.assert:
+    that:
+      - openssh_server_finalize_action in ['plan', 'apply', 'confirm', 'rollback']
+      - openssh_server_finalize_machine_id is match('^[a-f0-9]{32}$')
+      - openssh_server_finalize_approved_sources | length > 0
+      - openssh_server_finalize_source_revision is match('^[a-f0-9]{40}$')
+      - openssh_server_finalize_ee_digest is match('^sha256:[a-f0-9]{64}$')
+      - openssh_server_finalize_recovery is mapping
+      - openssh_server_finalize_recovery.reference | default('') | length > 0
+      - openssh_server_finalize_recovery.machine_id | default('') == openssh_server_finalize_machine_id
+      - openssh_server_finalize_recovery.verified_at | default(0) | int > 0
+      - openssh_server_finalize_retired_ports | length > 0
+    fail_msg: Target, source, EE and independent recovery evidence are mandatory; see role README.
+
+- name: Require a reviewed apply fingerprint and unique transaction identity
+  ansible.builtin.assert:
+    that:
+      - openssh_server_finalize_transaction_id is match('^[a-zA-Z0-9_-]{8,64}$')
+      - >-
+        openssh_server_finalize_action != 'apply'
+        or openssh_server_finalize_expected_fingerprint is match('^[a-f0-9]{64}$')
+  when: openssh_server_finalize_action in ['apply', 'confirm']

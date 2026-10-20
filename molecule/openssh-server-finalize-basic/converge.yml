@@ -1,0 +1,19 @@
+---
+- name: Validate the offline SSH transaction interface
+  hosts: localhost
+  gather_facts: false
+  vars:
+    openssh_server_finalize_action: plan
+    openssh_server_finalize_machine_id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    openssh_server_finalize_approved_sources: [192.0.2.1/32]
+    openssh_server_finalize_source_revision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    openssh_server_finalize_ee_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    openssh_server_finalize_recovery:
+      reference: synthetic-input-validation-only
+      machine_id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      verified_at: 1
+  tasks:
+    - name: Validate input shapes without touching SSH or the host
+      ansible.builtin.include_role:
+        name: lit.ubuntu.openssh_server
+        tasks_from: finalize_assert

@@ -1,0 +1,108 @@
+---
+- name: Validate the bounded OpenSSH finalization contract
+  ansible.builtin.import_tasks: finalize_assert.yml
+  tags: always
+
+- name: Reject a simulated SSH transaction
+  ansible.builtin.assert:
+    that: not ansible_check_mode
+    fail_msg: Use the read-only plan action instead of check mode for a transaction.
+
+- name: Open a new authenticated connection before transaction evidence
+  ansible.builtin.meta: reset_connection
+
+- name: Prove fresh retained-port Ansible access
+  ansible.builtin.ping:
+  become: false
+
+- name: Read the actual authenticated SSH connection
+  ansible.builtin.command:
+    argv: [/usr/bin/printenv, SSH_CONNECTION]
+  become: false
+  register: _openssh_server_finalize_connection
+  changed_when: false
+
+- name: Assemble the immutable transaction request
+  ansible.builtin.set_fact:
+    _openssh_server_finalize_request:
+      machine_id: "{{ openssh_server_finalize_machine_id }}"
+      connection: "{{ _openssh_server_finalize_connection.stdout }}"
+      approved_sources: "{{ openssh_server_finalize_approved_sources }}"
+      source_revision: "{{ openssh_server_finalize_source_revision }}"
+      ee_digest: "{{ openssh_server_finalize_ee_digest }}"
+      recovery: "{{ openssh_server_finalize_recovery }}"
+      ports: "{{ openssh_server_ports | map('int') | list }}"
+      retired_ports: "{{ openssh_server_finalize_retired_ports | map('int') | list }}"
+      expected_fingerprint: "{{ openssh_server_finalize_expected_fingerprint }}"
+      transaction_id: "{{ openssh_server_finalize_transaction_id }}"
+
+- name: Verify target and source before persistent transaction changes
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/transaction.py') }}"
+      - plan
+    stdin: "{{ _openssh_server_finalize_request | to_json }}"
+  register: _openssh_server_finalize_plan
+  changed_when: false
+  when: openssh_server_finalize_action in ['plan', 'apply']
+
+- name: Report the observed plan fingerprint
+  ansible.builtin.debug:
+    msg: "{{ _openssh_server_finalize_plan.stdout | from_json }}"
+  when: openssh_server_finalize_action == 'plan'
+
+- name: Require the previously reviewed configuration fingerprint
+  ansible.builtin.assert:
+    that:
+      - >-
+        (_openssh_server_finalize_plan.stdout | from_json).fingerprint
+        == openssh_server_finalize_expected_fingerprint
+      - (_openssh_server_finalize_plan.stdout | from_json).transaction_status != 'pending'
+    fail_msg: Configuration changed since the reviewed plan. No SSH change was made.
+  when: openssh_server_finalize_action == 'apply'
+
+- name: Prepare the protected host-local transaction directory
+  ansible.builtin.file:
+    path: /var/lib/lit-openssh-finalize
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  when: openssh_server_finalize_action == 'apply'
+
+- name: Install the host-local rollback implementation
+  ansible.builtin.copy:
+    src: transaction.py
+    dest: /var/lib/lit-openssh-finalize/transaction.py
+    owner: root
+    group: root
+    mode: '0700'
+  when: openssh_server_finalize_action == 'apply'
+
+- name: Render the candidate through the existing OpenSSH implementation
+  ansible.builtin.include_role:
+    name: lit.ubuntu.openssh_server
+  vars:
+    openssh_server_config_path: /var/lib/lit-openssh-finalize/staging/candidate.conf
+    openssh_server_config_mode: '0600'
+    openssh_server_manage_packages: false
+    openssh_server_manage_service: false
+  when: openssh_server_finalize_action == 'apply'
+
+- name: Execute the host-local SSH transaction
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - /var/lib/lit-openssh-finalize/transaction.py
+      - "{{ openssh_server_finalize_action }}"
+    stdin: "{{ _openssh_server_finalize_request | to_json }}"
+  register: _openssh_server_finalize_result
+  changed_when: (_openssh_server_finalize_result.stdout | from_json).changed | default(false) | bool
+  when: openssh_server_finalize_action != 'plan'
+
+- name: Report transaction status without exposing snapshots
+  ansible.builtin.debug:
+    msg: "{{ _openssh_server_finalize_result.stdout | from_json }}"
+  when: openssh_server_finalize_action != 'plan'
