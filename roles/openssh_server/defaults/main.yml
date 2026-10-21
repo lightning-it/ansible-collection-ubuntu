@@ -41,3 +41,14 @@ openssh_server_socket_name: ssh.socket
 openssh_server_verify_listeners: true
 openssh_server_listener_verify_host: 127.0.0.1
 openssh_server_listener_verify_timeout: 15
+
+# Explicit tasks_from: finalize entrypoint; normal role execution is unchanged.
+openssh_server_finalize_action: plan
+openssh_server_finalize_machine_id: ""
+openssh_server_finalize_approved_sources: []
+openssh_server_finalize_source_revision: ""
+openssh_server_finalize_ee_digest: ""
+openssh_server_finalize_recovery: {}
+openssh_server_finalize_expected_fingerprint: ""
+openssh_server_finalize_transaction_id: ""
+openssh_server_finalize_retired_ports: [22]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import os
 import subprocess
@@ -112,13 +113,107 @@ class ExactRevisionMaterializerTests(unittest.TestCase):
 
     def test_diff_reverification_uses_protected_reads(self) -> None:
         source = MATERIALIZER.read_text(encoding="utf-8")
-        self.assertNotIn("patch.read_bytes()", source)
-        self.assertNotIn('(regenerated / "change.patch").read_bytes()', source)
-        self.assertIn('patch, "review diff"', source)
-        self.assertIn(
-            'regenerated / "change.patch", "regenerated diff"',
-            source,
+        self._assert_protected_diff_reads(source)
+
+    def _assert_protected_diff_reads(self, source: str) -> None:
+        tree = ast.parse(source)
+        nodes = list(ast.walk(self._verifier(tree)))
+        self.assertFalse(
+            any(
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "read_bytes"
+                for node in nodes
+            )
         )
+        matches = [
+            node
+            for node in nodes
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id in {"original_diff", "fresh_diff"}
+        ]
+        self.assertEqual(2, len(matches))
+        assignments = {node.targets[0].id: node.value for node in matches}
+        self.assertEqual({"original_diff", "fresh_diff"}, set(assignments))
+        for name, path, label in (
+            ("original_diff", "patch", "review diff"),
+            ("fresh_diff", "regenerated / 'change.patch'", "regenerated diff"),
+        ):
+            call = assignments[name]
+            self.assertIsInstance(call, ast.Call)
+            self.assertEqual("protected_asset_bytes", ast.unparse(call.func))
+            self.assertEqual(2, len(call.args))
+            self.assertEqual(path, ast.unparse(call.args[0]))
+            self.assertEqual(label, ast.literal_eval(call.args[1]))
+            self.assertEqual(
+                [("maximum", "maximum")],
+                [(item.arg, ast.unparse(item.value)) for item in call.keywords],
+            )
+
+    def _verifier(self, tree: ast.Module) -> ast.FunctionDef:
+        verifiers = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "verify"
+        ]
+        self.assertEqual(1, len(verifiers))
+        return verifiers[0]
+
+    def _diff_read_fixture(self) -> tuple[ast.Module, ast.FunctionDef, ast.Assign]:
+        tree = ast.parse(MATERIALIZER.read_text(encoding="utf-8"))
+        verifier = self._verifier(tree)
+        originals = [
+            node
+            for node in ast.walk(verifier)
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "original_diff"
+        ]
+        self.assertEqual(1, len(originals))
+        return tree, verifier, originals[0]
+
+    def test_diff_read_guard_rejects_unrelated_decoy_assignments(self) -> None:
+        tree, _, original = self._diff_read_fixture()
+        original.value = ast.parse("unprotected_bytes", mode="eval").body
+        decoy = "\ndef unrelated_decoy():\n"
+        decoy += "".join("    " * depth + "if True:\n" for depth in range(1, 10))
+        for assignment in (
+            'original_diff = protected_asset_bytes(patch, "review diff", maximum=maximum)',
+            'fresh_diff = protected_asset_bytes(regenerated / "change.patch", "regenerated diff", maximum=maximum)',
+        ):
+            decoy += "    " * 10 + assignment + "\n"
+        tree.body.extend(ast.parse(decoy).body)
+        with self.assertRaises(AssertionError):
+            self._assert_protected_diff_reads(
+                ast.unparse(ast.fix_missing_locations(tree))
+            )
+
+    def test_diff_read_guard_rejects_duplicate_verifier_assignments(self) -> None:
+        tree, verifier, original = self._diff_read_fixture()
+        verifier.body.append(ast.parse(ast.unparse(original)).body[0])
+        with self.assertRaises(AssertionError):
+            self._assert_protected_diff_reads(
+                ast.unparse(ast.fix_missing_locations(tree))
+            )
+
+    def test_diff_read_fixtures_accept_reformatted_materializer(self) -> None:
+        reformatted = ast.unparse(ast.parse(MATERIALIZER.read_text(encoding="utf-8")))
+        self._assert_protected_diff_reads(reformatted)
+        with mock.patch.object(Path, "read_text", return_value=reformatted):
+            self.test_diff_read_guard_rejects_unrelated_decoy_assignments()
+            self.test_diff_read_guard_rejects_duplicate_verifier_assignments()
+            self.test_diff_read_guard_rejects_direct_read_with_valid_assignments()
+
+    def test_diff_read_guard_rejects_direct_read_with_valid_assignments(self) -> None:
+        tree, verifier, _ = self._diff_read_fixture()
+        verifier.body.append(ast.parse("patch.read_bytes()").body[0])
+        with self.assertRaises(AssertionError):
+            self._assert_protected_diff_reads(
+                ast.unparse(ast.fix_missing_locations(tree))
+            )
 
     def test_unfinished_reservation_is_always_failed_closed(self) -> None:
         workflow = REVIEW_WORKFLOW.read_text(encoding="utf-8")
