@@ -1,3 +1,0 @@
----
-minor_changes:
-  - host_firewall - support default-off exact UDP53 clients bound independently to each observed private bridge gateway.
