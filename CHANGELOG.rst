@@ -4,6 +4,16 @@ Lightning IT Collection Release Notes Release Notes
 
 .. contents:: Topics
 
+v1.17.0
+=======
+
+Minor Changes
+-------------
+
+- host_firewall - support default-off exact UDP53 clients bound independently to each observed private bridge gateway.
+- openssh_server - add explicit plan/apply/confirm/rollback finalization with source/target guards, candidate rendering, protected snapshots and a controller-independent 300-second systemd rollback timer.
+- podman - add an opt-in pinned authoritative-only Aardvark startup policy without restarting the shared resolver.
+
 v1.16.0
 =======
 
